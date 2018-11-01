@@ -90,7 +90,6 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # 'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.contrib.auth.context_processors.auth',
@@ -99,7 +98,6 @@ TEMPLATES = [
                 'django.template.context_processors.media',
                 'django.template.context_processors.static',
                 'django.template.context_processors.tz',
-                # 'django.template.context_processors.request',
                 'django.contrib.messages.context_processors.messages',
 
                 'mainsite.context_processors.extra_settings'
@@ -107,7 +105,6 @@ TEMPLATES = [
             'loaders': (
                 'django.template.loaders.app_directories.Loader',
                 'django.template.loaders.filesystem.Loader',
-                'django.template.loaders.app_directories.Loader',
             ),
         },
         
