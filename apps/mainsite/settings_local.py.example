@@ -5,7 +5,6 @@ from settings import *
 from mainsite import TOP_DIR
 
 DEBUG = True
-TEMPLATE_DEBUG = DEBUG
 DEBUG_ERRORS = DEBUG
 DEBUG_STATIC = DEBUG
 DEBUG_MEDIA = DEBUG
