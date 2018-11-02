@@ -262,8 +262,7 @@ class Issuer(ResizeUploadedImage,
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_badgeclasses(self):
-        return self.badgeclasses.all()
-
+        return self.badgeclasses.all().order_by("created_at")
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_pathways(self):
