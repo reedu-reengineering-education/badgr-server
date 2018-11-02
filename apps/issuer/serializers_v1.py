@@ -154,6 +154,8 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
     alignment = AlignmentItemSerializerV1(many=True, source='alignment_items', required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
 
+    expires_in_days = serializers.IntegerField(required=False)
+
     class Meta:
         apispec_definition = ('BadgeClass', {})
 

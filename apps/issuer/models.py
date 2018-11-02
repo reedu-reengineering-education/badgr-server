@@ -397,6 +397,8 @@ class BadgeClass(ResizeUploadedImage,
     criteria_url = models.CharField(max_length=254, blank=True, null=True, default=None)
     criteria_text = models.TextField(blank=True, null=True)
 
+    expires_in_days = models.IntegerField(blank=True, null=True, default=None)
+
     old_json = JSONField()
 
     objects = BadgeClassManager()

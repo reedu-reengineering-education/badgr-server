@@ -174,6 +174,8 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     alignments = AlignmentItemSerializerV2(source='alignment_items', many=True, required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
 
+    expiresInDays = serializers.IntegerField(required=False)
+
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
 
     class Meta(DetailSerializerV2.Meta):
@@ -251,6 +253,11 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
                         '$ref': '#/definitions/BadgeClassAlignment'
                     },
                     'description': "List of objects describing objectives or educational standards"
+                }),
+                ('expiresInDays', {
+                    'type': "integer",
+                    'format': "integer",
+                    'description': "Number of days after issue Assertions should automatically expire"
                 }),
             ])
         })
