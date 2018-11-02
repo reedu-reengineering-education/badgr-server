@@ -15,7 +15,7 @@ from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
 from mainsite.serializers import (CachedUrlHyperlinkedRelatedField, StripTagsCharField, MarkdownCharField,
                                   HumanReadableBooleanField, OriginalJsonSerializerMixin)
-from mainsite.validators import ChoicesValidator, TelephoneValidator, BadgeExtensionValidator
+from mainsite.validators import ChoicesValidator, TelephoneValidator, BadgeExtensionValidator, PositiveIntegerValidator
 
 
 class IssuerAccessTokenSerializerV2(BaseSerializerV2):
@@ -174,7 +174,7 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     alignments = AlignmentItemSerializerV2(source='alignment_items', many=True, required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
 
-    expiresInDays = serializers.IntegerField(required=False)
+    expiresInDays = serializers.IntegerField(source='expires_in_days', required=False, allow_null=True, validators=[PositiveIntegerValidator()])
 
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
 

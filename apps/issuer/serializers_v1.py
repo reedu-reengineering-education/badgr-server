@@ -14,7 +14,7 @@ from mainsite.models import BadgrApp
 from mainsite.serializers import HumanReadableBooleanField, StripTagsCharField, MarkdownCharField, \
     OriginalJsonSerializerMixin
 from mainsite.utils import OriginSetting
-from mainsite.validators import ChoicesValidator, BadgeExtensionValidator
+from mainsite.validators import ChoicesValidator, BadgeExtensionValidator, PositiveIntegerValidator
 from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance
 
 
@@ -154,7 +154,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
     alignment = AlignmentItemSerializerV1(many=True, source='alignment_items', required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
 
-    expires_in_days = serializers.IntegerField(required=False)
+    expires_in_days = serializers.IntegerField(required=False, allow_null=True, validators=[PositiveIntegerValidator()])
 
     class Meta:
         apispec_definition = ('BadgeClass', {})
@@ -204,6 +204,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
 
         instance.alignment_items = validated_data.get('alignment_items')
         instance.tag_items = validated_data.get('tag_items')
+        instance.expires_in_days = validated_data.get('expires_in_days')
 
         instance.save()
 

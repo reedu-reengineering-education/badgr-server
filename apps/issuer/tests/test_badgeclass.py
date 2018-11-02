@@ -68,8 +68,95 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
                 self.assertEqual(response.status_code, 200)
                 return json.loads(response.content)
 
+    def get_test_image_base64(self, image_path=None):
+        if not image_path:
+            image_path = self.get_test_image_path()
+        with open(image_path, 'r') as badge_image:
+            image_str = self._base64_data_uri_encode(badge_image, "image/png")
+            return image_str
+
     def test_can_create_badgeclass(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_image_path())
+
+    def test_badgeclass_with_expires_in_days_v1(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+
+        base_badgeclass_data = {
+            'name': 'Expiring Badge',
+            'description': "A testing badge that expires",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+        }
+
+        # can create a badgeclass with valid expires_in_days
+        v1_data = base_badgeclass_data.copy()
+        v1_data.update(dict(
+            expires_in_days=10
+        ))
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges'.format(issuer=test_issuer.entity_id), data=v1_data, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data.get('expires_in_days'), v1_data.get('expires_in_days'))
+
+        badgeclass_entity_id = response.data.get('slug')
+
+        def _update_badgeclass(data):
+            return self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_issuer.entity_id,
+                badge=badgeclass_entity_id
+            ), data=data, format="json")
+
+        # can update a badgeclass with valid expires_in_days
+        v1_data['expires_in_days'] = 25
+        response = _update_badgeclass(v1_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data.get('expires_in_days'), v1_data.get('expires_in_days'))
+
+        # can't use invalid expires_in_days
+        for bad_value in (0, -1, "foobar", 0.5):
+            v1_data['expires_in_days'] = bad_value
+            response = _update_badgeclass(v1_data)
+            self.assertEqual(response.status_code, 400)
+
+    def test_badgeclass_with_expires_in_days_v2(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+
+        base_badgeclass_data = {
+            'name': 'Expiring Badge',
+            'description': "A testing badge that expires",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+            'issuer': test_issuer.entity_id,
+        }
+
+        # can create a badgeclass with valid expires_in_days
+        v2_data = base_badgeclass_data.copy()
+        v2_data.update(dict(
+            expiresInDays=10
+        ))
+        response = self.client.post('/v2/badgeclasses', data=v2_data, format="json")
+        self.assertEqual(response.status_code, 201)
+        new_badgeclass = response.data.get('result', [None])[0]
+        self.assertEqual(new_badgeclass.get('expiresInDays'), v2_data.get('expiresInDays'))
+
+        # can update a badgeclass expires_in_days
+        def _update_badgeclass(data):
+            return self.client.put('/v2/badgeclasses/{badge}'.format(
+                badge=new_badgeclass.get('entityId')
+            ), data=data, format="json")
+
+        v2_data['expiresInDays'] = 25
+        response = _update_badgeclass(v2_data)
+        self.assertEqual(response.status_code, 200)
+        updated_badgeclass = response.data.get('result', [None])[0]
+        self.assertEqual(updated_badgeclass.get('expiresInDays'), v2_data.get('expiresInDays'))
+
+        # can't use invalid expires_in_days
+        for bad_value in (0, -1, "foobar", 0.5):
+            v2_data['expiresInDays'] = bad_value
+            response = _update_badgeclass(v2_data)
+            self.assertEqual(response.status_code, 400)
 
     def test_can_create_badgeclass_with_svg(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path())

@@ -73,3 +73,17 @@ class BadgeExtensionValidator(object):
 class PasswordValidator(object):
     def __call__(self, value):
         validate_password(value)
+
+
+class PositiveIntegerValidator(object):
+    message = "Must be a positive integer"
+    minimum_value = 1
+
+    def __call__(self, value):
+        try:
+            v = int(value)
+            if v < self.minimum_value:
+                raise ValidationError(self.message)
+        except ValueError:
+            raise ValidationError(self.message)
+
