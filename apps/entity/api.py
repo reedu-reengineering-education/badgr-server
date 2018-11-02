@@ -174,6 +174,7 @@ class UncachedPaginatedViewMixin(object):
     max_per_page = 500
     default_per_page = None  # dont paginate by default
     per_page_query_parameter_name = 'num'
+    ordering = "-created_at"
 
     def get_queryset(self, request, **kwargs):
         raise NotImplementedError
@@ -190,7 +191,7 @@ class UncachedPaginatedViewMixin(object):
 
         # only paginate on request
         if per_page:
-            self.paginator = EncryptedCursorPagination()
+            self.paginator = EncryptedCursorPagination(ordering=self.ordering)
             self.paginator.page_size = per_page
             page = self.paginator.paginate_queryset(queryset, request=request)
         else:

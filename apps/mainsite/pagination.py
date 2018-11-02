@@ -142,6 +142,10 @@ class EncryptedCursorPagination(BasePagination):
         crypto = None
         encrypt = False
 
+    def __init__(self, ordering=None):
+        if ordering:
+            self.ordering = ordering
+
     def _get_cursor_limits(self, cursor):
         """
         Parse decrypted cursor and return (lower_limit, upper_limit).
@@ -161,7 +165,7 @@ class EncryptedCursorPagination(BasePagination):
         """
         Get ordering key for given element.
         """
-        return str(getattr(elem, self.ordering))
+        return str(getattr(elem, self.ordering_field))
 
     def _get_page_cursors(self, page):
         """
@@ -211,6 +215,12 @@ class EncryptedCursorPagination(BasePagination):
 
         return page, extra_elem
 
+    @property
+    def ordering_field(self):
+        if self.ordering.startswith('-'):
+            return self.ordering[1:]
+        return self.ordering
+
     def paginate_queryset(self, queryset, request, view=None):
         """
         Given a queryset and request, return a page as a list.
@@ -227,10 +237,10 @@ class EncryptedCursorPagination(BasePagination):
         if lower_limit is not None:
             with transaction.atomic():
                 # Select up page_size + 1 elements in forward order to populate page and hasNext
-                padded_page = queryset.filter(**{self.ordering + '__gt': lower_limit}) \
+                padded_page = queryset.filter(**{self.ordering_field + '__gt': lower_limit}) \
                                       .order_by(self.ordering)[:self.page_size + 1]
                 # Select element for hasPrevious
-                prev_elem = queryset.filter(**{self.ordering + '__lte': lower_limit}) \
+                prev_elem = queryset.filter(**{self.ordering_field + '__lte': lower_limit}) \
                                     .order_by('-' + self.ordering) \
                                     .first()
 
@@ -238,10 +248,10 @@ class EncryptedCursorPagination(BasePagination):
         elif upper_limit is not None:
             with transaction.atomic():
                 # Select up page_size + 1 elements in reverse order to populate page and hasPrevious
-                padded_page = queryset.filter(**{self.ordering + '__lt': upper_limit}) \
+                padded_page = queryset.filter(**{self.ordering_field + '__lt': upper_limit}) \
                                       .order_by('-' + self.ordering)[:self.page_size + 1]
                 # Select element for hasNext
-                next_elem = queryset.filter(**{self.ordering + '__gte': upper_limit}) \
+                next_elem = queryset.filter(**{self.ordering_field + '__gte': upper_limit}) \
                                     .order_by(self.ordering) \
                                     .first()
 
