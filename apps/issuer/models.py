@@ -384,6 +384,17 @@ class BadgeClass(ResizeUploadedImage,
                  BaseOpenBadgeObjectModel):
     entity_class_name = 'BadgeClass'
 
+    EXPIRES_DURATION_DAYS = 'days'
+    EXPIRES_DURATION_WEEKS = 'weeks'
+    EXPIRES_DURATION_MONTHS = 'months'
+    EXPIRES_DURATION_YEARS = 'years'
+    EXPIRES_DURATION_CHOICES = (
+        (EXPIRES_DURATION_DAYS, 'Days'),
+        (EXPIRES_DURATION_WEEKS, 'Weeks'),
+        (EXPIRES_DURATION_MONTHS, 'Months'),
+        (EXPIRES_DURATION_YEARS, 'Years'),
+    )
+
     issuer = models.ForeignKey(Issuer, blank=False, null=False, on_delete=models.CASCADE, related_name="badgeclasses")
 
     # slug has been deprecated for now, but preserve existing values
@@ -397,7 +408,8 @@ class BadgeClass(ResizeUploadedImage,
     criteria_url = models.CharField(max_length=254, blank=True, null=True, default=None)
     criteria_text = models.TextField(blank=True, null=True)
 
-    expires_in_days = models.IntegerField(blank=True, null=True, default=None)
+    expires_amount = models.IntegerField(blank=True, null=True, default=None)
+    expires_duration = models.CharField(max_length=254, choices=EXPIRES_DURATION_CHOICES, blank=True, null=True, default=None)
 
     old_json = JSONField()
 

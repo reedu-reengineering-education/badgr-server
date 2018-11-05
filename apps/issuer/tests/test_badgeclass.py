@@ -92,11 +92,14 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         # can create a badgeclass with valid expires_in_days
         v1_data = base_badgeclass_data.copy()
         v1_data.update(dict(
-            expires_in_days=10
+            expires=dict(
+                amount=10,
+                duration="days"
+            ),
         ))
         response = self.client.post('/v1/issuer/issuers/{issuer}/badges'.format(issuer=test_issuer.entity_id), data=v1_data, format="json")
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data.get('expires_in_days'), v1_data.get('expires_in_days'))
+        self.assertDictEqual(response.data.get('expires'), v1_data.get('expires'))
 
         badgeclass_entity_id = response.data.get('slug')
 
@@ -107,14 +110,28 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             ), data=data, format="json")
 
         # can update a badgeclass with valid expires_in_days
-        v1_data['expires_in_days'] = 25
-        response = _update_badgeclass(v1_data)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data.get('expires_in_days'), v1_data.get('expires_in_days'))
+        good_expires_values = [
+            {"amount": 25, "duration": "days"},
+            {"amount": 1000000, "duration": "weeks"},
+            {"amount": 3, "duration": "months"},
+            {"amount": 1, "duration": "years"},
+        ]
+        for good_value in good_expires_values:
+            v1_data['expires'] = good_value
+            response = _update_badgeclass(v1_data)
+            self.assertEqual(response.status_code, 200)
+            self.assertDictEqual(response.data.get('expires'), good_value)
 
         # can't use invalid expires_in_days
-        for bad_value in (0, -1, "foobar", 0.5):
-            v1_data['expires_in_days'] = bad_value
+        bad_expires_values = [
+            {"amount": 0, "duration": "days"},
+            {"amount": -1, "duration": "weeks"},
+            {"duration": "years"},
+            {"amount": 0.5, "duration": "years"},
+            {"amount": 5, "duration": "fortnights"}
+        ]
+        for bad_value in bad_expires_values:
+            v1_data['expires'] = bad_value
             response = _update_badgeclass(v1_data)
             self.assertEqual(response.status_code, 400)
 
@@ -133,12 +150,15 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         # can create a badgeclass with valid expires_in_days
         v2_data = base_badgeclass_data.copy()
         v2_data.update(dict(
-            expiresInDays=10
+            expires=dict(
+                amount=10,
+                duration="days"
+            )
         ))
         response = self.client.post('/v2/badgeclasses', data=v2_data, format="json")
         self.assertEqual(response.status_code, 201)
         new_badgeclass = response.data.get('result', [None])[0]
-        self.assertEqual(new_badgeclass.get('expiresInDays'), v2_data.get('expiresInDays'))
+        self.assertEqual(new_badgeclass.get('expires'), v2_data.get('expires'))
 
         # can update a badgeclass expires_in_days
         def _update_badgeclass(data):
@@ -146,15 +166,29 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
                 badge=new_badgeclass.get('entityId')
             ), data=data, format="json")
 
-        v2_data['expiresInDays'] = 25
-        response = _update_badgeclass(v2_data)
-        self.assertEqual(response.status_code, 200)
-        updated_badgeclass = response.data.get('result', [None])[0]
-        self.assertEqual(updated_badgeclass.get('expiresInDays'), v2_data.get('expiresInDays'))
+        good_expires_values = [
+            {"amount": 25, "duration": "days"},
+            {"amount": 1000000, "duration": "weeks"},
+            {"amount": 3, "duration": "months"},
+            {"amount": 1, "duration": "years"},
+        ]
+        for good_data in good_expires_values:
+            v2_data['expires'] = good_data
+            response = _update_badgeclass(v2_data)
+            self.assertEqual(response.status_code, 200)
+            updated_badgeclass = response.data.get('result', [None])[0]
+            self.assertDictEqual(updated_badgeclass.get('expires'), v2_data.get('expires'))
 
-        # can't use invalid expires_in_days
-        for bad_value in (0, -1, "foobar", 0.5):
-            v2_data['expiresInDays'] = bad_value
+        # can't use invalid expiration
+        bad_expires_values = [
+            {"amount": 0, "duration": "days"},
+            {"amount": -1, "duration": "weeks"},
+            {"duration": "years"},
+            {"amount": 0.5, "duration": "years"},
+            {"amount": 5, "duration": "fortnights"}
+        ]
+        for bad_value in bad_expires_values:
+            v2_data['expires'] = bad_value
             response = _update_badgeclass(v2_data)
             self.assertEqual(response.status_code, 400)
 

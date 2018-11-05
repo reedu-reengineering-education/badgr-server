@@ -137,6 +137,11 @@ class AlignmentItemSerializerV1(serializers.Serializer):
         apispec_definition = ('BadgeClassAlignment', {})
 
 
+class BadgeClassExpirationSerializerV1(serializers.Serializer):
+    amount = serializers.IntegerField(source='expires_amount', allow_null=True, validators=[PositiveIntegerValidator()])
+    duration = serializers.ChoiceField(source='expires_duration', allow_null=True, choices=BadgeClass.EXPIRES_DURATION_CHOICES)
+
+
 class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     created_at = serializers.DateTimeField(read_only=True)
     created_by = BadgeUserIdentifierFieldV1()
@@ -154,7 +159,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
     alignment = AlignmentItemSerializerV1(many=True, source='alignment_items', required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
 
-    expires_in_days = serializers.IntegerField(required=False, allow_null=True, validators=[PositiveIntegerValidator()])
+    expires = BadgeClassExpirationSerializerV1(source='*', required=False, allow_null=True)
 
     class Meta:
         apispec_definition = ('BadgeClass', {})
@@ -204,7 +209,10 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
 
         instance.alignment_items = validated_data.get('alignment_items')
         instance.tag_items = validated_data.get('tag_items')
-        instance.expires_in_days = validated_data.get('expires_in_days')
+
+
+        instance.expires_amount = validated_data.get('expires_amount', None)
+        instance.expires_duration = validated_data.get('expires_duration', None)
 
         instance.save()
 

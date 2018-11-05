@@ -157,6 +157,17 @@ class AlignmentItemSerializerV2(BaseSerializerV2, OriginalJsonSerializerMixin):
         })
 
 
+class BadgeClassExpirationSerializerV2(serializers.Serializer):
+    amount = serializers.IntegerField(source='expires_amount', allow_null=True, validators=[PositiveIntegerValidator()])
+    duration = serializers.ChoiceField(source='expires_duration', allow_null=True, choices=BadgeClass.EXPIRES_DURATION_CHOICES)
+
+    class Meta:
+        apispec_definition = ('BadgeClassExpiration', {
+            'properties': {
+            }
+        })
+
+
 class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     openBadgeId = serializers.URLField(source='jsonld_id', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
@@ -174,7 +185,7 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     alignments = AlignmentItemSerializerV2(source='alignment_items', many=True, required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
 
-    expiresInDays = serializers.IntegerField(source='expires_in_days', required=False, allow_null=True, validators=[PositiveIntegerValidator()])
+    expires = BadgeClassExpirationSerializerV2(source='*', required=False, allow_null=True)
 
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
 
@@ -254,10 +265,9 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
                     },
                     'description': "List of objects describing objectives or educational standards"
                 }),
-                ('expiresInDays', {
-                    'type': "integer",
-                    'format': "integer",
-                    'description': "Number of days after issue Assertions should automatically expire"
+                ('expires', {
+                    '$ref': "#/definitions/BadgeClassExpiration",
+                    'description': "Expiration period for Assertions awarded from this BadgeClass"
                 }),
             ])
         })
