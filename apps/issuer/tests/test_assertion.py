@@ -8,6 +8,7 @@ import datetime
 import dateutil.parser
 import png
 import pytz
+import re
 from django.apps import apps
 from django.core import mail
 from django.core.urlresolvers import reverse
@@ -21,6 +22,55 @@ from mainsite.utils import OriginSetting
 
 
 class AssertionTests(SetupIssuerHelper, BadgrTestCase):
+
+    def test_assertion_pagination(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        total_assertion_count = 25
+        per_page = 10
+
+        for i in range(0, total_assertion_count):
+            test_badgeclass.issue(recipient_id='test3@unittest.concentricsky.com')
+
+        def _parse_link_header(link_header):
+            link_re = re.compile(r'<(?P<url>[^>]+)>; rel="(?P<name>[^"]+)"')
+            ret = {}
+            for match in link_re.findall(link_header):
+                url, name = match
+                ret[name] = url
+            return ret
+
+        page_number = 0
+        number_seen = 0
+        more_pages_present = True
+        response = self.client.get('/v1/issuer/issuers/{issuer}/badges/{badgeclass}/assertions?num={per_page}'.format(
+            issuer=test_issuer.entity_id,
+            badgeclass=test_badgeclass.entity_id,
+            per_page=per_page
+        ))
+        while more_pages_present:
+            self.assertEquals(response.status_code, 200)
+
+            page = response.data
+            expected_page_count = min(total_assertion_count-number_seen, per_page)
+            self.assertEqual(len(page), expected_page_count)
+            number_seen += len(page)
+
+            link_header = response.get('Link', None)
+            self.assertIsNotNone(link_header)
+            links = _parse_link_header(link_header)
+            if page_number != 0:
+                self.assertTrue('prev' in links.keys())
+
+            if number_seen < total_assertion_count:
+                self.assertTrue('next' in links.keys())
+                next_url = links.get('next')
+                response = self.client.get(next_url)
+                page_number += 1
+            else:
+                more_pages_present = False
 
     @skip("test does not pass when using FileStorage, but does when using S3BotoStorage, and behavior works as expected in server")
     def test_can_rebake_assertion(self):
