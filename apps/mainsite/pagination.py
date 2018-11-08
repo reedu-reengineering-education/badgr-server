@@ -241,7 +241,7 @@ class EncryptedCursorPagination(BasePagination):
                                       .order_by(self.ordering)[:self.page_size + 1]
                 # Select element for hasPrevious
                 prev_elem = queryset.filter(**{self.ordering_field + '__lte': lower_limit}) \
-                                    .order_by('-' + self.ordering) \
+                                    .order_by(self.ordering) \
                                     .first()
 
             page, next_elem = self._partition_padded_page(padded_page)
@@ -249,7 +249,7 @@ class EncryptedCursorPagination(BasePagination):
             with transaction.atomic():
                 # Select up page_size + 1 elements in reverse order to populate page and hasPrevious
                 padded_page = queryset.filter(**{self.ordering_field + '__lt': upper_limit}) \
-                                      .order_by('-' + self.ordering)[:self.page_size + 1]
+                                      .order_by(self.ordering)[:self.page_size + 1]
                 # Select element for hasNext
                 next_elem = queryset.filter(**{self.ordering_field + '__gte': upper_limit}) \
                                     .order_by(self.ordering) \

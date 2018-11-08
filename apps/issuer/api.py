@@ -360,7 +360,7 @@ class BadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, BaseEn
             recipient_id = request.query_params.get('recipient').lower()
             queryset = queryset.filter(recipient_identifier=recipient_id)
 
-        return queryset.order_by("-created_at")
+        return queryset
 
     def get_context_data(self, **kwargs):
         context = super(BadgeInstanceList, self).get_context_data(**kwargs)
@@ -428,7 +428,7 @@ class IssuerBadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, 
             recipient_id = request.query_params.get('recipient').lower()
             queryset = queryset.filter(recipient_identifier=recipient_id)
 
-        return queryset.order_by("-created_at")
+        return queryset
 
     @apispec_list_operation('Assertion',
         summary='Get a list of Assertions for a single Issuer',
