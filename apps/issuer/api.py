@@ -27,7 +27,6 @@ from issuer.serializers_v2 import IssuerSerializerV2, BadgeClassSerializerV2, Ba
     IssuerAccessTokenSerializerV2
 from apispec_drf.decorators import apispec_get_operation, apispec_put_operation, \
     apispec_delete_operation, apispec_list_operation, apispec_post_operation
-from mainsite.pagination import EncryptedCursorPagination
 from mainsite.permissions import AuthenticatedWithVerifiedEmail
 from mainsite.serializers import CursorPaginatedListSerializer
 
