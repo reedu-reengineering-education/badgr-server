@@ -38,7 +38,7 @@ AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 
 class BaseAuditedModel(cachemodel.CacheModel):
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+")
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+")
@@ -262,8 +262,7 @@ class Issuer(ResizeUploadedImage,
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_badgeclasses(self):
-        return self.badgeclasses.all()
-
+        return self.badgeclasses.all().order_by("created_at")
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_pathways(self):
