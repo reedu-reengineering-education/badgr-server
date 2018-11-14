@@ -164,6 +164,13 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
     class Meta:
         apispec_definition = ('BadgeClass', {})
 
+    def to_internal_value(self, data):
+        # if expires was included as null, remove it so to_internal_value() doesnt choke on a None
+        expires = data.get('expires', None)
+        if not expires or len(expires) == 0:
+            del data['expires']
+        return super(BadgeClassSerializerV1, self).to_internal_value(data)
+
     def to_representation(self, instance):
         representation = super(BadgeClassSerializerV1, self).to_representation(instance)
         representation['issuer'] = OriginSetting.HTTP+reverse('issuer_json', kwargs={'entity_id': instance.cached_issuer.entity_id})
