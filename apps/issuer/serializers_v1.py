@@ -165,10 +165,10 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
         apispec_definition = ('BadgeClass', {})
 
     def to_internal_value(self, data):
-        # if expires was included as null, remove it so to_internal_value() doesnt choke on a None
-        expires = data.get('expires', None)
-        if not expires or len(expires) == 0:
-            del data['expires']
+        if 'expires' in data:
+            if not data['expires'] or len(data['expires']) == 0:
+                # if expires was included blank, remove it so to_internal_value() doesnt choke
+                del data['expires']
         return super(BadgeClassSerializerV1, self).to_internal_value(data)
 
     def to_representation(self, instance):
