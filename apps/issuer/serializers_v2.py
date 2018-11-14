@@ -15,7 +15,7 @@ from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
 from mainsite.serializers import (CachedUrlHyperlinkedRelatedField, StripTagsCharField, MarkdownCharField,
                                   HumanReadableBooleanField, OriginalJsonSerializerMixin)
-from mainsite.validators import ChoicesValidator, TelephoneValidator, BadgeExtensionValidator
+from mainsite.validators import ChoicesValidator, TelephoneValidator, BadgeExtensionValidator, PositiveIntegerValidator
 
 
 class IssuerAccessTokenSerializerV2(BaseSerializerV2):
@@ -157,6 +157,17 @@ class AlignmentItemSerializerV2(BaseSerializerV2, OriginalJsonSerializerMixin):
         })
 
 
+class BadgeClassExpirationSerializerV2(serializers.Serializer):
+    amount = serializers.IntegerField(source='expires_amount', allow_null=True, validators=[PositiveIntegerValidator()])
+    duration = serializers.ChoiceField(source='expires_duration', allow_null=True, choices=BadgeClass.EXPIRES_DURATION_CHOICES)
+
+    class Meta:
+        apispec_definition = ('BadgeClassExpiration', {
+            'properties': {
+            }
+        })
+
+
 class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     openBadgeId = serializers.URLField(source='jsonld_id', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
@@ -173,6 +184,8 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
 
     alignments = AlignmentItemSerializerV2(source='alignment_items', many=True, required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
+
+    expires = BadgeClassExpirationSerializerV2(source='*', required=False, allow_null=True)
 
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
 
@@ -252,8 +265,19 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
                     },
                     'description': "List of objects describing objectives or educational standards"
                 }),
+                ('expires', {
+                    '$ref': "#/definitions/BadgeClassExpiration",
+                    'description': "Expiration period for Assertions awarded from this BadgeClass"
+                }),
             ])
         })
+
+    def to_internal_value(self, data):
+        if 'expires' in data:
+            if not data['expires'] or len(data['expires']) == 0:
+                # if expires was included blank, remove it so to_internal_value() doesnt choke
+                del data['expires']
+        return super(BadgeClassSerializerV2, self).to_internal_value(data)
 
     def update(self, instance, validated_data):
         if 'cached_issuer' in validated_data:
