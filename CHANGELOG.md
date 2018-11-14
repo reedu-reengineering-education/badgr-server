@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+
+## [2.14.6] - 2018-11-14
+ - /o/token now restricts scopes to ones defined by the ApplicationInfo
+ - Switched bakery SVG XML parsing library for security purposes
+ - Protect against large and malicious images uploaded by users in resize feature
+ - deprecate /api-auth/token (rest_framework.Token)in favor of /o/token (oauth_toolkit.AccessToken)
+ - Limit brute force login attempts (on /o/token for grant_type=password)
+ - Implement password security requirements (at least 8 characters, non-common)
+ - require existing password to change password
+ - do not display plaintext tokens in /staff
+ - update api documentation for how to authenticate using /o/token
+ - Emit BadgrLog events for failed login attempts
+ - no longer attempt to de-dupe AccessTokens (you should run ./manage.py cleartokens periodically)
+ - updated default expiration time of AccessTokens to 1 Day
+ - AccessTokens will update their expiration on use
+
+
 ## [2.13.0] - 2018-10-04
  - both /v1/ and /v2/ Assertion PUT endpoints rebake assertion image
  - Automatically notifiy recipient the first time they are awarded an assertion
