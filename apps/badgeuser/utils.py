@@ -10,7 +10,11 @@ def notify_on_password_change(user, request=None):
     """
     Sends an email notification to a user's primary email address to notify them a password change was successful.
     """
-    badgr_app = BadgrApp.objects.get_current(request=request)
+    if not user.badgrapp_id:
+        badgr_app = BadgrApp.objects.get_current(request=request)
+    else:
+        badgr_app = user.badgrapp
+        
     base_context = {
         'user': user,
         'site': get_current_site(request),
