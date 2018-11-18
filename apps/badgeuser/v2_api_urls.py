@@ -3,14 +3,15 @@ from __future__ import unicode_literals
 
 from django.conf.urls import url
 
-from badgeuser.api import BadgeUserToken, BadgeUserForgotPassword, BadgeUserEmailConfirm, BadgeUserDetail, \
-    AccessTokenList, AccessTokenDetail
+from badgeuser.api import (BadgeUserAccountConfirm, BadgeUserToken, BadgeUserForgotPassword, BadgeUserEmailConfirm,
+                           BadgeUserDetail, AccessTokenList, AccessTokenDetail,)
 
 urlpatterns = [
 
     url(r'^auth/token$', BadgeUserToken.as_view(), name='v2_api_auth_token'),
     url(r'^auth/forgot-password$', BadgeUserForgotPassword.as_view(), name='v2_api_auth_forgot_password'),
     url(r'^auth/confirm-email/(?P<confirm_id>[^/]+)$', BadgeUserEmailConfirm.as_view(), name='v2_api_auth_confirm_email'),
+    url(r'^auth/confirm-account/(?P<authcode>[^/]+)$', BadgeUserAccountConfirm.as_view(), name='v2_api_account_confirm'),
 
     url(r'^auth/tokens$', AccessTokenList.as_view(), name='v2_api_access_token_list'),
     url(r'^auth/tokens/(?P<entity_id>[^/]+)$', AccessTokenDetail.as_view(), name='v2_api_access_token_detail'),

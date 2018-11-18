@@ -1,8 +1,14 @@
-from allauth.account.managers import EmailAddressManager
-from django.contrib.auth.models import UserManager
-from django.core.exceptions import ValidationError
+import json
 
-from mainsite.models import BadgrApp
+from allauth.account.managers import EmailAddressManager
+from allauth.account.adapter import get_adapter
+from django.contrib.auth.models import UserManager
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.urls import reverse
+
+from badgeuser.authcode import encrypt_authcode
+from mainsite.models import BadgrApp, OriginSetting
 
 
 class BadgeUserManager(UserManager):
@@ -21,6 +27,7 @@ class BadgeUserManager(UserManager):
         from badgeuser.models import CachedEmailAddress, TermsVersion
 
         user = None
+        badgrapp = BadgrApp.objects.get_current(request=request)
 
         # Do we know about this email address yet?
         try:
@@ -29,20 +36,32 @@ class BadgeUserManager(UserManager):
             # nope
             pass
         else:
-            if not existing_email.user.password:
-                # yes, its owned by an auto-created user trying to set a password
+            if plaintext_password and not existing_email.user.password and not existing_email.verified:
+                # yes, it's owned by an auto-created user trying to set a password
                 user = existing_email.user
+            elif plaintext_password and not existing_email.user.password:
+                # yes, it's owned by an auto-created user trying to set a password,
+                # but email was marked verified to allow this user API access from other applications
+                # We shouldn't set any of the user attributes at this time until confirmation
+                user = existing_email.user
+                self.send_account_confirmation(
+                  email=email,
+                  first_name=first_name,
+                  last_name=last_name,
+                  badgrapp_id=badgrapp.id,
+                  marketing_opt_in=marketing_opt_in,
+                  plaintext_password=plaintext_password
+                )
+                return self.model(email=email)
             elif existing_email.verified:
                 raise ValidationError(self.duplicate_email_error)
             else:
-                # yes, its an unverified email address owned by a claimed user
+                # yes, it's an unverified email address owned by a claimed user
                 # remove the email
                 existing_email.delete()
                 # if the user no longer has any emails, remove it
                 if len(existing_email.user.cached_emails()) == 0:
                     existing_email.user.delete()
-
-        badgrapp = BadgrApp.objects.get_current(request=request)
 
         if user is None:
             user = self.model(email=email)
@@ -60,6 +79,28 @@ class BadgeUserManager(UserManager):
         if create_email_address:
             CachedEmailAddress.objects.add_email(user, email, request=request, signup=True, confirm=send_confirmation)
         return user
+
+    @staticmethod
+    def send_account_confirmation(**kwargs):
+        if not kwargs.get('email'):
+            return
+
+        email = kwargs['email']
+        expires_seconds = getattr(settings, 'AUTH_TIMEOUT_SECONDS', 7 * 86400)
+        payload = json.dumps(kwargs)
+        authcode = encrypt_authcode(payload, expires_seconds=expires_seconds)
+        confirmation_url = "{origin}{path}".format(
+            origin=OriginSetting.HTTP,
+            path=reverse('v2_api_account_confirm', kwargs=dict(authcode=authcode)),
+        )
+
+        get_adapter().send_mail('account/email/email_confirmation_signup', email, {
+            'HTTP_ORIGIN': settings.HTTP_ORIGIN,
+            'STATIC_URL': settings.STATIC_URL,
+            'MEDIA_URL': settings.MEDIA_URL,
+            'activate_url': confirmation_url,
+            'email': email,
+        })
 
 
 class CachedEmailAddressManager(EmailAddressManager):
