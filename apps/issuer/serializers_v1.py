@@ -338,6 +338,19 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
 
         representation['public_url'] = OriginSetting.HTTP+reverse('badgeinstance_json', kwargs={'entity_id': instance.entity_id})
 
+        if apps.is_installed('badgebook'):
+            try:
+                from badgebook.models import BadgeObjectiveAward
+                from badgebook.serializers import BadgeObjectiveAwardSerializer
+                try:
+                    award = BadgeObjectiveAward.cached.get(badge_instance_id=instance.id)
+                except BadgeObjectiveAward.DoesNotExist:
+                    representation['award'] = None
+                else:
+                    representation['award'] = BadgeObjectiveAwardSerializer(award).data
+            except ImportError:
+                pass
+
         return representation
 
     def create(self, validated_data):
