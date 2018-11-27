@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
+from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.urlresolvers import reverse
 from django.http import Http404
@@ -37,7 +38,7 @@ from entity.api import BaseEntityDetailView, BaseEntityListView, BaseEntityView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
 from mainsite.models import BadgrApp
-from mainsite.utils import OriginSetting
+from mainsite.utils import OriginSetting, backoff_cache_key
 
 RATE_LIMIT_DELTA = datetime.timedelta(minutes=5)
 
@@ -336,6 +337,8 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
             validate_password(password)
         except DjangoValidationError as e:
             return Response(dict(password=e.messages), status=HTTP_400_BAD_REQUEST)
+
+        cache.set(backoff_cache_key(user.email, None), None)
 
         user.set_password(password)
         user.save()

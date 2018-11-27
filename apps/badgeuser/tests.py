@@ -4,10 +4,12 @@ import re
 import os
 from django.contrib.auth import SESSION_KEY
 from django.core import mail
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.test import override_settings
+from django.utils import timezone
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 
@@ -20,6 +22,7 @@ from badgeuser.models import EmailAddressVariant, CachedEmailAddress
 from issuer.models import BadgeClass, Issuer
 from mainsite.models import BadgrApp, ApplicationInfo
 from mainsite.tests.base import BadgrTestCase
+from mainsite.utils import backoff_cache_key
 
 
 class AuthTokenTests(BadgrTestCase):
@@ -448,6 +451,7 @@ class UserEmailTests(BadgrTestCase):
 
     def test_user_can_request_forgot_password(self):
         self.client.logout()
+        cache.clear()
 
         # dont send recovery to unknown emails
         response = self.client.post('/v1/user/forgot-password', {
@@ -461,6 +465,12 @@ class UserEmailTests(BadgrTestCase):
             response = self.client.post('/v1/user/forgot-password', {
                 'email': self.first_user_email
             })
+
+            backoff_key = backoff_cache_key(self.first_user_email, None)
+            backoff_data = {'count': 6, 'until': timezone.now() + timezone.timedelta(seconds=60)}
+            cache.set(backoff_key, backoff_data)
+            self.assertEqual(cache.get(backoff_key), backoff_data)
+
             self.assertEqual(response.status_code, 200)
             # received email with recovery url
             self.assertEqual(len(mail.outbox), 1)
@@ -475,6 +485,9 @@ class UserEmailTests(BadgrTestCase):
                 'password': new_password
             })
             self.assertEqual(response.status_code, 200)
+
+            backoff_data = cache.get(backoff_key)
+            self.assertIsNone(backoff_data)
 
             response = self.client.post('/api-auth/token', {
                 'username': self.first_user.username,

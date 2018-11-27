@@ -1,6 +1,8 @@
 import urllib
 
+from django.core.cache import cache
 from django.urls import reverse
+from django.utils import timezone
 from oauth2_provider.models import AccessToken, Application
 
 from badgeuser.authcode import encrypt_authcode, decrypt_authcode, authcode_for_accesstoken
@@ -8,6 +10,7 @@ from badgeuser.models import BadgrAccessToken
 from issuer.models import Issuer
 from mainsite.models import ApplicationInfo
 from mainsite.tests import BadgrTestCase
+from mainsite.utils import backoff_cache_key
 
 
 class OAuth2TokenTests(BadgrTestCase):
@@ -112,3 +115,51 @@ class OAuth2TokenTests(BadgrTestCase):
         response = self.client.post(reverse('oauth2_code_exchange'), dict(code=expired_authcode))
         self.assertEqual(response.status_code, 400)
 
+    def test_can_reset_failed_login_backoff(self):
+        cache.clear()
+        password = 'secret'
+        user = self.setup_user(authenticate=False, password=password, email='testemail233@example.test')
+        backoff_key = backoff_cache_key(user.email, None)
+        application = Application.objects.create(
+            client_id='public',
+            client_secret='',
+            user=None,
+            authorization_grant_type=Application.GRANT_PASSWORD,
+            name='public'
+        )
+        ApplicationInfo.objects.create(
+            application=application,
+            allowed_scopes='rw:issuer rw:backpack rw:profile'
+        )
+
+        post_data = {
+            'username': user.email,
+            'password': password
+        }
+        response = self.client.post('/o/token', data=post_data)
+        self.assertEqual(response.status_code, 200)
+        backoff_data = cache.get(backoff_key)
+        self.assertIsNone(backoff_data)
+
+        post_data['password'] = 'bad_and_incorrect'
+        response = self.client.post('/o/token', data=post_data)
+        self.assertEqual(response.status_code, 401)
+        backoff_data = cache.get(backoff_key)
+        self.assertEqual(backoff_data['count'], 1)
+        backoff_time = backoff_data['until']
+
+        post_data['password'] = password
+        response = self.client.post('/o/token', data=post_data)
+        self.assertEqual(response.status_code, 401)
+        backoff_data = cache.get(backoff_key)
+        self.assertEqual(backoff_data['count'], 2, "Count increases even if sent too soon even if password is right")
+        self.assertGreaterEqual(backoff_data['until'], backoff_time + timezone.timedelta(seconds=2),
+                                "backoff time should increase by at least two seconds")
+
+        backoff_data['until'] = backoff_time - timezone.timedelta(seconds=3)  # reset to a time in the past
+        cache.set(backoff_key, backoff_data)
+
+        response = self.client.post('/o/token', data=post_data)
+        self.assertEqual(response.status_code, 200)
+        backoff_data = cache.get(backoff_key)
+        self.assertIsNone(backoff_data)

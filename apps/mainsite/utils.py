@@ -59,6 +59,11 @@ def client_ip_from_request(request):
     return ip
 
 
+def backoff_cache_key(username, client_ip):
+    client_descriptor = username if username else client_ip
+    return "failed_token_backoff_{}".format(client_descriptor)
+
+
 class OriginSettingsObject(object):
     DefaultOrigin = "http://localhost:8000"
 
