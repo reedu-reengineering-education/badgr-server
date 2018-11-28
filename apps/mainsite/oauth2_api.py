@@ -154,6 +154,8 @@ class TokenView(OAuth2ProviderTokenView):
 
     def post(self, request, *args, **kwargs):
         _backoff_period = getattr(settings, 'TOKEN_BACKOFF_PERIOD_SECONDS', 2)
+        _max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour
+
         grant_type = request.POST.get('grant_type', 'password')
         username = request.POST.get('username')
         client_ip = client_ip_from_request(request)
@@ -166,13 +168,15 @@ class TokenView(OAuth2ProviderTokenView):
                 backoff_count = backoff.get('count', 1)
                 if backoff_until > timezone.now():
                     backoff_count += 1
-                    backoff_seconds = min(86400, _backoff_period ** backoff_count)  # maximum backoff is 24 hours
+                    backoff_seconds = min(_max_backoff, _backoff_period ** backoff_count)
                     backoff_until = timezone.now() + datetime.timedelta(seconds=backoff_seconds)
                     cache.set(backoff_cache_key(username, client_ip), dict(until=backoff_until, count=backoff_count), timeout=None)
                     # return the same error as a failed login attempt
-                    return HttpResponse(json.dumps(
-                        {"error_description": "Too many login attempts. Please wait and try again.", "error": "invalid_grant"}),
-                        status=HTTP_401_UNAUTHORIZED)
+                    return HttpResponse(json.dumps({
+                        "error_description": "Too many login attempts. Please wait and try again.",
+                        "error": "login attempts throttled",
+                        "expires": backoff_seconds,
+                    }), status=HTTP_401_UNAUTHORIZED)
 
         # pre-validate scopes requested
         client_id = request.POST.get('client_id', None)
