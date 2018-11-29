@@ -46,7 +46,7 @@ class PinterestShareProvider(ShareProvider):
     def share_url(self, badge_instance, **kwargs):
         return "http://www.pinterest.com/pin/create/button/?url={url}&media={image}&description={summary}".format(
             url=urllib.quote(badge_instance.share_url),
-            image=badge_instance.image_url,
+            image=badge_instance.image_url(),
             summary=badge_instance.cached_badgeclass.name
         )
 
