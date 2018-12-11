@@ -592,7 +592,8 @@ class AssertionsChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
     valid_scopes = ["r:assertions"]
 
-    def get_user(self, request):
+    @staticmethod
+    def get_user(request):
         if request.user:
             return request.user
         if request.auth:
@@ -626,9 +627,11 @@ class AssertionsChangedSince(BaseEntityView):
         since = request.GET.get('since', None)
         if since is not None:
             try:
-                since = dateutil.parser.parse(since)
+                since = dateutil.parser.isoparse(since)
             except ValueError as e:
-                err = V2ErrorSerializer(data={}, field_errors={'since': ["must be iso8601 format"]}, validation_errors=[])
+                err = V2ErrorSerializer(
+                    data={}, field_errors={'since': ["must be ISO-8601 format with time zone"]},
+                    validation_errors=[])
                 err._success = False
                 err._description = "bad request"
                 err.is_valid(raise_exception=False)
@@ -642,5 +645,3 @@ class AssertionsChangedSince(BaseEntityView):
             context=context)
         serializer.is_valid()
         return Response(serializer.data)
-
-        # return super(AssertionsChangedSince, self).get(request, **kwargs)
