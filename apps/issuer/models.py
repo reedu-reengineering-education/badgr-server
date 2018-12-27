@@ -642,6 +642,17 @@ class BadgeClass(ResizeUploadedImage,
     def cached_badgrapp(self):
         return self.cached_issuer.cached_badgrapp
 
+    def generate_expires_at(self, issued_on=None):
+        if self.expires_duration is None or self.expires_amount is None:
+            return None
+
+        if issued_on is None:
+            issued_on = timezone.now()
+
+        duration_kwargs = dict()
+        duration_kwargs[self.expires_duration] = self.expires_amount
+        return issued_on + timezone.timedelta(**duration_kwargs)
+
 
 class BadgeInstance(BaseAuditedModel,
                     BaseVersionedEntity,
