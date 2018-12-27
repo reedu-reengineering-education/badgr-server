@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [2.15.3] - 2018-12-11
+ - Updates for GDPR compliance: email on first badge award text
+ - Improves support for badge expiration, including ability to set default validity period for BadgeClass
+ - Update Open Badges validator for better support of 2.0 features
+ - Improve user password brute force attempt mitigation, adds `TOKEN_BACKOFF_MAXIMUM_SECONDS` setting
+ - Improve pagination of certain API responses
+
 
 ## [2.14.6] - 2018-11-14
  - /o/token now restricts scopes to ones defined by the ApplicationInfo
