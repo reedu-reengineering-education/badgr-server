@@ -17,6 +17,7 @@ from django.core.urlresolvers import reverse
 from django.utils import timezone
 from oauth2_provider.models import Application
 
+from badgeuser.models import CachedEmailAddress
 from issuer.models import BadgeInstance, IssuerStaff
 from mainsite.models import ApplicationInfo
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationHelper
@@ -196,6 +197,35 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         image_data = json.loads(unbake(image))
 
         self.assertEqual(image_data.get('evidence', {})[0].get('narrative'), v2_assertion_data['evidence'][0]['narrative'])
+
+    def test_can_update_assertion_issuer(self):
+        test_user = self.setup_user(authenticate=True)
+        email_two = CachedEmailAddress.objects.create(email='testemail2@example.com', verified=True, user=test_user)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        assertion_data = {
+            "email": "test@example.com",
+            "create_notification": False,
+        }
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ), assertion_data)
+        self.assertEqual(response.status_code, 201)
+        original_assertion = response.data
+
+        response = self.client.put(
+            '/v1/issuer/issuers/{issuer}'.format(issuer=test_issuer.entity_id),
+            json.dumps({
+                'email': email_two.email,
+                'url': test_issuer.url,
+                'name': test_issuer.name
+            }), content_type='application/json')
+
+        response = self.client.get('/public/assertions/{}?expand=badge&expand=badge.issuer'.format(original_assertion['slug']))
+        assertion_data = response.data
+        self.assertEqual(assertion_data['badge']['issuer']['email'], email_two.email)
 
     def test_can_issue_assertion_with_expiration(self):
         test_user = self.setup_user(authenticate=True)
