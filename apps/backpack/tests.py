@@ -714,6 +714,102 @@ class TestBadgeUploads(BadgrTestCase):
         response = self.client.post('/v1/earner/badges', post_input, format='json')
         self.assertEqual(response.status_code, 201)
 
+    @responses.activate
+    def test_submit_basic_1_0_badge_via_url_delete_and_readd(self):
+        setup_basic_1_0()
+        setup_resources([
+            {'url': OPENBADGES_CONTEXT_V1_URI, 'filename': 'v1_context.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)}
+        ])
+        self.setup_user(email='test@example.com', token_scope='rw:backpack')
+
+        post_input = {
+            'url': 'http://a.com/instance'
+        }
+        response = self.client.post(
+            '/v1/earner/badges', post_input
+        )
+        self.assertEqual(response.status_code, 201)
+        get_response = self.client.get('/v1/earner/badges')
+        self.assertEqual(get_response.status_code, 200)
+        self.assertEqual(
+            get_response.data[0].get('json', {}).get('id'), 'http://a.com/instance',
+            "The badge in our backpack should report its JSON-LD id as its original OpenBadgeId"
+        )
+
+        new_instance = BadgeInstance.objects.first()
+        expected_url = "{}{}".format(OriginSetting.HTTP,
+                                     reverse('badgeinstance_image', kwargs=dict(entity_id=new_instance.entity_id)))
+        self.assertEqual(get_response.data[0].get('json', {}).get('image', {}).get('id'), expected_url)
+
+        response = self.client.delete('/v1/earner/badges/{}'.format(new_instance.entity_id))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(BadgeInstance.objects.count(), 0)
+
+        response = self.client.post(
+            '/v1/earner/badges', post_input
+        )
+        self.assertEqual(response.status_code, 201)
+
+
+class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
+    @responses.activate
+    def test_can_delete_local(self):
+        test_issuer_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_issuer_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        test_recipient = self.setup_user(email='test_recipient@email.test', authenticate=True)
+        assertion = test_badgeclass.issue(recipient_id='test_recipient@email.test')
+
+        response = self.client.get(
+            '/v1/earner/badges'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1, "There is a badge in the recipient's backpack")
+
+        response = self.client.delete('/v1/earner/badges/{}'.format(assertion.entity_id))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(BadgeInstance.objects.count(), 1)
+        assertion = BadgeInstance.objects.get(pk=assertion.pk)
+        self.assertEqual(assertion.acceptance, BadgeInstance.ACCEPTANCE_REJECTED)
+
+        response = self.client.get(
+            '/v1/earner/badges'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0, "There is no longer a badge in the recipient's backpack")
+
+        setup_resources([
+            {'url': OPENBADGES_CONTEXT_V1_URI, 'filename': 'v1_context.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
+            {'url': assertion.jsonld_id, 'response_body': json.dumps(assertion.get_json())},
+            {
+                'url': assertion.jsonld_id + '/image',
+                'response_body': assertion.image.read(),
+                'content-type': 'image/png'
+            },
+            {'url': test_badgeclass.jsonld_id, 'response_body': json.dumps(test_badgeclass.get_json())},
+            {
+                'url': test_badgeclass.jsonld_id + '/image',
+                'response_body': test_badgeclass.image.read(),
+                'content-type': 'image/png'
+            },
+            {'url': test_issuer.jsonld_id, 'response_body': json.dumps(test_issuer.get_json())}
+        ])
+
+        post_input = {
+            'url': assertion.jsonld_id
+        }
+        response = self.client.post(
+            '/v1/earner/badges', post_input
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['id'], assertion.entity_id)
+        get_response = self.client.get('/v1/earner/badges')
+        self.assertEqual(get_response.status_code, 200)
+        self.assertEqual(len(get_response.data), 1)
+
 
 class TestExpandAssertions(BadgrTestCase, SetupIssuerHelper):
     def test_no_expands(self):
@@ -857,8 +953,6 @@ class TestExpandAssertions(BadgrTestCase, SetupIssuerHelper):
         for i in range(6):
             self.assertTrue(isinstance(response.data['result'][i]['badgeclass'], collections.OrderedDict))
             self.assertTrue(isinstance(response.data['result'][i]['badgeclass']['issuer'], collections.OrderedDict))
-
-
 
 
 class TestCollections(BadgrTestCase):
