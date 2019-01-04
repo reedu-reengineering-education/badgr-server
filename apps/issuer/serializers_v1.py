@@ -322,9 +322,6 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
             return data
 
     def to_representation(self, instance):
-        # if self.context.get('extended_json'):
-        #     self.fields['json'] = V1InstanceSerializer(source='extended_json')
-
         representation = super(BadgeInstanceSerializerV1, self).to_representation(instance)
         representation['json'] = instance.get_json(obi_version="1_1", use_canonical_id=True)
         if self.context.get('include_issuer', False):
@@ -337,19 +334,6 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
             representation['badge_class'] = OriginSetting.HTTP+reverse('badgeclass_json', kwargs={'entity_id': instance.cached_badgeclass.entity_id})
 
         representation['public_url'] = OriginSetting.HTTP+reverse('badgeinstance_json', kwargs={'entity_id': instance.entity_id})
-
-        if apps.is_installed('badgebook'):
-            try:
-                from badgebook.models import BadgeObjectiveAward
-                from badgebook.serializers import BadgeObjectiveAwardSerializer
-                try:
-                    award = BadgeObjectiveAward.cached.get(badge_instance_id=instance.id)
-                except BadgeObjectiveAward.DoesNotExist:
-                    representation['award'] = None
-                else:
-                    representation['award'] = BadgeObjectiveAwardSerializer(award).data
-            except ImportError:
-                pass
 
         return representation
 
