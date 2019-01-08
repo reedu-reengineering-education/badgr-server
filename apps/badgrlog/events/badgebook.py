@@ -34,9 +34,12 @@ class InstructorAssignedIssuerEvent(BaseBadgrLtiEvent):
 
     def to_representation(self):
         data = super(InstructorAssignedIssuerEvent, self).to_representation()
-        data.update({
-            'issuer': self.issuer.get('json').get('id'),
-        })
+        try:
+            data.update({
+                'issuer': self.issuer.get('json', {}).get('id'),
+            })
+        except AttributeError:
+            data.update({'issuer': None})
         return data
 
 
