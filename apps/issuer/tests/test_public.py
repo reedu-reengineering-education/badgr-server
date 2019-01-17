@@ -11,7 +11,7 @@ from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V1_URI, OP
 from openbadges_bakery import unbake
 
 from backpack.models import BackpackCollection, BackpackCollectionBadgeInstance
-from backpack.tests import setup_resources, setup_basic_1_0
+from backpack.tests.utils import setup_resources, setup_basic_1_0
 from issuer.models import Issuer, BadgeInstance
 from issuer.utils import CURRENT_OBI_VERSION, OBI_VERSION_CONTEXT_IRIS, UNVERSIONED_BAKED_VERSION
 from mainsite.models import BadgrApp
