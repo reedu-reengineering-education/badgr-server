@@ -643,7 +643,7 @@ class BadgeClass(ResizeUploadedImage,
         return self.cached_issuer.cached_badgrapp
 
     def generate_expires_at(self, issued_on=None):
-        if self.expires_duration is None or self.expires_amount is None:
+        if not self.expires_duration or not self.expires_amount:
             return None
 
         if issued_on is None:
