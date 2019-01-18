@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import StringIO
 import datetime
+import dateutil
 import re
 import uuid
 from collections import OrderedDict
@@ -651,7 +652,7 @@ class BadgeClass(ResizeUploadedImage,
 
         duration_kwargs = dict()
         duration_kwargs[self.expires_duration] = self.expires_amount
-        return issued_on + timezone.timedelta(**duration_kwargs)
+        return issued_on + dateutil.relativedelta.relativedelta(**duration_kwargs)
 
 
 class BadgeInstance(BaseAuditedModel,

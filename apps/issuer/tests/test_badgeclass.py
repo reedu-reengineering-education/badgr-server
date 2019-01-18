@@ -6,6 +6,7 @@ import json
 
 from django.core.files.images import get_image_dimensions
 from django.core.urlresolvers import reverse
+from django.utils import timezone
 
 from issuer.models import BadgeClass
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper
@@ -191,6 +192,34 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             v2_data['expires'] = bad_value
             response = _update_badgeclass(v2_data)
             self.assertEqual(response.status_code, 400)
+
+    def test_badgeclass_relative_expire_date_generation(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+
+        badgeclass = BadgeClass.objects.create(issuer=test_issuer)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_MONTHS
+        badgeclass.expires_amount = 6
+
+        date = badgeclass.generate_expires_at(issued_on=timezone.datetime(year=2018, month=8, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2019)
+        self.assertEqual(date.month, 2)
+        self.assertEqual(date.day, 28)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_YEARS
+        date = badgeclass.generate_expires_at(
+            issued_on=timezone.datetime(year=2020, month=2, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2026)
+        self.assertEqual(date.month, 2)
+        self.assertEqual(date.day, 28)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_DAYS
+        date = badgeclass.generate_expires_at(
+            issued_on=timezone.datetime(year=2020, month=2, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2020)
+        self.assertEqual(date.month, 3)
+        self.assertEqual(date.day, 6)
 
     def test_can_create_badgeclass_with_svg(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path())
