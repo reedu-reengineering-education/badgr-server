@@ -46,7 +46,8 @@ class IssuerList(BaseEntityListView):
     create_event = badgrlog.IssuerCreatedEvent
 
     def get_objects(self, request, **kwargs):
-        return self.request.user.cached_issuers()
+        origin = request.META.get('HTTP_ORIGIN', None)
+        return self.request.user.cached_issuers().filter(badgrapp__cors=origin)
 
     @apispec_list_operation('Issuer',
         summary="Get a list of Issuers for authenticated user",
