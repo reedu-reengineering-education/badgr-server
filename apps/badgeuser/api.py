@@ -363,24 +363,27 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         """
 
         token = request.query_params.get('token')
+
         badgrapp_id = request.query_params.get('a', None)
         if badgrapp_id is None:
             badgrapp_id = getattr(settings, 'BADGR_APP_ID', 1)
-        try:
-            badgrapp = BadgrApp.objects.get(id=badgrapp_id)
-        except BadgrApp.DoesNotExist:
-            return Response(status=HTTP_404_NOT_FOUND)
-        # badgr_app = get_session_badgr_app(self.request) # Could we reuse this method?
+        else:
+            # badgr_app = get_session_badgr_app(self.request) # Could we reuse this method?
+            try:
+                badgrapp = BadgrApp.objects.get(id=badgrapp_id)
+            except BadgrApp.DoesNotExist:
+                return Response(status=HTTP_404_NOT_FOUND)
 
         emailconfirmation = EmailConfirmationHMAC.from_key(kwargs.get('confirm_id'))
         if emailconfirmation is None:
             return Response(status=HTTP_404_NOT_FOUND)
-
-        try:
-            email_address = CachedEmailAddress.cached.get(pk=emailconfirmation.email_address.pk)
-        except CachedEmailAddress.DoesNotExist:
-            return Response(status=HTTP_404_NOT_FOUND)
-        # verification_email = get_session_verification_email(self.request) # Could we reuse this method?
+        else:
+            try:
+                # verification_email = get_session_verification_email(self.request) # Could we reuse this method?
+                email_address = CachedEmailAddress.cached.get(
+                    pk=emailconfirmation.email_address.pk)
+            except CachedEmailAddress.DoesNotExist:
+                return Response(status=HTTP_404_NOT_FOUND)
 
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
