@@ -379,7 +379,6 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
             return Response(status=HTTP_404_NOT_FOUND)
         else:
             try:
-                # verification_email = get_session_verification_email(self.request) # Could we reuse this method?
                 email_address = CachedEmailAddress.cached.get(
                     pk=emailconfirmation.email_address.pk)
             except CachedEmailAddress.DoesNotExist:
