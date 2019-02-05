@@ -138,7 +138,7 @@ class BadgeCheckHelper(object):
         })
 
     @classmethod
-    def get_or_create_assertion(cls, url=None, imagefile=None, assertion=None, created_by=None):
+    def get_or_create_assertion(cls, url=None, imagefile=None, assertion=None, created_by=None, allow_unvalidated_recipient=False):
 
         # distill 3 optional arguments into one query argument
         query = (url, imagefile, assertion)
@@ -148,8 +148,13 @@ class BadgeCheckHelper(object):
         query = query[0]
 
         if created_by:
+            validated_emails = created_by.all_recipient_identifiers
+
+            if not validated_emails and allow_unvalidated_recipient:
+                validated_emails = [created_by.email]
+
             badgecheck_recipient_profile = {
-                'email': created_by.all_recipient_identifiers
+                'email': validated_emails
             }
         else:
             badgecheck_recipient_profile = None

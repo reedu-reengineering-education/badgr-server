@@ -135,7 +135,10 @@ class BackpackImportSerializerV2(DetailSerializerV2):
 
     def create(self, validated_data):
         try:
-            instance, created = BadgeCheckHelper.get_or_create_assertion(**validated_data)
+            kwargs = validated_data.extend({
+                'allow_unvalidated_recipient': True
+            })
+            instance, created = BadgeCheckHelper.get_or_create_assertion(**kwargs)
             if not created:
                 instance.acceptance = BadgeInstance.ACCEPTANCE_ACCEPTED
                 instance.save()

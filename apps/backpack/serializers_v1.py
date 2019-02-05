@@ -103,6 +103,7 @@ class LocalBadgeInstanceUploadSerializerV1(serializers.Serializer):
                 imagefile=validated_data.get('image', None),
                 assertion=validated_data.get('assertion', None),
                 created_by=owner,
+                allow_unvalidated_recipient=True,
             )
             if not created:
                 if instance.acceptance == BadgeInstance.ACCEPTANCE_ACCEPTED:
