@@ -766,6 +766,20 @@ class BadgeInstance(BaseAuditedModel,
     def owners(self):
         return self.issuer.owners
 
+    @property
+    def is_recipient_email_unverified(self):
+        from badgeuser.models import CachedEmailAddress
+        try:
+            existing_email = CachedEmailAddress.cached.get(
+                email=self.recipient_identifier)
+        except CachedEmailAddress.DoesNotExist:
+            existing_email = None
+
+        if not existing_email or existing_email.verified != True:
+            return True
+        else:
+            return False
+
     def save(self, *args, **kwargs):
         if self.pk is None:
             self.salt = uuid.uuid4().hex

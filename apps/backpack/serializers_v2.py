@@ -35,6 +35,7 @@ class BackpackAssertionSerializerV2(DetailSerializerV2, OriginalJsonSerializerMi
     revoked = HumanReadableBooleanField(read_only=True)
     revocationReason = serializers.CharField(source='revocation_reason', read_only=True)
     expires = serializers.DateTimeField(source='expires_at', required=False)
+    is_recipient_email_unverified = serializers.ReadOnlyField()
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeInstance

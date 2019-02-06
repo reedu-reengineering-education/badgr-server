@@ -148,7 +148,7 @@ class BadgeCheckHelper(object):
         query = query[0]
 
         if created_by:
-            validated_emails = created_by.all_recipient_identifiers
+            validated_emails = created_by.all_verified_recipient_identifiers
 
             if not validated_emails and allow_unvalidated_recipient:
                 validated_emails = [created_by.email]

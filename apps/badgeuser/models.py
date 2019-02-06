@@ -286,10 +286,16 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
 
     @property
     def all_recipient_identifiers(self):
-        return [e.email for e in self.cached_emails() if e.verified] + [e.email for e in self.cached_email_variants()]
+        return [e.email for e in self.cached_emails()] + \
+            [e.email for e in self.cached_email_variants()]
+
+    @property
+    def all_verified_recipient_identifiers(self):
+        return [e.email for e in self.cached_emails() if e.verified] + \
+            [e.email for e in self.cached_email_variants()]
 
     def is_email_verified(self, email):
-        if email in self.all_recipient_identifiers:
+        if email in self.all_verified_recipient_identifiers:
             return True
 
         try:

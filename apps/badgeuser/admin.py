@@ -54,7 +54,7 @@ class BadgeUserAdmin(DjangoObjectActions, ModelAdmin):
     ]
 
     def clear_login_backoff(self, request, obj):
-        for email in obj.all_recipient_identifiers:
+        for email in obj.all_verified_recipient_identifiers:
             cache_key = backoff_cache_key(username=email)
             cache.delete(cache_key)
     clear_login_backoff.label = "Clear login backoffs"
@@ -62,7 +62,7 @@ class BadgeUserAdmin(DjangoObjectActions, ModelAdmin):
 
     def login_backoff(self, obj):
         out = []
-        for email in obj.all_recipient_identifiers:
+        for email in obj.all_verified_recipient_identifiers:
             cache_key = backoff_cache_key(username=email)
             backoff = cache.get(cache_key)
             if backoff is not None:

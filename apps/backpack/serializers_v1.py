@@ -28,6 +28,7 @@ class LocalBadgeInstanceUploadSerializerV1(serializers.Serializer):
     acceptance = serializers.CharField(default='Accepted')
     narrative = MarkdownCharField(required=False, read_only=True)
     evidence_items = EvidenceItemSerializer(many=True, required=False, read_only=True)
+    is_recipient_email_unverified = serializers.ReadOnlyField()
 
     extensions = serializers.DictField(source='extension_items', read_only=True)
 
@@ -135,7 +136,7 @@ class CollectionBadgesSerializerV1(serializers.ListSerializer):
 
     def to_representation(self, data):
         filtered_data = [b for b in data if b.cached_badgeinstance.acceptance is not BadgeInstance.ACCEPTANCE_REJECTED and b.cached_badgeinstance.revoked is False]
-        filtered_data = [c for c in filtered_data if c.cached_badgeinstance.recipient_identifier in c.cached_collection.owner.all_recipient_identifiers]
+        filtered_data = [c for c in filtered_data if c.cached_badgeinstance.recipient_identifier in c.cached_collection.owner.all_verified_recipient_identifiers]
 
         representation = super(CollectionBadgesSerializerV1, self).to_representation(filtered_data)
         return representation
@@ -191,7 +192,7 @@ class CollectionBadgeSerializerV1(serializers.ModelSerializer):
             badgeinstance = BadgeInstance.cached.get(entity_id=data.get('id'))
         except BadgeInstance.DoesNotExist:
             raise RestframeworkValidationError("Assertion not found")
-        if badgeinstance.recipient_identifier not in collection.owner.all_recipient_identifiers:
+        if badgeinstance.recipient_identifier not in collection.owner.all_verified_recipient_identifiers:
             raise serializers.ValidationError("Cannot add badge to a collection created by a different recipient.")
 
         collect, created = BackpackCollectionBadgeInstance.objects.get_or_create(
@@ -453,6 +454,8 @@ class V1BadgeInstanceSerializer(V1InstanceSerializer):
     """
     used to serialize a issuer.BadgeInstance like a composition.LocalBadgeInstance
     """
+    is_recipient_email_unverified = serializers.ReadOnlyField()
+
     def to_representation(self, instance):
         localbadgeinstance_json = instance.json
         if 'evidence' in localbadgeinstance_json:

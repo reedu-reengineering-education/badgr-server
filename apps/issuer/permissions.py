@@ -171,7 +171,7 @@ class VerifiedEmailMatchesRecipientIdentifier(permissions.BasePermission):
     """
     def has_object_permission(self, request, view, obj):
         recipient_identifier = getattr(obj, 'recipient_identifier', None)
-        return recipient_identifier and recipient_identifier in request.user.all_recipient_identifiers
+        return recipient_identifier and recipient_identifier in request.user.all_verified_recipient_identifiers
 
 
 class BadgrOAuthTokenHasScope(permissions.BasePermission):

@@ -114,7 +114,7 @@ class ExternalToolLaunchpoint(cachemodel.CacheModel):
                 if any(s.user.id == user.id for s in obj.cached_issuer.cached_issuerstaff()):
                     roles.append('issuer')
 
-                if obj.recipient_identifier in user.all_recipient_identifiers:
+                if obj.recipient_identifier in user.all_verified_recipient_identifiers:
                     roles.append('earner')
 
         launch_data['roles'] = roles
