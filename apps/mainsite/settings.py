@@ -412,14 +412,14 @@ MARKDOWNIFY_WHITELIST_TAGS = [
 
 OAUTH2_PROVIDER = {
     'SCOPES': {
-        'r:profile': 'See who you are',
-        'rw:profile': 'Update your own User profile',
-        'r:backpack': "List assertions in a User's Backpack",
-        'rw:backpack': "Upload badges into a User's Backpack",
-        'rw:issuer': 'Create and update Issuers, create and update Badgeclasses, and award Assertions',
+        'r:profile':   'See who you are',
+        'rw:profile':  'Update your own user profile',
+        'r:backpack':  'List assertions in your backpack',
+        'rw:backpack': 'Upload badges into a backpack',
+        'rw:issuer':   'Create and update issuers, create and update badge classes, and award assertions',
 
         # private scopes used for integrations
-        'rw:issuer:*': 'Create and update Badgeclasses, and award Assertions for a single Issuer',
+        'rw:issuer:*':  'Create and update badge classes, and award assertions for a single issuer',
         'r:assertions': 'Batch receive assertions',
     },
     'DEFAULT_SCOPES': ['r:profile'],
