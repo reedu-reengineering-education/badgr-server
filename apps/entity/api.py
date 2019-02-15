@@ -4,11 +4,11 @@ from __future__ import unicode_literals
 from django.core.exceptions import FieldError
 from django.http import Http404
 from rest_framework.response import Response
-from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_201_CREATED, HTTP_204_NO_CONTENT
+from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_201_CREATED, HTTP_204_NO_CONTENT
 from rest_framework.views import APIView
 
 import badgrlog
-from mainsite.pagination import EncryptedCursorPagination
+from mainsite.pagination import BadgrCursorPagination
 
 
 class BaseEntityView(APIView):
@@ -174,6 +174,10 @@ class UncachedPaginatedViewMixin(object):
     max_per_page = 500
     default_per_page = None  # dont paginate by default
     per_page_query_parameter_name = 'num'
+    ordering = "-created_at"
+
+    def get_ordering(self):
+        return self.ordering
 
     def get_queryset(self, request, **kwargs):
         raise NotImplementedError
@@ -190,8 +194,7 @@ class UncachedPaginatedViewMixin(object):
 
         # only paginate on request
         if per_page:
-            self.paginator = EncryptedCursorPagination()
-            self.paginator.page_size = per_page
+            self.paginator = BadgrCursorPagination(ordering=self.get_ordering(), page_size=per_page)
             page = self.paginator.paginate_queryset(queryset, request=request)
         else:
             page = list(queryset)

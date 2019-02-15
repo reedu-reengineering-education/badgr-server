@@ -38,7 +38,7 @@ AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 
 class BaseAuditedModel(cachemodel.CacheModel):
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+")
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+")
@@ -262,8 +262,7 @@ class Issuer(ResizeUploadedImage,
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_badgeclasses(self):
-        return self.badgeclasses.all()
-
+        return self.badgeclasses.all().order_by("created_at")
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_pathways(self):
@@ -384,6 +383,17 @@ class BadgeClass(ResizeUploadedImage,
                  BaseOpenBadgeObjectModel):
     entity_class_name = 'BadgeClass'
 
+    EXPIRES_DURATION_DAYS = 'days'
+    EXPIRES_DURATION_WEEKS = 'weeks'
+    EXPIRES_DURATION_MONTHS = 'months'
+    EXPIRES_DURATION_YEARS = 'years'
+    EXPIRES_DURATION_CHOICES = (
+        (EXPIRES_DURATION_DAYS, 'Days'),
+        (EXPIRES_DURATION_WEEKS, 'Weeks'),
+        (EXPIRES_DURATION_MONTHS, 'Months'),
+        (EXPIRES_DURATION_YEARS, 'Years'),
+    )
+
     issuer = models.ForeignKey(Issuer, blank=False, null=False, on_delete=models.CASCADE, related_name="badgeclasses")
 
     # slug has been deprecated for now, but preserve existing values
@@ -396,6 +406,9 @@ class BadgeClass(ResizeUploadedImage,
 
     criteria_url = models.CharField(max_length=254, blank=True, null=True, default=None)
     criteria_text = models.TextField(blank=True, null=True)
+
+    expires_amount = models.IntegerField(blank=True, null=True, default=None)
+    expires_duration = models.CharField(max_length=254, choices=EXPIRES_DURATION_CHOICES, blank=True, null=True, default=None)
 
     old_json = JSONField()
 

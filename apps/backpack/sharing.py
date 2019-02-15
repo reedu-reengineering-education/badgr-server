@@ -2,6 +2,8 @@ import urllib
 
 from django.conf import settings
 
+from issuer.models import BadgeInstance
+
 
 class ShareProvider(object):
     provider_code = None
@@ -14,9 +16,16 @@ class TwitterShareProvider(ShareProvider):
     provider_code = 'twitter'
     provider_name = 'Twitter'
 
-    def share_url(self, badge_instance, **kwargs):
-        return "https://twitter.com/intent/tweet?text={url}".format(
-            url=urllib.quote(badge_instance.share_url)
+    def share_url(self, obj, **kwargs):
+        if isinstance(obj, BadgeInstance):
+            text = "I earned a badge from {issuer}! {url}".format(
+                issuer=obj.cached_issuer.name,
+                url=obj.share_url
+            )
+        else:
+            text = obj.share_url
+        return "https://twitter.com/intent/tweet?text={text}".format(
+            text=urllib.quote(text)
         )
 
 
@@ -37,7 +46,7 @@ class PinterestShareProvider(ShareProvider):
     def share_url(self, badge_instance, **kwargs):
         return "http://www.pinterest.com/pin/create/button/?url={url}&media={image}&description={summary}".format(
             url=urllib.quote(badge_instance.share_url),
-            image=badge_instance.image_url,
+            image=badge_instance.image_url(),
             summary=badge_instance.cached_badgeclass.name
         )
 

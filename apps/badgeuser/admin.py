@@ -1,9 +1,12 @@
 from django.contrib.admin import ModelAdmin, TabularInline
+from django.core.cache import cache
+from django.utils import timezone
+from django_object_actions import DjangoObjectActions
 
 from externaltools.models import ExternalToolUserActivation
 from mainsite.admin import badgr_admin
-
-from .models import BadgeUser, EmailAddressVariant, TermsVersion, TermsAgreement
+from mainsite.utils import backoff_cache_key
+from .models import BadgeUser, EmailAddressVariant, TermsVersion, TermsAgreement, CachedEmailAddress
 
 
 class ExternalToolInline(TabularInline):
@@ -23,21 +26,54 @@ class TermsAgreementInline(TabularInline):
     fields = ('created_at', 'terms_version')
 
 
-class BadgeUserAdmin(ModelAdmin):
-    readonly_fields = ('entity_id', 'date_joined', 'last_login', 'username', 'entity_id', 'agreed_terms_version')
+class EmailAddressInline(TabularInline):
+    model = CachedEmailAddress
+    fk_name = 'user'
+    extra = 0
+    fields = ('email','verified','primary')
+
+
+class BadgeUserAdmin(DjangoObjectActions, ModelAdmin):
+    readonly_fields = ('entity_id', 'date_joined', 'last_login', 'username', 'entity_id', 'agreed_terms_version', 'login_backoff')
     list_display = ('email', 'first_name', 'last_name', 'is_active', 'is_staff', 'entity_id', 'date_joined')
     list_filter = ('is_active', 'is_staff', 'is_superuser', 'date_joined', 'last_login')
     search_fields = ('email', 'first_name', 'last_name', 'username', 'entity_id')
     fieldsets = (
         ('Metadata', {'fields': ('entity_id', 'username', 'date_joined',), 'classes': ('collapse',)}),
         (None, {'fields': ('email', 'first_name', 'last_name', 'badgrapp', 'agreed_terms_version', 'marketing_opt_in')}),
-        ('Access', {'fields': ('is_active', 'is_staff', 'is_superuser', 'password')}),
+        ('Access', {'fields': ('is_active', 'is_staff', 'is_superuser', 'password', 'login_backoff')}),
         ('Permissions', {'fields': ('groups', 'user_permissions')}),
     )
     inlines = [
+        EmailAddressInline,
         ExternalToolInline,
-        TermsAgreementInline
+        TermsAgreementInline,
     ]
+    change_actions = [
+        'clear_login_backoff'
+    ]
+
+    def clear_login_backoff(self, request, obj):
+        for email in obj.all_recipient_identifiers:
+            cache_key = backoff_cache_key(username=email)
+            cache.delete(cache_key)
+    clear_login_backoff.label = "Clear login backoffs"
+    clear_login_backoff.short_description = "Remove blocks created by failed login attempts"
+
+    def login_backoff(self, obj):
+        out = []
+        for email in obj.all_recipient_identifiers:
+            cache_key = backoff_cache_key(username=email)
+            backoff = cache.get(cache_key)
+            if backoff is not None:
+                out.append("<div><strong>{email}</strong>: <span>{until}</span> <span>({count} attempts)</span></div>".format(
+                    email=email,
+                    until=backoff.get('until').astimezone(timezone.get_current_timezone()).strftime("%Y-%m-%d %H:%M:%S"),
+                    count=backoff.get('count')
+                ))
+        if len(out):
+            return "".join(out)
+    login_backoff.allow_tags = True
 
 badgr_admin.register(BadgeUser, BadgeUserAdmin)
 

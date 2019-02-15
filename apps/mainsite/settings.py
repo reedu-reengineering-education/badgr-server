@@ -350,7 +350,8 @@ REST_FRAMEWORK = {
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'DEFAULT_VERSION': 'v1',
     'ALLOWED_VERSIONS': ['v1','v2'],
-    'EXCEPTION_HANDLER': 'entity.views.exception_handler'
+    'EXCEPTION_HANDLER': 'entity.views.exception_handler',
+    'PAGE_SIZE': 100,
 }
 
 
@@ -420,7 +421,6 @@ OAUTH2_PROVIDER = {
         # private scopes used for integrations
         'rw:issuer:*': 'Create and update Badgeclasses, and award Assertions for a single Issuer',
         'r:assertions': 'Batch receive assertions',
-        'rw:badgeuserAdmin': 'Ability to signup new BadgeUsers'
     },
     'DEFAULT_SCOPES': ['r:profile'],
 
@@ -433,7 +433,7 @@ OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = 'oauth2_provider.AccessToken'
 
 OAUTH2_TOKEN_SESSION_TIMEOUT_SECONDS = OAUTH2_PROVIDER['ACCESS_TOKEN_EXPIRE_SECONDS']
 
-API_DOCS_EXCLUDED_SCOPES = ['rw:issuer:*', 'r:assertions', '*', 'rw:badgeuserAdmin']
+API_DOCS_EXCLUDED_SCOPES = ['rw:issuer:*', 'r:assertions', '*']
 
 
 BADGR_PUBLIC_BOT_USERAGENTS = [
@@ -441,14 +441,15 @@ BADGR_PUBLIC_BOT_USERAGENTS = [
     'Twitterbot',    # 'Twitterbot/1.0'
     'facebook',      # https://developers.facebook.com/docs/sharing/webmasters/crawler
     'Facebot',
+    'Slackbot',
+]
+BADGR_PUBLIC_BOT_USERAGENTS_WIDE = [
+    'LinkedInBot',
+    'Twitterbot',
+    'facebook',
+    'Facebot',
 ]
 
-
-# Allow use of weaker CAs (1024 bits) to avoid problem with chained certificates used by accounts.google.com
-# Ideally this environment variable would be set on a per-environment basis, only where needed
-import os
-import certifi
-os.environ['REQUESTS_CA_BUNDLE'] = certifi.old_where()
 
 # default celery to always_eager
 CELERY_ALWAYS_EAGER = True

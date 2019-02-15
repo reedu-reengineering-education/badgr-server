@@ -25,7 +25,7 @@ import badgrlog
 from badgeuser.authcode import accesstoken_for_authcode
 from mainsite.models import ApplicationInfo
 from mainsite.oauth_validator import BadgrRequestValidator, BadgrOauthServer
-from mainsite.utils import client_ip_from_request
+from mainsite.utils import backoff_cache_key, client_ip_from_request
 
 badgrlogger = badgrlog.BadgrLogger()
 
@@ -153,33 +153,30 @@ class TokenView(OAuth2ProviderTokenView):
     validator_class = BadgrRequestValidator
 
     def post(self, request, *args, **kwargs):
-
-        def _request_identity(request):
-            username = request.POST.get('username', None)
-            if username:
-                return username
-            return client_ip_from_request(self.request)
-
-        def _backoff_cache_key(request):
-            return "failed_token_backoff_{}".format(_request_identity(request))
-
         _backoff_period = getattr(settings, 'TOKEN_BACKOFF_PERIOD_SECONDS', 2)
+        _max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour
 
         grant_type = request.POST.get('grant_type', 'password')
+        username = request.POST.get('username')
+        client_ip = client_ip_from_request(request)
 
         if grant_type == 'password' and _backoff_period is not None:
             # check for existing backoff for password attempts
-            backoff = cache.get(_backoff_cache_key(request))
+            backoff = cache.get(backoff_cache_key(username, client_ip))
             if backoff is not None:
                 backoff_until = backoff.get('until', None)
                 backoff_count = backoff.get('count', 1)
                 if backoff_until > timezone.now():
                     backoff_count += 1
-                    backoff_seconds = min(86400, _backoff_period ** backoff_count)  # maximum backoff is 24 hours
+                    backoff_seconds = min(_max_backoff, _backoff_period ** backoff_count)
                     backoff_until = timezone.now() + datetime.timedelta(seconds=backoff_seconds)
-                    cache.set(_backoff_cache_key(request), dict(until=backoff_until, count=backoff_count), timeout=None)
+                    cache.set(backoff_cache_key(username, client_ip), dict(until=backoff_until, count=backoff_count), timeout=None)
                     # return the same error as a failed login attempt
-                    return HttpResponse(json.dumps({"error_description": "Invalid credentials given.", "error": "invalid_grant"}), status=HTTP_401_UNAUTHORIZED)
+                    return HttpResponse(json.dumps({
+                        "error_description": "Too many login attempts. Please wait and try again.",
+                        "error": "login attempts throttled",
+                        "expires": backoff_seconds,
+                    }), status=HTTP_401_UNAUTHORIZED)
 
         # pre-validate scopes requested
         client_id = request.POST.get('client_id', None)
@@ -214,15 +211,15 @@ class TokenView(OAuth2ProviderTokenView):
 
             if _backoff_period is not None:
                 # update backoff for failed logins
-                backoff = cache.get(_backoff_cache_key(request))
+                backoff = cache.get(backoff_cache_key(username, client_ip))
                 if backoff is None:
                     backoff = {'count': 0}
                 backoff['count'] += 1
                 backoff['until'] = timezone.now() + datetime.timedelta(seconds=_backoff_period ** backoff['count'])
-                cache.set(_backoff_cache_key(request), backoff, timeout=None)
+                cache.set(backoff_cache_key(username, client_ip), backoff, timeout=None)
         elif response.status_code == 200:
             # successful login
-            cache.set(_backoff_cache_key(request), None)  # clear any existing backoff
+            cache.set(backoff_cache_key(username, client_ip), None)  # clear any existing backoff
 
         return response
 

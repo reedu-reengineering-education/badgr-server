@@ -1,26 +1,78 @@
 # encoding: utf-8
 from __future__ import unicode_literals
 
-import json
-from unittest import skip
-
 import datetime
 import dateutil.parser
+import json
+from unittest import skip
+from openbadges_bakery import unbake
 import png
 import pytz
+import re
+from urllib import quote_plus
+
 from django.apps import apps
 from django.core import mail
 from django.core.urlresolvers import reverse
 from django.utils import timezone
-
-from mainsite.tests import BadgrTestCase, SetupIssuerHelper
-from openbadges_bakery import unbake
+from oauth2_provider.models import Application
 
 from issuer.models import BadgeInstance, IssuerStaff
+from mainsite.models import ApplicationInfo
+from mainsite.tests import BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationHelper
 from mainsite.utils import OriginSetting
 
 
 class AssertionTests(SetupIssuerHelper, BadgrTestCase):
+
+    def test_assertion_pagination(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        total_assertion_count = 25
+        per_page = 10
+
+        for i in range(0, total_assertion_count):
+            test_badgeclass.issue(recipient_id='test3@unittest.concentricsky.com')
+
+        def _parse_link_header(link_header):
+            link_re = re.compile(r'<(?P<url>[^>]+)>; rel="(?P<name>[^"]+)"')
+            ret = {}
+            for match in link_re.findall(link_header):
+                url, name = match
+                ret[name] = url
+            return ret
+
+        page_number = 0
+        number_seen = 0
+        more_pages_present = True
+        response = self.client.get('/v1/issuer/issuers/{issuer}/badges/{badgeclass}/assertions?num={per_page}'.format(
+            issuer=test_issuer.entity_id,
+            badgeclass=test_badgeclass.entity_id,
+            per_page=per_page
+        ))
+        while more_pages_present:
+            self.assertEquals(response.status_code, 200)
+
+            page = response.data
+            expected_page_count = min(total_assertion_count-number_seen, per_page)
+            self.assertEqual(len(page), expected_page_count)
+            number_seen += len(page)
+
+            link_header = response.get('Link', None)
+            self.assertIsNotNone(link_header)
+            links = _parse_link_header(link_header)
+            if page_number != 0:
+                self.assertTrue('prev' in links.keys())
+
+            if number_seen < total_assertion_count:
+                self.assertTrue('next' in links.keys())
+                next_url = links.get('next')
+                response = self.client.get(next_url)
+                page_number += 1
+            else:
+                more_pages_present = False
 
     @skip("test does not pass when using FileStorage, but does when using S3BotoStorage, and behavior works as expected in server")
     def test_can_rebake_assertion(self):
@@ -800,3 +852,57 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.post('/v2/badgeclasses/{badgeclass}/assertions'.format(
             badgeclass=other_badgeclass.entity_id), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 404)
+
+
+class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase):
+    def test_application_can_get_changed_assertions(self):
+        application_user = self.setup_user(
+            authenticate=False, first_name='app', last_name='user', email='app@example.test', verified=True)
+        issuer_user = self.setup_user(authenticate=False, verified=True)
+        test_issuer = self.setup_issuer(owner=issuer_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        IssuerStaff.objects.create(
+            issuer=test_issuer,
+            role=IssuerStaff.ROLE_STAFF,
+            user=application_user
+        )
+
+        application = self.setup_oauth2_application(
+            user=application_user,
+            allowed_scopes="rw:issuer rw:backpack rw:profile r:assertions",
+            trust_email=True,
+            authorization_grant_type=Application.GRANT_PASSWORD
+        )
+
+        # retrieve a token for the issuer owner user
+        response = self.client.post('/o/token', data=dict(
+            grant_type=application.authorization_grant_type.replace('-','_'),
+            client_id=application.client_id,
+            scope="rw:issuer r:assertions",
+            username=issuer_user.email,
+            password='secret'
+        ))
+        self.assertEqual(response.status_code, 200, "Can get a token for the issuer user")
+
+        # retrieve a token for the application user
+        response = self.client.post('/o/token', data=dict(
+            grant_type=application.authorization_grant_type.replace('-', '_'),
+            client_id=application.client_id,
+            scope="r:assertions",
+            username=application_user.email,
+            password='secret'
+        ))
+        self.assertEqual(response.status_code, 200, "Can get a token for the application user")
+
+        test_badgeclass.issue(recipient_id='test@example.com')
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + response.json()['access_token'])
+        response = self.client.get('/v2/assertions/changed')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+        timestamp = response.data['timestamp']
+        # Get it again to assert no new results
+        response = self.client.get('/v2/assertions/changed?since={}'.format(quote_plus(timestamp)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 0)
