@@ -5,3 +5,4 @@ from .public import *
 from .badgebook import *
 from .badgeuser import *
 from .composition import *
+from .blacklist import *
