@@ -71,12 +71,12 @@ class BadgeUserProfileSerializerV1(serializers.Serializer):
 
         if password:
             if not current_password:
-                raise serializers.ValidationError({'currrent_password': "Field is required"})
+                raise serializers.ValidationError({'current_password': "Field is required"})
             if user.check_password(current_password):
                 user.set_password(password)
                 notify_on_password_change(user)
             else:
-                raise serializers.ValidationError({'currrent_password': "Incorrect password"})
+                raise serializers.ValidationError({'current_password': "Incorrect password"})
 
         if 'agreed_terms_version' in validated_data:
             user.agreed_terms_version = validated_data.get('agreed_terms_version')
