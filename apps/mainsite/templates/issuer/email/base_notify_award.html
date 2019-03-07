@@ -3,290 +3,461 @@
 {% load staticfiles %}
 
 {% block main %}
-<!-- Begin Title Row -->
-<tr>
-  <td style="
-    padding-bottom: 48px;
-  ">
-    <h1 class="mstext" style="
-      color: #05012C;
-      font-family: 'Open Sans', Trebuchet, sans-serif;
-      font-weight: normal;
-      font-size: 24px;
-      font-weight: 600;
-      line-height: 32px;
-      margin: 0;
-      text-align: center;
-    ">
-      Congratulations, you earned a badge!
-    </h1>
-  </td>
-</tr>
-<!-- Begin Badge Row -->
-<tr>
-  <td align="center" style="
-    padding-bottom: 16px;
-  ">
-    <a href="{{ badge_instance_url }}" style="
-      text-decoration: none;
-    ">
-      <img class="badge" src="{{ image_url }}" alt="Badge" style="max-width: 75%; height: auto;" />
-    </a>
-  </td>
-</tr>
-<!-- Begin Badge Title Row -->
-<tr>
-  <td style="
-    padding-bottom: 16px;
-  ">
-    <h2 class="mstext" style="
-      color: #05012C;
-      font-family: 'Open Sans', Trebuchet, sans-serif;
-      font-weight: normal;
-      font-size: 24px;
-      font-weight: 600;
-      line-height: 32px;
-      margin: 0;
-      text-align: center;
-    ">
-      {{ badge_name }}
-    </h2>
-  </td>
-</tr>
-<!-- Begin Buttons Row -->
-<tr>
-  <td align="center">
-    <table cellpadding="0" cellspacing="0" style="
-      border-collapse: collapse;
-    ">
+<!--[if mso | IE]>
+          </td>
+        </tr>
+      </table>
+      
+      <table
+         align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600"
+      >
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]-->
+<div style="background:#FFFFFF;background-color:#FFFFFF;Margin:0px auto;max-width:600px;">
+        
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#FFFFFF;background-color:#FFFFFF;width:100%;">
+      <tbody>
+        <tr>
+          <td style="border-left:1px solid #DBD8DF;border-right:1px solid #DBD8DF;direction:ltr;font-size:0px;padding:12px;padding-top:32px;text-align:center;vertical-align:top;">
+            <!--[if mso | IE]>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+            
+    <tr>
+  
+        <td
+           class="" style="vertical-align:top;width:574px;"
+        >
+      <![endif]-->
+        
+  <div class="mj-column-per-100 outlook-group-fix" style="font-size:13px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+    
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+    
+        <tr>
+          <td align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <div style="font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:32px;font-weight:bold;line-height:40px;text-align:center;color:#191919;">
+    Congratulations, you earned a badge!
+  </div>
+
+          </td>
+        </tr>
+      
+        <tr>
+          <td align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
+    <tbody>
       <tr>
-        <td style="
-          padding-bottom: 16px;
-          padding-left: 8px;
-          padding-right: 8px;
-        ">
-          <table cellpadding="0" cellspacing="0" style="
-            border-collapse: collapse;
+        <td style="width:160px;">
+            <a href="{{ badge_instance_url }}" style="
+            text-decoration: none;
           ">
-            <tbody>
-              <tr>
-                <td bgcolor="#FFFFFF" style="
-                  border-radius: 4px;
-                ">
-                  <a class="mstext" href="{{ download_url }}" style="
-                    border: 1px solid #C30A28;
-                    border-radius: 4px;
-                    color: #C30A28;
-                    display: inline-block;
-                    font-family: 'Open Sans', Trebuchet, sans-serif;
-                    font-size: 14px;
-                    font-weight: bold;
-                    padding-bottom: 8px;
-                    padding-left: 16px;
-                    padding-right: 16px;
-                    padding-top: 8px;
-                    text-decoration: none;
-                    text-transform: uppercase;
-                  ">
-                    Download
-                  </a>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+  <img alt="" height="auto" src="{{ image_url }}" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;" width="160">
+        </a>
         </td>
-        <td style="
-          padding-bottom: 16px;
-          padding-left: 8px;
-          padding-top: 4px;
-        ">
-          <a href="{{ HTTP_ORIGIN }}{% url 'v1_api_analytics_share_badge' slug=badge_id %}?provider=facebook&source=awardemail"><img srcset="{% static 'images/emailfacebook-2x.png' %} 2x" src="{% static 'images/emailfacebook.png' %}" alt=""></a>
-        </td>
-        <td style="
-          padding-bottom: 16px;
-          padding-left: 8px;
-          padding-top: 4px;
-        ">
-          <a href="{{ HTTP_ORIGIN }}{% url 'v1_api_analytics_share_badge' slug=badge_id %}?provider=linkedin&source=awardemail"><img srcset="{% static 'images/emaillinkedin-2x.png' %} 2x" src="{% static 'images/emaillinkedin.png' %}" alt=""></a>
-        </td>
-        <td style="
-          padding-bottom: 16px;
-          padding-left: 8px;
-          padding-top: 4px;
-        ">
-          <a href="{{ HTTP_ORIGIN }}{% url 'v1_api_analytics_share_badge' slug=badge_id %}?provider=twitter&source=awardemail"><img srcset="{% static 'images/emailtwitter-2x.png' %} 2x" src="{% static 'images/emailtwitter.png' %}" alt=""></a>
-        </td>
-        <td style="
-          padding-bottom: 16px;
-          padding-left: 8px;
-          padding-top: 4px;
-        ">
-          <a href="{{ HTTP_ORIGIN }}{% url 'v1_api_analytics_share_badge' slug=badge_id %}?provider=pinterest&source=awardemail"><img srcset="{% static 'images/emailpinterest-2x.png' %} 2x" src="{% static 'images/emailpinterest.png' %}" alt=""></a>
+      </tr>
+    </tbody>
+  </table>
+
+          </td>
+        </tr>
+      
+        <tr>
+          <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <div style="font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:18px;font-weight:bold;line-height:24px;text-align:left;color:#191919;">
+      {{ badge_name }}
+  </div>
+
+          </td>
+        </tr>
+      
+        <tr>
+          <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <div style="font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:400;line-height:24px;text-align:left;color:#666666;">
+      {{ badge_description }}
+  </div>
+
+          </td>
+        </tr>
+      
+        <tr>
+          <td style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <p style="border-top:solid 1px #f2f2f2;font-size:1;margin:0px auto;width:100%;">
+  </p>
+  
+  <!--[if mso | IE]>
+    <table
+       align="center" border="0" cellpadding="0" cellspacing="0" style="border-top:solid 1px #f2f2f2;font-size:1;margin:0px auto;width:524px;" role="presentation" width="524px"
+    >
+      <tr>
+        <td style="height:0;line-height:0;">
+          &nbsp;
         </td>
       </tr>
     </table>
-  </td>
-</tr>
-<!-- Begin Description Row -->
-<tr>
-  <td style="
-    padding-bottom: 8px;
-  ">
-    <p class="mstext" style="
-      color: #05012C;
-      font-family: 'Open Sans', Trebuchet, sans-serif;
-      font-size: 14px;
-      line-height: 24px;
-      margin: 0;
-    ">
-      {{ badge_description }}
-    </p>
-  </td>
-</tr>
-<!-- Begin Issuer Header Row -->
-<tr>
-  <td style="
-    padding-bottom: 16px;
-  ">
-    <div style="
-      position: relative;
-    ">
-      <h3 class="mstext" style="
-        background-color: #FFFFFF;
-        color: #E1E0E5;
-        font-family: 'Open Sans', Trebuchet, sans-serif;
-        font-size: 12px;
-        font-weight: normal;
-        display: inline-block;
-        line-height: 16px;
-        margin: 0;
-        padding-right: 8px;
-        position: relative;
-        z-index: 2;
-      ">
-        Issuer
-      </h3>
-      <div style="
-        background-color: #E1E0E5;
-        height: 1px;
-        left: 0;
-        position: absolute;
-        top: 10px;
-        width: 100%;
-        z-index: 1;
-      "></div>
-    </div>
-  </td>
-</tr>
-<!-- Begin Issuer Row -->
-<tr>
-  <td>
-    <table cellpadding="0" cellspacing="0" style="
-      border-collapse: collapse;
-    ">
-      <tbody>
-        <tr>
-          {% if issuer_image_url %}
-          <td style="
-            padding-right: 16px;
-          ">
-            <a href="{{ issuer_detail }}" style="
-              text-decoration: none;
-            ">
-              <img src="{{ issuer_image_url }}" alt="" style="max-width: 80px; height: auto;">
-            </a>
+  <![endif]-->
+
+
           </td>
-          {% endif %}
-          <td>
-            <a class="mstext" href="{{ issuer_detail }}" style="
-              color: #05012C;
-              font-family: 'Open Sans', Trebuchet, sans-serif;
-              font-weight: normal;
-              font-size: 16px;
-              line-height: 24px;
-              margin: 0;
-              text-decoration: none;
-            ">
-              {{ issuer_name }}
-            </a>
+        </tr>
+      
+        <tr>
+          <td align="left" style="font-size:0px;padding:10px 25px;padding-top:32px;word-break:break-word;">
+            
+  <div style="font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:bold;line-height:24px;text-align:left;color:#666666;">
+    Issued by:
+  </div>
+
+          </td>
+        </tr>
+      
+  </table>
+
+  </div>
+
+      <!--[if mso | IE]>
+        </td>
+      
+    </tr>
+  
+              </table>
+            <![endif]-->
           </td>
         </tr>
       </tbody>
     </table>
-  </td>
-</tr>
+    
+  </div>
+
+  
+  <!--[if mso | IE]>
+      </td>
+    </tr>
+  </table>
+  
+  <table
+     align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600"
+  >
+    <tr>
+      <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+  <![endif]-->
+
+  
+  <div style="background:#FFFFFF;background-color:#FFFFFF;Margin:0px auto;max-width:600px;">
+    
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#FFFFFF;background-color:#FFFFFF;width:100%;">
+      <tbody>
+        <tr>
+          <td style="border-left:1px solid #DBD8DF;border-right:1px solid #DBD8DF;direction:ltr;font-size:0px;padding:12px;text-align:center;vertical-align:top;">
+            <!--[if mso | IE]>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+            
+    <tr>
+  
+        <td
+           class="" style="vertical-align:top;width:114.8px;"
+        >
+      <![endif]-->
+        
+  <div class="mj-column-per-20 outlook-group-fix" style="font-size:13px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+    
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+    
+        <tr>
+          <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
+    <tbody>
+      <tr>
+        <td style="width:48px;">
+            {% if issuer_image_url %}
+  <img alt="" height="auto" src="{{ issuer_image_url }}" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;" width="48">
+  {% endif %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+          </td>
+        </tr>
+      
+  </table>
+
+  </div>
+
+      <!--[if mso | IE]>
+        </td>
+      
+        <td
+           class="" style="vertical-align:top;width:459.2px;"
+        >
+      <![endif]-->
+        
+  <div class="mj-column-per-80 outlook-group-fix" style="font-size:13px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+    
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+    
+        <tr>
+          <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <div style="font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:400;line-height:24px;text-align:left;color:#000000;">
+    <a href="{{ issuer_detail }}" class="linkstyle" style="color: #515dc6; font-weight: bold; text-decoration: none;">{{ issuer_name }}</a>
+  </div>
+
+          </td>
+        </tr>
+      
+  </table>
+
+  </div>
+
+      <!--[if mso | IE]>
+        </td>
+      
+    </tr>
+  
+              </table>
+            <![endif]-->
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    
+  </div>
+
+  
+  <!--[if mso | IE]>
+      </td>
+    </tr>
+  </table>
+  
+  <table
+     align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600"
+  >
+    <tr>
+      <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+  <![endif]-->
+
+  
+  <div style="background:#FFFFFF;background-color:#FFFFFF;Margin:0px auto;max-width:600px;">
+    
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#FFFFFF;background-color:#FFFFFF;width:100%;">
+      <tbody>
+        <tr>
+          <td style="border-left:1px solid #DBD8DF;border-right:1px solid #DBD8DF;direction:ltr;font-size:0px;padding:12px;text-align:center;vertical-align:top;">
+            <!--[if mso | IE]>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+            
+    <tr>
+  
+        <td
+           class="" style="vertical-align:top;width:574px;"
+        >
+      <![endif]-->
+        
+  <div class="mj-column-per-100 outlook-group-fix" style="font-size:13px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+    
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+    
+        <tr>
+          <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <div style="font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:12px;font-weight:400;line-height:24px;text-align:left;color:#666666;">
+    {% if issued_on %}
+    Issued on {{issued_on}}
+    {% endif %}
+  </div>
+
+          </td>
+        </tr>
+      
+  </table>
+
+  </div>
+
+      <!--[if mso | IE]>
+        </td>
+      
+    </tr>
+  
+              </table>
+            <![endif]-->
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    
+  </div>
+
+  
+  <!--[if mso | IE]>
+      </td>
+    </tr>
+  </table>
+  
+  <table
+     align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600"
+  >
+    <tr>
+      <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+  <![endif]-->
+
+  
+  <div style="background:#FFFFFF;background-color:#FFFFFF;Margin:0px auto;max-width:600px;">
+    
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#FFFFFF;background-color:#FFFFFF;width:100%;">
+      <tbody>
+        <tr>
+          <td style="border-left:1px solid #DBD8DF;border-right:1px solid #DBD8DF;direction:ltr;font-size:0px;padding:12px;text-align:center;vertical-align:top;">
+            <!--[if mso | IE]>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+            
+    <tr>
+  
+        <td
+           class="" style="vertical-align:top;width:574px;"
+        >
+      <![endif]-->
+        
+  <div class="mj-column-per-100 outlook-group-fix" style="font-size:13px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+    
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+    
+        <tr>
+          <td align="center" vertical-align="middle" style="font-size:0px;padding:10px 25px;padding-bottom:8px;word-break:break-word;">
+            
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;width:100%;line-height:100%;">
+    <tr>
+      <td align="center" bgcolor="#3F44BA" role="presentation" style="border:none;border-radius:2px;cursor:auto;padding:15px 30px;background:#3F44BA;" valign="middle">
+        <a href="{{ site_url }}" style="background:#3F44BA;color:#FFFFFF;font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:bold;line-height:120%;Margin:0;text-decoration:none;text-transform:none;" target="_blank">
+            {% block call_to_action_label %}
+            {% endblock %}
+        </a>
+      </td>
+    </tr>
+  </table>
+
+          </td>
+        </tr>
+      
+        <tr>
+          <td align="center" vertical-align="middle" style="font-size:0px;padding:10px 25px;padding-bottom:8px;word-break:break-word;">
+            
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;width:100%;line-height:100%;">
+    <tr>
+      <td align="center" bgcolor="#ffffff" role="presentation" style="border:solid 1px #3F44BA;border-radius:2px;cursor:auto;padding:15px 30px;background:#ffffff;" valign="middle">
+        <a href="{{ download_url }}" style="background:#ffffff;color:#3F44BA;font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:bold;line-height:120%;Margin:0;text-decoration:none;text-transform:none;" target="_blank">
+          Download
+        </a>
+      </td>
+    </tr>
+  </table>
+
+          </td>
+        </tr>
+      
+  </table>
+
+  </div>
+
+      <!--[if mso | IE]>
+        </td>
+      
+    </tr>
+  
+              </table>
+            <![endif]-->
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    
+  </div>
+
+  
+  <!--[if mso | IE]>
+      </td>
+    </tr>
+  </table>
+  
+  <table
+     align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600"
+  >
+    <tr>
+      <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+  <![endif]-->
+
+  
+  <div style="background:#FFFFFF;background-color:#FFFFFF;Margin:0px auto;max-width:600px;">
+    
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#FFFFFF;background-color:#FFFFFF;width:100%;">
+      <tbody>
+        <tr>
+          <td style="border-left:1px solid #DBD8DF;border-right:1px solid #DBD8DF;direction:ltr;font-size:0px;padding:12px;text-align:center;vertical-align:top;">
+            <!--[if mso | IE]>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+            
+    <tr>
+  
+        <td
+           class="" style="vertical-align:top;width:574px;"
+        >
+      <![endif]-->
+        
+  <div class="mj-column-per-100 outlook-group-fix" style="font-size:13px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+    
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+    <tbody>
+      <tr>
+        <td style="vertical-align:top;padding-bottom:32px;">
+          
+  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%">
+    
+        <tr>
+          <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+            
+  <div style="font-family:'Open Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:400;line-height:24px;text-align:left;color:#000000;">
+      <a href="{{ HTTP_ORIGIN }}{% url 'v1_api_analytics_share_badge' slug=badge_id %}?provider=facebook&source=awardemail"><img src="{% static '/images/icon-facebook@2x.png' %}" align="left" width="32px" style="padding-right:16px;"></a>
+      <a href="{{ HTTP_ORIGIN }}{% url 'v1_api_analytics_share_badge' slug=badge_id %}?provider=linkedin&source=awardemail"><img src="{% static '/images/icon-linkedin@2x.png' %}" align="left" width="32px" style="padding-right:16px;"></a>
+      <a href="{{ HTTP_ORIGIN }}{% url 'v1_api_analytics_share_badge' slug=badge_id %}?provider=pinterest&source=awardemail"><img src="{% static '/images/icon-pinterest@2x.png' %}" align="left" width="32px" style="padding-right:16px;"></a>
+      <a href="{{ HTTP_ORIGIN }}{% url 'v1_api_analytics_share_badge' slug=badge_id %}?provider=twitter&source=awardemail"><img src="{% static '/images/icon-twitter@2x.png' %}" align="left" width="32px" style="padding-right:16px;"></a>
+  </div>
+
+          </td>
+        </tr>
+      
+  </table>
+
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  </div>
+
+      <!--[if mso | IE]>
+        </td>
+      
+    </tr>
+  
+              </table>
+            <![endif]-->
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    
+  </div>
+
+  
+  <!--[if mso | IE]>
+      </td>
+    </tr>
+  </table>
+  <![endif]-->
 {% endblock main %}
-
-{% block beforeabout %}
-<!-- Begin How To Use Title Row -->
-<tr>
-  <td style="
-    padding-bottom: 8px;
-  ">
-    <h2 class="mstext" style="
-    color: #05012C;
-    font-family: 'Open Sans', Trebuchet, sans-serif;
-    font-weight: normal;
-    font-size: 24px;
-    font-weight: 600;
-    line-height: 32px;
-    margin: 0;
-    ">
-      {% block how_to_use_title %}Badge Storage and Access{% endblock %}
-    </h2>
-  </td>
-</tr>
-<!-- Begin How To Use Body Row -->
-<tr>
-  <td style="
-    padding-bottom: 32px;
-  ">
-    <p class="mstext" style="
-    color: #05012C;
-    font-family: 'Open Sans', Trebuchet, sans-serif;
-    font-size: 14px;
-    line-height: 24px;
-    margin: 0 0 1em 0;
-    ">
-      Save this badge image for your records or to upload to any Open Badges-compatible service.
-    </p>
-    <p class="mstext" style="
-      color: #05012C;
-      font-family: 'Open Sans', Trebuchet, sans-serif;
-      font-size: 14px;
-      line-height: 24px;
-      margin: 0 0 1em 0;
-    ">{% block how_to_use_row %}Wherever you take your badge, portable information about your achievement will
-      be locked inside. You can use any Open Badges backpack service, but if you choose
-      to create a {{ site_name }} account, your badges awarded from this issuer will
-      be automatically added.
-    {% endblock %}</p>
-
-    {% block know_your_rights %}{% endblock %}
-
-      <p class="mstext" style="
-      color: #05012C;
-      font-family: 'Open Sans', Trebuchet, sans-serif;
-      font-size: 14px;
-      line-height: 24px;
-      margin: 0;
-    ">
-        <a href="{{ site_url }}" style="
-          border: 1px solid #C30A28;
-          border-radius: 4px;
-          color: #C30A28;
-          display: inline-block;
-          font-family: 'Open Sans', Trebuchet, sans-serif;
-          font-size: 14px;
-          font-weight: bold;
-          padding-bottom: 8px;
-          padding-left: 16px;
-          padding-right: 16px;
-          padding-top: 8px;
-          text-decoration: none;
-          text-transform: uppercase;">{% block call_to_action_label %}Create Account{% endblock %}</a>
-      </p>
-
-  </td>
-</tr>
-{% endblock beforeabout %}
