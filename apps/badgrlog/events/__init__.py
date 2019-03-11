@@ -4,3 +4,4 @@ from .issuer import *
 from .public import *
 from .badgeuser import *
 from .composition import *
+from .blacklist import *
