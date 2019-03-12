@@ -15,7 +15,7 @@ from rest_framework.serializers import ListSerializer
 from six import string_types
 
 from entity.serializers import BaseSerializerV2
-from mainsite.pagination import EncryptedCursorPagination
+from mainsite.pagination import BadgrCursorPagination
 
 
 class HumanReadableBooleanField(serializers.BooleanField):
@@ -185,7 +185,7 @@ class OriginalJsonSerializerMixin(serializers.Serializer):
 class CursorPaginatedListSerializer(serializers.ListSerializer):
 
     def __init__(self, queryset, request, *args, **kwargs):
-        self.paginator = EncryptedCursorPagination()
+        self.paginator = BadgrCursorPagination()
         self.page = self.paginator.paginate_queryset(queryset, request)
         super(CursorPaginatedListSerializer, self).__init__(data=self.page, *args, **kwargs)
 

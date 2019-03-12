@@ -14,7 +14,7 @@ from mainsite.models import BadgrApp
 from mainsite.serializers import HumanReadableBooleanField, StripTagsCharField, MarkdownCharField, \
     OriginalJsonSerializerMixin
 from mainsite.utils import OriginSetting
-from mainsite.validators import ChoicesValidator, BadgeExtensionValidator
+from mainsite.validators import ChoicesValidator, BadgeExtensionValidator, PositiveIntegerValidator
 from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance
 
 
@@ -52,6 +52,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     description = StripTagsCharField(max_length=16384, required=False)
     url = serializers.URLField(max_length=1024, required=True)
     staff = IssuerStaffSerializerV1(read_only=True, source='cached_issuerstaff', many=True)
+    badgrapp = serializers.CharField(read_only=True, max_length=255)
 
     class Meta:
         apispec_definition = ('Issuer', {})
@@ -137,6 +138,11 @@ class AlignmentItemSerializerV1(serializers.Serializer):
         apispec_definition = ('BadgeClassAlignment', {})
 
 
+class BadgeClassExpirationSerializerV1(serializers.Serializer):
+    amount = serializers.IntegerField(source='expires_amount', allow_null=True, validators=[PositiveIntegerValidator()])
+    duration = serializers.ChoiceField(source='expires_duration', allow_null=True, choices=BadgeClass.EXPIRES_DURATION_CHOICES)
+
+
 class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     created_at = serializers.DateTimeField(read_only=True)
     created_by = BadgeUserIdentifierFieldV1()
@@ -154,8 +160,17 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
     alignment = AlignmentItemSerializerV1(many=True, source='alignment_items', required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
 
+    expires = BadgeClassExpirationSerializerV1(source='*', required=False, allow_null=True)
+
     class Meta:
         apispec_definition = ('BadgeClass', {})
+
+    def to_internal_value(self, data):
+        if 'expires' in data:
+            if not data['expires'] or len(data['expires']) == 0:
+                # if expires was included blank, remove it so to_internal_value() doesnt choke
+                del data['expires']
+        return super(BadgeClassSerializerV1, self).to_internal_value(data)
 
     def to_representation(self, instance):
         representation = super(BadgeClassSerializerV1, self).to_representation(instance)
@@ -202,6 +217,10 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
 
         instance.alignment_items = validated_data.get('alignment_items')
         instance.tag_items = validated_data.get('tag_items')
+
+
+        instance.expires_amount = validated_data.get('expires_amount', None)
+        instance.expires_duration = validated_data.get('expires_duration', None)
 
         instance.save()
 
@@ -304,9 +323,6 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
             return data
 
     def to_representation(self, instance):
-        # if self.context.get('extended_json'):
-        #     self.fields['json'] = V1InstanceSerializer(source='extended_json')
-
         representation = super(BadgeInstanceSerializerV1, self).to_representation(instance)
         representation['json'] = instance.get_json(obi_version="1_1", use_canonical_id=True)
         if self.context.get('include_issuer', False):
@@ -319,19 +335,6 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
             representation['badge_class'] = OriginSetting.HTTP+reverse('badgeclass_json', kwargs={'entity_id': instance.cached_badgeclass.entity_id})
 
         representation['public_url'] = OriginSetting.HTTP+reverse('badgeinstance_json', kwargs={'entity_id': instance.entity_id})
-
-        if apps.is_installed('badgebook'):
-            try:
-                from badgebook.models import BadgeObjectiveAward
-                from badgebook.serializers import BadgeObjectiveAwardSerializer
-                try:
-                    award = BadgeObjectiveAward.cached.get(badge_instance_id=instance.id)
-                except BadgeObjectiveAward.DoesNotExist:
-                    representation['award'] = None
-                else:
-                    representation['award'] = BadgeObjectiveAwardSerializer(award).data
-            except ImportError:
-                pass
 
         return representation
 

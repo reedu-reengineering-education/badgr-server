@@ -113,7 +113,10 @@ class SetupIssuerHelper(object):
                      name='Test Issuer',
                      description='test case Issuer',
                      owner=None):
-        issuer = Issuer.objects.create(name=name, description=description, created_by=owner)
+        issuer = Issuer.objects.create(
+            name=name, description=description, created_by=owner, email=owner.email,
+            url='http://example.com'
+        )
         return issuer
 
     def get_testfiles_path(self, *args):

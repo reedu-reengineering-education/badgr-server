@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import StringIO
 import datetime
+import dateutil
 import re
 import uuid
 from collections import OrderedDict
@@ -25,20 +26,24 @@ from jsonfield import JSONField
 from openbadges_bakery import bake
 from django.utils import timezone
 
+import badgrlog
 from entity.models import BaseVersionedEntity
 from issuer.managers import BadgeInstanceManager, IssuerManager, BadgeClassManager, BadgeInstanceEvidenceManager
 from mainsite.managers import SlugOrJsonIdCacheModelManager
 from mainsite.mixins import ResizeUploadedImage, ScrubUploadedSvgImage
-from mainsite.models import (BadgrApp, EmailBlacklist)
+from mainsite.models import BadgrApp, EmailBlacklist
+from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri
 from .utils import generate_sha256_hashstring, CURRENT_OBI_VERSION, get_obi_context, add_obi_version_ifneeded, \
     UNVERSIONED_BAKED_VERSION
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
+logger = badgrlog.BadgrLogger()
+
 
 class BaseAuditedModel(cachemodel.CacheModel):
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+")
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+")
@@ -262,8 +267,7 @@ class Issuer(ResizeUploadedImage,
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_badgeclasses(self):
-        return self.badgeclasses.all()
-
+        return self.badgeclasses.all().order_by("created_at")
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_pathways(self):
@@ -384,6 +388,17 @@ class BadgeClass(ResizeUploadedImage,
                  BaseOpenBadgeObjectModel):
     entity_class_name = 'BadgeClass'
 
+    EXPIRES_DURATION_DAYS = 'days'
+    EXPIRES_DURATION_WEEKS = 'weeks'
+    EXPIRES_DURATION_MONTHS = 'months'
+    EXPIRES_DURATION_YEARS = 'years'
+    EXPIRES_DURATION_CHOICES = (
+        (EXPIRES_DURATION_DAYS, 'Days'),
+        (EXPIRES_DURATION_WEEKS, 'Weeks'),
+        (EXPIRES_DURATION_MONTHS, 'Months'),
+        (EXPIRES_DURATION_YEARS, 'Years'),
+    )
+
     issuer = models.ForeignKey(Issuer, blank=False, null=False, on_delete=models.CASCADE, related_name="badgeclasses")
 
     # slug has been deprecated for now, but preserve existing values
@@ -396,6 +411,9 @@ class BadgeClass(ResizeUploadedImage,
 
     criteria_url = models.CharField(max_length=254, blank=True, null=True, default=None)
     criteria_text = models.TextField(blank=True, null=True)
+
+    expires_amount = models.IntegerField(blank=True, null=True, default=None)
+    expires_duration = models.CharField(max_length=254, choices=EXPIRES_DURATION_CHOICES, blank=True, null=True, default=None)
 
     old_json = JSONField()
 
@@ -629,6 +647,17 @@ class BadgeClass(ResizeUploadedImage,
     def cached_badgrapp(self):
         return self.cached_issuer.cached_badgrapp
 
+    def generate_expires_at(self, issued_on=None):
+        if not self.expires_duration or not self.expires_amount:
+            return None
+
+        if issued_on is None:
+            issued_on = timezone.now()
+
+        duration_kwargs = dict()
+        duration_kwargs[self.expires_duration] = self.expires_amount
+        return issued_on + dateutil.relativedelta.relativedelta(**duration_kwargs)
+
 
 class BadgeInstance(BaseAuditedModel,
                     BaseVersionedEntity,
@@ -743,6 +772,14 @@ class BadgeInstance(BaseAuditedModel,
 
     def save(self, *args, **kwargs):
         if self.pk is None:
+            is_in_blacklist = \
+                blacklist.api_query_is_in_blacklist(self.recipient_identifier)
+
+            if is_in_blacklist == True:
+                badge_instance = self
+                logger.event(badgrlog.BlacklistAssertionNotCreatedEvent(badge_instance))
+                return
+
             self.salt = uuid.uuid4().hex
             self.created_at = datetime.datetime.now()
 

@@ -350,7 +350,8 @@ REST_FRAMEWORK = {
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'DEFAULT_VERSION': 'v1',
     'ALLOWED_VERSIONS': ['v1','v2'],
-    'EXCEPTION_HANDLER': 'entity.views.exception_handler'
+    'EXCEPTION_HANDLER': 'entity.views.exception_handler',
+    'PAGE_SIZE': 100,
 }
 
 
@@ -411,16 +412,15 @@ MARKDOWNIFY_WHITELIST_TAGS = [
 
 OAUTH2_PROVIDER = {
     'SCOPES': {
-        'r:profile': 'See who you are',
-        'rw:profile': 'Update your own User profile',
-        'r:backpack': "List assertions in a User's Backpack",
-        'rw:backpack': "Upload badges into a User's Backpack",
-        'rw:issuer': 'Create and update Issuers, create and update Badgeclasses, and award Assertions',
+        'r:profile':   'See who you are',
+        'rw:profile':  'Update your own user profile',
+        'r:backpack':  'List assertions in your backpack',
+        'rw:backpack': 'Upload badges into a backpack',
+        'rw:issuer':   'Create and update issuers, create and update badge classes, and award assertions',
 
         # private scopes used for integrations
-        'rw:issuer:*': 'Create and update Badgeclasses, and award Assertions for a single Issuer',
+        'rw:issuer:*':  'Create and update badge classes, and award assertions for a single issuer',
         'r:assertions': 'Batch receive assertions',
-        'rw:badgeuserAdmin': 'Ability to signup new BadgeUsers'
     },
     'DEFAULT_SCOPES': ['r:profile'],
 
@@ -433,7 +433,7 @@ OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = 'oauth2_provider.AccessToken'
 
 OAUTH2_TOKEN_SESSION_TIMEOUT_SECONDS = OAUTH2_PROVIDER['ACCESS_TOKEN_EXPIRE_SECONDS']
 
-API_DOCS_EXCLUDED_SCOPES = ['rw:issuer:*', 'r:assertions', '*', 'rw:badgeuserAdmin']
+API_DOCS_EXCLUDED_SCOPES = ['rw:issuer:*', 'r:assertions', '*']
 
 
 BADGR_PUBLIC_BOT_USERAGENTS = [
@@ -451,12 +451,6 @@ BADGR_PUBLIC_BOT_USERAGENTS_WIDE = [
 ]
 
 
-# Allow use of weaker CAs (1024 bits) to avoid problem with chained certificates used by accounts.google.com
-# Ideally this environment variable would be set on a per-environment basis, only where needed
-import os
-import certifi
-os.environ['REQUESTS_CA_BUNDLE'] = certifi.old_where()
-
 # default celery to always_eager
 CELERY_ALWAYS_EAGER = True
 
@@ -469,3 +463,5 @@ BADGERANK_NOTIFY_URL = 'https://api.badgerank.org/v1/badgeclass/submit'
 from cryptography.fernet import Fernet
 PAGINATION_SECRET_KEY = Fernet.generate_key()
 AUTHCODE_SECRET_KEY = Fernet.generate_key()
+
+AUTHCODE_EXPIRES_SECONDS = 600  # needs to be long enough to fetch information from socialauth providers

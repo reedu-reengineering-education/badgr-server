@@ -92,6 +92,31 @@ If your badgr-ui is running on http://localhost:4000, use the following values:
 * UI connect success redirect: `http://localhost:4000/profile/`
 * Public pages redirect: `http://localhost:4000/public/`
 
+#### Additional Configuration
+
+**Sign-In Configuration**
+
+* [Create an oAuth2 Provider Application](http://localhost:8000/staff/oauth2_provider/application/add/) with
+    * Client id: `public`
+    * Client type: Public
+    * allowed scopes: `rw:profile rw:issuer rw:backpack`
+    * Authorization grant type: Resource owner password-based
+    * Name: `localdev`
+    * Redirect uris: `http://localhost:4000`
+
+**User Configuration**
+
+* [Edit your super user](http://localhost:8000/staff/badgeuser/badgeuser/1/change/)
+    * Add an email address, check "verified" and "primary"
+
+* [Create an oAuth2 Provider Application](http://localhost:8000/staff/oauth2_provider/application/add/) with
+    * Client id: `public`
+    * Client type: Public
+    * allowed scopes: `rw:profile rw:issuer rw:backpack`
+    * Authorization grant type: Resource owner password-based
+    * Name: `localdev`
+    * Redirect uris: `http://localhost:4000`
+
 ### Additional configuration options
 Set these values in your settings_local.py file to configure the application to your specific needs. Required options are listed in bold.
 * *HELP_EMAIL* (Required)
@@ -108,3 +133,5 @@ Set these values in your settings_local.py file to configure the application to 
   - This defaults to True, but allows you to turn off signup if you would like to use Badgr for only single-account use or to manually create all users in `/staff`.
 * PAGINATION_SECRET_KEY:
   - Key used for symmetrical encryption of pagination cursors.  If not defined, encryption is disabled.  Must be 32 byte, base64-encoded random string.  For example: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key())"
+* AUTHCODE_SECRET_KEY must be 32 url-safe base64-encoded bytes:
+  - Key used for symmetrical encryption of pagination cursors.  If not defined, encryption is disabled.  Must be 32 byte, base64-encoded random string as above.

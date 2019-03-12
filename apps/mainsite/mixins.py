@@ -59,7 +59,7 @@ class ScrubUploadedSvgImage(object):
     SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 
     def save(self, *args, **kwargs):
-        if self.pk is None and self.image and verify_svg(self.image.file):
+        if self.image and verify_svg(self.image.file):
             self.image.file.seek(0)
             ET.register_namespace("", self.SVG_NAMESPACE)
             tree = ET.parse(self.image.file)

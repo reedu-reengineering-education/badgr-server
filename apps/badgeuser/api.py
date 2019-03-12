@@ -1,5 +1,8 @@
 import datetime
+import json
 import re
+import urllib
+import urlparse
 
 from allauth.account.adapter import get_adapter
 from allauth.account.models import EmailConfirmationHMAC
@@ -11,10 +14,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
+from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.urlresolvers import reverse
 from django.http import Http404
 from django.utils import timezone
+from django.views.generic import RedirectView
 from rest_framework import permissions, serializers, status
 from rest_framework.exceptions import ValidationError as RestframeworkValidationError
 from rest_framework.response import Response
@@ -22,8 +27,8 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.status import HTTP_302_FOUND, HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_201_CREATED, \
     HTTP_400_BAD_REQUEST
 
-from badgeuser.authcode import accesstoken_for_authcode, authcode_for_accesstoken
-from badgeuser.models import BadgeUser, CachedEmailAddress, BadgrAccessToken
+from badgeuser.authcode import accesstoken_for_authcode, authcode_for_accesstoken, decrypt_authcode
+from badgeuser.models import BadgeUser, CachedEmailAddress, BadgrAccessToken, TermsVersion
 from badgeuser.permissions import BadgeUserIsAuthenticatedUser
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserTokenSerializerV1
 from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerializerV2, AccessTokenSerializerV2
@@ -33,7 +38,7 @@ from entity.api import BaseEntityDetailView, BaseEntityListView, BaseEntityView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
 from mainsite.models import BadgrApp
-from mainsite.utils import OriginSetting
+from mainsite.utils import OriginSetting, backoff_cache_key
 
 RATE_LIMIT_DELTA = datetime.timedelta(minutes=5)
 
@@ -333,6 +338,8 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
         except DjangoValidationError as e:
             return Response(dict(password=e.messages), status=HTTP_400_BAD_REQUEST)
 
+        cache.set(backoff_cache_key(user.email, None), None)
+
         user.set_password(password)
         user.save()
         return self.get_response()
@@ -356,22 +363,26 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         """
 
         token = request.query_params.get('token')
+
         badgrapp_id = request.query_params.get('a', None)
         if badgrapp_id is None:
             badgrapp_id = getattr(settings, 'BADGR_APP_ID', 1)
-        try:
-            badgrapp = BadgrApp.objects.get(id=badgrapp_id)
-        except BadgrApp.DoesNotExist:
-            return Response(status=HTTP_404_NOT_FOUND)
+        else:
+            # badgr_app = get_session_badgr_app(self.request) # Could we reuse this method?
+            try:
+                badgrapp = BadgrApp.objects.get(id=badgrapp_id)
+            except BadgrApp.DoesNotExist:
+                return Response(status=HTTP_404_NOT_FOUND)
 
         emailconfirmation = EmailConfirmationHMAC.from_key(kwargs.get('confirm_id'))
         if emailconfirmation is None:
             return Response(status=HTTP_404_NOT_FOUND)
-
-        try:
-            email_address = CachedEmailAddress.cached.get(pk=emailconfirmation.email_address.pk)
-        except CachedEmailAddress.DoesNotExist:
-            return Response(status=HTTP_404_NOT_FOUND)
+        else:
+            try:
+                email_address = CachedEmailAddress.cached.get(
+                    pk=emailconfirmation.email_address.pk)
+            except CachedEmailAddress.DoesNotExist:
+                return Response(status=HTTP_404_NOT_FOUND)
 
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
@@ -381,9 +392,22 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         if not (uidb36 and key):
             return Response(status=HTTP_404_NOT_FOUND)
 
+        # get badgr_app url redirect
+        redirect_url = get_adapter().get_email_confirmation_redirect_url(request, badgr_app=badgrapp)
+
         user = self._get_user(uidb36)
         if user is None or not default_token_generator.check_token(user, key):
-            return Response(status=HTTP_404_NOT_FOUND)
+            # Resend e-mail verification
+            email_address.send_confirmation(request=request, signup=True)
+
+            # Redirect to front-end about expired link
+            auth_error_message = urllib.quote(
+                "Your authorization link has expired. You have been sent a new "
+                "link. Please check your email and try again.")
+            redirect_url_with_message = "{url}?authError={authError}".format(
+                url=redirect_url, authError=auth_error_message)
+            return Response(status=HTTP_302_FOUND,
+                            headers={ 'Location': redirect_url_with_message })
 
         if email_address.user != user:
             return Response(status=HTTP_404_NOT_FOUND)
@@ -395,9 +419,6 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         email_address.save()
 
         process_email_verification.delay(email_address.pk)
-
-        # get badgr_app url redirect
-        redirect_url = get_adapter().get_email_confirmation_redirect_url(request, badgr_app=badgrapp)
 
         # generate an AccessToken for the user
         accesstoken = BadgrAccessToken.objects.generate_new_token_for_user(
@@ -412,6 +433,66 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
             redirect_url = set_url_query_params(redirect_url, authToken=accesstoken.token)
 
         return Response(status=HTTP_302_FOUND, headers={'Location': redirect_url})
+
+
+class BadgeUserAccountConfirm(RedirectView):
+    badgrapp = None
+
+    def error_redirect_url(self):
+        if self.badgrapp is None:
+            try:
+                self.badgrapp = BadgrApp.objects.get(id=getattr(settings, 'BADGR_APP_ID', 1))
+            except BadgrApp.DoesNotExist:
+                return OriginSetting.HTTP
+
+        return set_url_query_params(
+            self.badgrapp.ui_login_redirect.rstrip('/'),
+            authError='Error validating request.'
+        )
+
+    def get_redirect_url(self, *args, **kwargs):
+        authcode = kwargs.get('authcode', None)
+        if not authcode:
+            return self.error_redirect_url()
+
+        user_info = decrypt_authcode(authcode)
+        try:
+            user_info = json.loads(user_info)
+        except (TypeError, ValueError,):
+            user_info = None
+        if not user_info:
+            return self.error_redirect_url()
+
+        badgrapp_id = user_info.get('badgrapp_id')
+        if badgrapp_id is None:
+            badgrapp_id = getattr(settings, 'BADGR_APP_ID', 1)
+        try:
+            self.badgrapp = BadgrApp.objects.get(id=badgrapp_id)
+        except BadgrApp.DoesNotExist:
+            return self.error_redirect_url()
+
+        try:
+            email_address = CachedEmailAddress.cached.get(email=user_info.get('email'))
+        except CachedEmailAddress.DoesNotExist:
+            return self.error_redirect_url()
+
+        user = email_address.user
+        user.first_name = user_info.get('first_name', user.first_name)
+        user.last_name = user_info.get('last_name', user.last_name)
+        user.badgrapp = self.badgrapp
+        user.marketing_opt_in = user_info.get('marketing_opt_in', user.marketing_opt_in)
+        user.agreed_terms_version = TermsVersion.cached.latest_version()
+        user.email_verified = True
+        if user_info.get('plaintext_password'):
+            user.set_password(user_info['plaintext_password'])
+        user.save()
+
+        redirect_url = urlparse.urljoin(
+            self.badgrapp.email_confirmation_redirect.rstrip('/') + '/',
+            urllib.quote(user.first_name.encode('utf8'))
+        )
+        redirect_url = set_url_query_params(redirect_url, email=email_address.email.encode('utf8'))
+        return redirect_url
 
 
 class AccessTokenList(BaseEntityListView):

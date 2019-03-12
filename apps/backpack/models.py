@@ -9,6 +9,7 @@ from basic_models.models import CreatedUpdatedAt
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.db import models, transaction
+from django.db.models import Q
 
 from entity.models import BaseVersionedEntity
 from issuer.models import BaseAuditedModel, BadgeInstance
@@ -41,6 +42,13 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
         super(BackpackCollection, self).delete(*args, **kwargs)
         self.publish_delete('share_hash')
         self.created_by.publish()
+
+    def save(self, **kwargs):
+        if self.pk:
+            BackpackCollectionBadgeInstance.objects.filter(
+                Q(badgeinstance__acceptance=BadgeInstance.ACCEPTANCE_REJECTED) | Q(badgeinstance__revoked=True)
+            ).delete()
+        super(BackpackCollection, self).save(**kwargs)
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_badgeinstances(self):

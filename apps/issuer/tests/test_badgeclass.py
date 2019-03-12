@@ -6,6 +6,7 @@ import json
 
 from django.core.files.images import get_image_dimensions
 from django.core.urlresolvers import reverse
+from django.utils import timezone
 
 from issuer.models import BadgeClass
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper
@@ -68,8 +69,157 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
                 self.assertEqual(response.status_code, 200)
                 return json.loads(response.content)
 
+    def get_test_image_base64(self, image_path=None):
+        if not image_path:
+            image_path = self.get_test_image_path()
+        with open(image_path, 'r') as badge_image:
+            image_str = self._base64_data_uri_encode(badge_image, "image/png")
+            return image_str
+
     def test_can_create_badgeclass(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_image_path())
+
+    def test_badgeclass_with_expires_in_days_v1(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+
+        base_badgeclass_data = {
+            'name': 'Expiring Badge',
+            'description': "A testing badge that expires",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+        }
+
+        # can create a badgeclass with valid expires_in_days
+        v1_data = base_badgeclass_data.copy()
+        v1_data.update(dict(
+            expires=dict(
+                amount=10,
+                duration="days"
+            ),
+        ))
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges'.format(issuer=test_issuer.entity_id), data=v1_data, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertDictEqual(response.data.get('expires'), v1_data.get('expires'))
+
+        badgeclass_entity_id = response.data.get('slug')
+
+        def _update_badgeclass(data):
+            return self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_issuer.entity_id,
+                badge=badgeclass_entity_id
+            ), data=data, format="json")
+
+        # can update a badgeclass with valid expires_in_days
+        good_expires_values = [
+            {"amount": 25, "duration": "days"},
+            {"amount": 1000000, "duration": "weeks"},
+            {"amount": 3, "duration": "months"},
+            {"amount": 1, "duration": "years"},
+        ]
+        for good_value in good_expires_values:
+            v1_data['expires'] = good_value
+            response = _update_badgeclass(v1_data)
+            self.assertEqual(response.status_code, 200)
+            self.assertDictEqual(response.data.get('expires'), good_value)
+
+        # can't use invalid expires_in_days
+        bad_expires_values = [
+            {"amount": 0, "duration": "days"},
+            {"amount": -1, "duration": "weeks"},
+            {"duration": "years"},
+            {"amount": 0.5, "duration": "years"},
+            {"amount": 5, "duration": "fortnights"}
+        ]
+        for bad_value in bad_expires_values:
+            v1_data['expires'] = bad_value
+            response = _update_badgeclass(v1_data)
+            self.assertEqual(response.status_code, 400)
+
+    def test_badgeclass_with_expires_in_days_v2(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+
+        base_badgeclass_data = {
+            'name': 'Expiring Badge',
+            'description': "A testing badge that expires",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+            'issuer': test_issuer.entity_id,
+        }
+
+        # can create a badgeclass with valid expires_in_days
+        v2_data = base_badgeclass_data.copy()
+        v2_data.update(dict(
+            expires=dict(
+                amount=10,
+                duration="days"
+            )
+        ))
+        response = self.client.post('/v2/badgeclasses', data=v2_data, format="json")
+        self.assertEqual(response.status_code, 201)
+        new_badgeclass = response.data.get('result', [None])[0]
+        self.assertEqual(new_badgeclass.get('expires'), v2_data.get('expires'))
+
+        # can update a badgeclass expires_in_days
+        def _update_badgeclass(data):
+            return self.client.put('/v2/badgeclasses/{badge}'.format(
+                badge=new_badgeclass.get('entityId')
+            ), data=data, format="json")
+
+        good_expires_values = [
+            {"amount": 25, "duration": "days"},
+            {"amount": 1000000, "duration": "weeks"},
+            {"amount": 3, "duration": "months"},
+            {"amount": 1, "duration": "years"},
+        ]
+        for good_data in good_expires_values:
+            v2_data['expires'] = good_data
+            response = _update_badgeclass(v2_data)
+            self.assertEqual(response.status_code, 200)
+            updated_badgeclass = response.data.get('result', [None])[0]
+            self.assertDictEqual(updated_badgeclass.get('expires'), v2_data.get('expires'))
+
+        # can't use invalid expiration
+        bad_expires_values = [
+            {"amount": 0, "duration": "days"},
+            {"amount": -1, "duration": "weeks"},
+            {"duration": "years"},
+            {"amount": 0.5, "duration": "years"},
+            {"amount": 5, "duration": "fortnights"}
+        ]
+        for bad_value in bad_expires_values:
+            v2_data['expires'] = bad_value
+            response = _update_badgeclass(v2_data)
+            self.assertEqual(response.status_code, 400)
+
+    def test_badgeclass_relative_expire_date_generation(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+
+        badgeclass = BadgeClass.objects.create(issuer=test_issuer)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_MONTHS
+        badgeclass.expires_amount = 6
+
+        date = badgeclass.generate_expires_at(issued_on=timezone.datetime(year=2018, month=8, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2019)
+        self.assertEqual(date.month, 2)
+        self.assertEqual(date.day, 28)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_YEARS
+        date = badgeclass.generate_expires_at(
+            issued_on=timezone.datetime(year=2020, month=2, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2026)
+        self.assertEqual(date.month, 2)
+        self.assertEqual(date.day, 28)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_DAYS
+        date = badgeclass.generate_expires_at(
+            issued_on=timezone.datetime(year=2020, month=2, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2020)
+        self.assertEqual(date.month, 3)
+        self.assertEqual(date.day, 6)
 
     def test_can_create_badgeclass_with_svg(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path())
