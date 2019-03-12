@@ -92,9 +92,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             "key": emailconfirmation.key,
             "badgr_app": badgr_app
         }
-        if signup == 'canvas':
-            email_template = 'account/email/email_confirmation_canvas'
-        elif signup:
+        if signup:
             email_template = 'account/email/email_confirmation_signup'
         else:
             email_template = 'account/email/email_confirmation'
