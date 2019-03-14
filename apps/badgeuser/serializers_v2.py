@@ -79,12 +79,12 @@ class BadgeUserSerializerV2(DetailSerializerV2):
 
         if password:
             if not current_password:
-                raise serializers.ValidationError({'currrent_password': "Field is required"})
+                raise serializers.ValidationError({'current_password': "Field is required"})
             if instance.check_password(current_password):
                 instance.set_password(password)
                 notify_on_password_change(instance)
             else:
-                raise serializers.ValidationError({'currrent_password': "Incorrect password"})
+                raise serializers.ValidationError({'current_password': "Incorrect password"})
 
         instance.badgrapp = BadgrApp.objects.get_current(request=self.context.get('request', None))
 
