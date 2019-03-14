@@ -363,22 +363,26 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         """
 
         token = request.query_params.get('token')
+
         badgrapp_id = request.query_params.get('a', None)
         if badgrapp_id is None:
             badgrapp_id = getattr(settings, 'BADGR_APP_ID', 1)
-        try:
-            badgrapp = BadgrApp.objects.get(id=badgrapp_id)
-        except BadgrApp.DoesNotExist:
-            return Response(status=HTTP_404_NOT_FOUND)
+        else:
+            # badgr_app = get_session_badgr_app(self.request) # Could we reuse this method?
+            try:
+                badgrapp = BadgrApp.objects.get(id=badgrapp_id)
+            except BadgrApp.DoesNotExist:
+                return Response(status=HTTP_404_NOT_FOUND)
 
         emailconfirmation = EmailConfirmationHMAC.from_key(kwargs.get('confirm_id'))
         if emailconfirmation is None:
             return Response(status=HTTP_404_NOT_FOUND)
-
-        try:
-            email_address = CachedEmailAddress.cached.get(pk=emailconfirmation.email_address.pk)
-        except CachedEmailAddress.DoesNotExist:
-            return Response(status=HTTP_404_NOT_FOUND)
+        else:
+            try:
+                email_address = CachedEmailAddress.cached.get(
+                    pk=emailconfirmation.email_address.pk)
+            except CachedEmailAddress.DoesNotExist:
+                return Response(status=HTTP_404_NOT_FOUND)
 
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
@@ -388,9 +392,22 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         if not (uidb36 and key):
             return Response(status=HTTP_404_NOT_FOUND)
 
+        # get badgr_app url redirect
+        redirect_url = get_adapter().get_email_confirmation_redirect_url(request, badgr_app=badgrapp)
+
         user = self._get_user(uidb36)
         if user is None or not default_token_generator.check_token(user, key):
-            return Response(status=HTTP_404_NOT_FOUND)
+            # Resend e-mail verification
+            email_address.send_confirmation(request=request, signup=True)
+
+            # Redirect to front-end about expired link
+            auth_error_message = urllib.quote(
+                "Your authorization link has expired. You have been sent a new "
+                "link. Please check your email and try again.")
+            redirect_url_with_message = "{url}?authError={authError}".format(
+                url=redirect_url, authError=auth_error_message)
+            return Response(status=HTTP_302_FOUND,
+                            headers={ 'Location': redirect_url_with_message })
 
         if email_address.user != user:
             return Response(status=HTTP_404_NOT_FOUND)
@@ -402,9 +419,6 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         email_address.save()
 
         process_email_verification.delay(email_address.pk)
-
-        # get badgr_app url redirect
-        redirect_url = get_adapter().get_email_confirmation_redirect_url(request, badgr_app=badgrapp)
 
         # generate an AccessToken for the user
         accesstoken = BadgrAccessToken.objects.generate_new_token_for_user(

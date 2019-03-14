@@ -290,7 +290,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         assertion_slug = response.data.get('slug')
 
         # assert that the BadgeInstance was published to and fetched from cache
-        query_count = 1 if apps.is_installed('badgebook') else 0
+        query_count = 0
         with self.assertNumQueries(query_count):
             response = self.client.get('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions/{assertion}'.format(
                 issuer=test_issuer.entity_id,

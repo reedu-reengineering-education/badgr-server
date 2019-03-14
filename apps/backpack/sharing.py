@@ -69,11 +69,12 @@ class LinkedinShareProvider(ShareProvider):
         if title is None:
             title = "I earned a badge from Badgr!"
         if summary is None:
-            summary = badge_instance.cached_badgeclass.name,
+            summary = badge_instance.cached_badgeclass.name
+            summary = summary.encode('utf8')  # Unicode is forbidden in URLs, urllib does not handle Unicode
         return "https://www.linkedin.com/shareArticle?mini=true&url={url}&title={title}&summary={summary}".format(
             url=urllib.quote(badge_instance.share_url),
-            title=title,
-            summary=summary
+            title=urllib.quote(title),
+            summary=urllib.quote(summary),
         )
 
     def certification_share_url(self, badge_instance, **kwargs):
