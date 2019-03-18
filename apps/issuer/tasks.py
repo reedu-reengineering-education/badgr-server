@@ -230,7 +230,7 @@ def remove_backpack_duplicate_issuer(self, issuer_entity_id=None, report_only=Fa
             'issuer_entity_id': issuer_entity_id
         }
 
-    assertions = issuer.badgeinstances.all()
+    assertions = issuer.badgeinstance_set.all()
     badgeclasses = issuer.badgeclasses.all()
 
     # ensure this issuer doesn't own any non-duplicate objects
