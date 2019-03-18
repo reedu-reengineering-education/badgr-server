@@ -44,6 +44,7 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     emails = BadgeUserEmailSerializerV2(many=True, source='email_items', required=False)
     agreedTermsVersion = serializers.IntegerField(source='agreed_terms_version', required=False)
     marketingOptIn = serializers.BooleanField(source='marketing_opt_in', required=False)
+    badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeUser
