@@ -57,6 +57,7 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     url = serializers.URLField(max_length=1024, required=True)
     staff = IssuerStaffSerializerV2(many=True, source='staff_items', required=False)
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
+    badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
 
     class Meta(DetailSerializerV2.Meta):
         model = Issuer
@@ -335,7 +336,7 @@ class BadgeRecipientSerializerV2(BaseSerializerV2):
         if hashed is None:
             attrs['hashed'] = self.HASHED_DEFAULTS.get(recipient_type, True)
         return attrs
-        
+
     def to_representation(self, instance):
         representation = super(BadgeRecipientSerializerV2, self).to_representation(instance)
         if instance.hashed:
