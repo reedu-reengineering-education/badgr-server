@@ -1,6 +1,6 @@
 import base64
 from datetime import datetime, timedelta
-from hashlib import sha1
+from hashlib import sha1, sha256
 import hmac
 
 import requests
@@ -80,8 +80,7 @@ def generate_email_signature(email):
         int((expiration - datetime(1970, 1, 1)).total_seconds())
 
     email_encoded = base64.b64encode(email)
-    email_hash = "email$sha1${hash}".format(
-        hash=hmac.new(secret_key, email_encoded, sha1).hexdigest())
+    email_hash = "email$sha256${hash}".format(hash=sha256(email).hexdigest())
     timestamp_hash = hmac.new(
         secret_key, email_encoded + str(expiration_timestamp), sha1)
 
