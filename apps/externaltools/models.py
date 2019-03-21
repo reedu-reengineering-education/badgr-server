@@ -65,7 +65,7 @@ class ExternalTool(BaseAuditedModel, BaseVersionedEntity):
 class ExternalToolLaunchpoint(cachemodel.CacheModel):
     externaltool = models.ForeignKey('externaltools.ExternalTool')
     launchpoint = models.CharField(max_length=254)
-    launch_url = models.URLField()
+    launch_url = models.CharField(max_length=1024)
     label = models.CharField(max_length=254)
     icon_url = models.URLField(blank=True, null=True)
 
