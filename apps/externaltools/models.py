@@ -107,9 +107,9 @@ class ExternalToolLaunchpoint(cachemodel.CacheModel):
                     custom_badgr_assertion_recipient=obj.recipient_identifier,
                     custom_badgr_assertion_id=obj.entity_id,
                     custom_badgr_badgeclass_id=obj.cached_badgeclass.entity_id,
-                    custom_badgr_badgeclass_name=obj.cached_badgeclass.name,
+                    custom_badgr_badgeclass_name=urllib.quote_plus(obj.cached_badgeclass.name.encode('utf-8')),
                     custom_badgr_issuer_id=obj.cached_issuer.entity_id,
-                    custom_badgr_issuer_name=obj.cached_issuer.name,
+                    custom_badgr_issuer_name=urllib.quote_plus(obj.cached_issuer.name.encode('utf-8')),
                 )
                 if any(s.user.id == user.id for s in obj.cached_issuer.cached_issuerstaff()):
                     roles.append('issuer')
