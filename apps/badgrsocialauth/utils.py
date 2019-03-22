@@ -1,6 +1,8 @@
 import urllib
 import urlparse
 
+from django.http import HttpResponseRedirect
+
 from rest_framework.authentication import TokenAuthentication
 
 from mainsite.models import BadgrApp
@@ -50,3 +52,11 @@ def get_verified_user(auth_token):
     authenticator = TokenAuthentication()
     verified_user, _ = authenticator.authenticate_credentials(auth_token)
     return verified_user
+
+
+def redirect_to_frontend_error_toast(request, message):
+    badgr_app = get_session_badgr_app(request)
+    redirect_url = "{url}?authError={message}".format(
+        url=badgr_app.ui_login_redirect,
+        message=urllib.quote(message))
+    return HttpResponseRedirect(redirect_to=redirect_url)
