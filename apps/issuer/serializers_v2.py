@@ -30,7 +30,14 @@ class IssuerAccessTokenSerializerV2(BaseSerializerV2):
         return super(IssuerAccessTokenSerializerV2, self).to_representation(instance)
 
 
+class StaffUserProfileSerializerV2(DetailSerializerV2):
+    firstName = StripTagsCharField(source='first_name', read_only=True)
+    lastName = StripTagsCharField(source='last_name', read_only=True)
+    email = serializers.EmailField(read_only=True)
+
+
 class IssuerStaffSerializerV2(DetailSerializerV2):
+    userProfile = StaffUserProfileSerializerV2(source='cached_user')
     user = EntityRelatedFieldV2(source='cached_user', queryset=BadgeUser.cached)
     role = serializers.CharField(validators=[ChoicesValidator(dict(IssuerStaff.ROLE_CHOICES).keys())])
 
