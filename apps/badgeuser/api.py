@@ -33,7 +33,8 @@ from badgeuser.permissions import BadgeUserIsAuthenticatedUser
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserTokenSerializerV1
 from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerializerV2, AccessTokenSerializerV2
 from badgeuser.tasks import process_email_verification
-from badgrsocialauth.utils import set_url_query_params
+from badgrsocialauth.utils import set_url_query_params, redirect_to_frontend_error_toast
+import badgrlog
 from entity.api import BaseEntityDetailView, BaseEntityListView, BaseEntityView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
@@ -41,6 +42,8 @@ from mainsite.models import BadgrApp
 from mainsite.utils import OriginSetting, backoff_cache_key
 
 RATE_LIMIT_DELTA = datetime.timedelta(minutes=5)
+
+logger = badgrlog.BadgrLogger()
 
 
 class BadgeUserDetail(BaseEntityDetailView):
@@ -376,41 +379,59 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
 
         emailconfirmation = EmailConfirmationHMAC.from_key(kwargs.get('confirm_id'))
         if emailconfirmation is None:
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.NoEmailConfirmation())
+            return redirect_to_frontend_error_toast(request,
+                "Your email confirmation link is invalid. Please attempt to "
+                "create an account with this email address, again.")
         else:
             try:
                 email_address = CachedEmailAddress.cached.get(
                     pk=emailconfirmation.email_address.pk)
             except CachedEmailAddress.DoesNotExist:
-                return Response(status=HTTP_404_NOT_FOUND)
+                logger.event(badgrlog.NoEmailConfirmationEmailAddress(
+                    email=emailconfirmation.email_address))
+                return redirect_to_frontend_error_toast(request,
+                    "Your email confirmation link is invalid. Please attempt "
+                    "to create an account with this email address, again.")
 
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.InvalidEmailConfirmationToken(
+                token=token, email=email_address))
+            email_address.send_confirmation(request=request, signup=True)
+            return redirect_to_frontend_error_toast(request,
+                "Your email confirmation token is invalid. You have been sent "
+                "a new link. Please check your email and try again.")
         uidb36 = matches.group(1)
         key = matches.group(2)
         if not (uidb36 and key):
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.InvalidEmailConfirmationToken(
+                token=token, email=email_address))
+            email_address.send_confirmation(request=request, signup=True)
+            return redirect_to_frontend_error_toast(request,
+                "Your email confirmation token is invalid. You have been sent "
+                "a new link. Please check your email and try again.")
 
         # get badgr_app url redirect
         redirect_url = get_adapter().get_email_confirmation_redirect_url(request, badgr_app=badgrapp)
 
         user = self._get_user(uidb36)
         if user is None or not default_token_generator.check_token(user, key):
-            # Resend e-mail verification
+            logger.event(badgrlog.EmailConfirmationTokenExpired(
+                email=email_address))
             email_address.send_confirmation(request=request, signup=True)
-
-            # Redirect to front-end about expired link
-            auth_error_message = urllib.quote(
+            return redirect_to_frontend_error_toast(request,
                 "Your authorization link has expired. You have been sent a new "
                 "link. Please check your email and try again.")
-            redirect_url_with_message = "{url}?authError={authError}".format(
-                url=redirect_url, authError=auth_error_message)
-            return Response(status=HTTP_302_FOUND,
-                            headers={ 'Location': redirect_url_with_message })
 
         if email_address.user != user:
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.OtherUsersEmailConfirmationToken(
+                token=token, email=email_address, other_user=user))
+            email_address.send_confirmation(request=request, signup=True)
+            return redirect_to_frontend_error_toast(request,
+                "Your email confirmation token is associated with another "
+                "user. You have been sent a new link. Please check your email "
+                "and try again.")
 
         old_primary = CachedEmailAddress.objects.get_primary(user)
         if old_primary is None:
