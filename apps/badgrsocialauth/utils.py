@@ -3,6 +3,8 @@ import urlparse
 
 from django.http import HttpResponseRedirect
 
+from rest_framework.response import Response
+from rest_framework.status import HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.authentication import TokenAuthentication
 
 from mainsite.models import BadgrApp
@@ -56,7 +58,11 @@ def get_verified_user(auth_token):
 
 def redirect_to_frontend_error_toast(request, message):
     badgr_app = get_session_badgr_app(request)
-    redirect_url = "{url}?authError={message}".format(
-        url=badgr_app.ui_login_redirect,
-        message=urllib.quote(message))
-    return HttpResponseRedirect(redirect_to=redirect_url)
+
+    if badgr_app:
+        redirect_url = "{url}?authError={message}".format(
+            url=badgr_app.ui_login_redirect,
+            message=urllib.quote(message))
+        return HttpResponseRedirect(redirect_to=redirect_url)
+    else:
+        return Response(message, status=HTTP_500_INTERNAL_SERVER_ERROR)
