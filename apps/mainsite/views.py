@@ -60,7 +60,7 @@ def info_view(request):
 
 def email_unsubscribe_error(request, message):
     badgr_app = get_session_badgr_app(request)
-    redirect_url = "{url}?authError={message}".format(
+    redirect_url = "{url}?infoMessage={message}".format(
         url=badgr_app.ui_login_redirect,
         message=message)
     return HttpResponseRedirect(redirect_to=redirect_url)
