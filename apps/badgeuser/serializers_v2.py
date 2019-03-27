@@ -45,7 +45,7 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     agreedTermsVersion = serializers.IntegerField(source='agreed_terms_version', required=False)
     marketingOptIn = serializers.BooleanField(source='marketing_opt_in', required=False)
     badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
-    has_password_set = serializers.SerializerMethodField()
+    hasPasswordSet = serializers.SerializerMethodField('get_has_password_set')
 
     def get_has_password_set(self, obj):
         return obj.password != None and obj.password != ''
