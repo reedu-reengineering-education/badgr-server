@@ -8,6 +8,7 @@ from django.core.validators import URLValidator, EmailValidator, RegexValidator
 from rest_framework import serializers
 
 from badgeuser.models import BadgeUser
+from badgeuser.serializers_v2 import BadgeUserEmailSerializerV2
 from entity.serializers import DetailSerializerV2, EntityRelatedFieldV2, BaseSerializerV2
 from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance
 from issuer.utils import generate_sha256_hashstring
@@ -33,7 +34,8 @@ class IssuerAccessTokenSerializerV2(BaseSerializerV2):
 class StaffUserProfileSerializerV2(DetailSerializerV2):
     firstName = StripTagsCharField(source='first_name', read_only=True)
     lastName = StripTagsCharField(source='last_name', read_only=True)
-    email = serializers.EmailField(read_only=True)
+    emails = BadgeUserEmailSerializerV2(many=True, source='email_items', required=False, read_only=True)
+    badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
 
 
 class IssuerStaffSerializerV2(DetailSerializerV2):
