@@ -43,6 +43,11 @@ class BadgeUserProfileSerializerV1(serializers.Serializer):
     slug = serializers.CharField(source='entity_id', read_only=True)
     agreed_terms_version = serializers.IntegerField(required=False)
     marketing_opt_in = serializers.BooleanField(required=False)
+    has_password_set = serializers.SerializerMethodField()
+
+    def get_has_password_set(self, obj):
+        return obj.password != None and obj.password != ''
+
 
     class Meta:
         apispec_definition = ('BadgeUser', {})
