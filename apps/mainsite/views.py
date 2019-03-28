@@ -60,10 +60,14 @@ def info_view(request):
 
 def email_unsubscribe_error(request, message):
     badgr_app = get_session_badgr_app(request)
-    redirect_url = "{url}?infoMessage={message}".format(
-        url=badgr_app.ui_login_redirect,
-        message=message)
-    return HttpResponseRedirect(redirect_to=redirect_url)
+
+    if badgr_app:
+        redirect_url = "{url}?infoMessage={message}".format(
+            url=badgr_app.ui_login_redirect,
+            message=message)
+        return HttpResponseRedirect(redirect_to=redirect_url)
+    else:
+        return HttpResponse(message)
 
 
 def email_unsubscribe(request, *args, **kwargs):
