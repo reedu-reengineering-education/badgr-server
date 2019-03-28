@@ -58,12 +58,15 @@ def info_view(request):
     return redirect(getattr(settings, 'LOGIN_REDIRECT_URL'))
 
 
-def email_unsubscribe_error(request, message):
+def email_unsubscribe_response(request, message, error=False):
     badgr_app = BadgrApp.objects.get_current(request=request)
 
+    query_param = 'infoMessage' if error else 'authError'
+
     if badgr_app:
-        redirect_url = "{url}?infoMessage={message}".format(
+        redirect_url = "{url}?{query_param}={message}".format(
             url=badgr_app.ui_login_redirect,
+            query_param=query_param,
             message=message)
         return HttpResponseRedirect(redirect_to=redirect_url)
     else:
@@ -72,16 +75,18 @@ def email_unsubscribe_error(request, message):
 
 def email_unsubscribe(request, *args, **kwargs):
     if time.time() > int(kwargs['expiration']):
-        return email_unsubscribe_error(
-            request, 'Your unsubscription link has expired.')
+        return email_unsubscribe_response(
+            request, 'Your unsubscription link has expired.', error=True)
 
     try:
         email = base64.b64decode(kwargs['email_encoded'])
     except TypeError:
-        return email_unsubscribe_error(request, 'Invalid unsubscribe link.')
+        return email_unsubscribe_response(request, 'Invalid unsubscribe link.',
+                                          error=True)
 
     if not EmailBlacklist.verify_email_signature(**kwargs):
-        return email_unsubscribe_error(request, 'Invalid unsubscribe link.')
+        return email_unsubscribe_response(request, 'Invalid unsubscribe link.',
+                                          error=True)
 
     blacklist_instance = EmailBlacklist(email=email)
     try:
@@ -89,7 +94,7 @@ def email_unsubscribe(request, *args, **kwargs):
     except IntegrityError:
         pass
 
-    return email_unsubscribe_error(
+    return email_unsubscribe_response(
         request, "You will no longer receive email notifications for earned"
         " badges from this domain.")
 
