@@ -199,9 +199,8 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
             try:
                 badgr_app = BadgrApp.objects.get(id=badgrapp_id)
             except BadgrApp.DoesNotExist:
-                pass
-        if not badgr_app:
-            badgr_app = BadgrApp.objects.get_current(request)
+                badgr_app = BadgrApp.objects.get_current(request)
+
         redirect_url = badgr_app.forgot_password_redirect
         token = request.GET.get('token', '')
         tokenized_url = "{}{}".format(redirect_url, token)
@@ -284,7 +283,7 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
             "site": get_current_site(request),
             "user": user,
             "password_reset_url": reset_url,
-            'badgr_app': badgrapp
+            'badgr_app': badgrapp,
         }
         get_adapter().send_mail('account/email/password_reset_key', email, email_context)
 

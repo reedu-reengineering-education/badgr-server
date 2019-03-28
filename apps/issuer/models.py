@@ -920,8 +920,6 @@ class BadgeInstance(BaseAuditedModel,
                 'badge_instance_url': self.public_url,
                 'image_url': self.public_url + '/image',
                 'download_url': self.public_url + "?action=download",
-                'unsubscribe_url': getattr(settings, 'HTTP_ORIGIN') + EmailBlacklist.generate_email_signature(
-                    self.recipient_identifier),
                 'site_name': badgr_app.name,
                 'site_url': badgr_app.signup_redirect,
                 'badgr_app': badgr_app,

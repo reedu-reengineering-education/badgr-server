@@ -24,7 +24,13 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
     def send_mail(self, template_prefix, email, context):
         context['STATIC_URL'] = getattr(settings, 'STATIC_URL')
         context['HTTP_ORIGIN'] = getattr(settings, 'HTTP_ORIGIN')
-        context['unsubscribe_url'] = getattr(settings, 'HTTP_ORIGIN') + EmailBlacklist.generate_email_signature(email)
+        if context.get('unsubscribe_url', None) is None:
+            try:
+                badgrapp_pk = context['badgr_app'].pk
+            except (KeyError, AttributeError):
+                badgrapp_pk = None
+            context['unsubscribe_url'] = getattr(settings, 'HTTP_ORIGIN') + EmailBlacklist.generate_email_signature(
+                email, badgrapp_pk)
 
         msg = self.render_mail(template_prefix, email, context)
         msg.send()
@@ -90,7 +96,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             "activate_url": activate_url,
             "current_site": current_site,
             "key": emailconfirmation.key,
-            "badgr_app": badgr_app
+            "badgr_app": badgr_app,
         }
         if signup:
             email_template = 'account/email/email_confirmation_signup'
