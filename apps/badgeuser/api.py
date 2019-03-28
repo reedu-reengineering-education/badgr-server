@@ -371,7 +371,6 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         if badgrapp_id is None:
             badgrapp_id = getattr(settings, 'BADGR_APP_ID', 1)
         else:
-            # badgr_app = get_session_badgr_app(self.request) # Could we reuse this method?
             try:
                 badgrapp = BadgrApp.objects.get(id=badgrapp_id)
             except BadgrApp.DoesNotExist:

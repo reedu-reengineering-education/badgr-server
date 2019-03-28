@@ -29,6 +29,10 @@ def set_session_verification_email(request, verification_email):
 
 
 def get_session_badgr_app(request):
+    """
+    This method can ONLY be used within the SSO process. The badgr_app_pk value
+    in request.session is ONLY stored prior to the external hop to the SSO.
+    """
     try:
         if request and hasattr(request, 'session'):
             return BadgrApp.objects.get(pk=request.session.get('badgr_app_pk', None))

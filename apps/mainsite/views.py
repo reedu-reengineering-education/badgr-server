@@ -59,7 +59,7 @@ def info_view(request):
 
 
 def email_unsubscribe_error(request, message):
-    badgr_app = get_session_badgr_app(request)
+    badgr_app = BadgrApp.objects.get_current(request=request)
 
     if badgr_app:
         redirect_url = "{url}?infoMessage={message}".format(
