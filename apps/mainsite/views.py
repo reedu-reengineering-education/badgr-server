@@ -85,12 +85,9 @@ def email_unsubscribe(request, *args, **kwargs):
     except IntegrityError:
         pass
 
-    if response and response.status_code == 201:
-        return email_unsubscribe_error(
-            request, "You will no longer receive email notifications for "
-            + "earned badges from this domain.")
-
-    return email_unsubscribe_error(request, "Unsubscribe request failed.")
+    return email_unsubscribe_error(
+        request, "You will no longer receive email notifications for earned"
+        " badges from this domain.")
 
 
 class AppleAppSiteAssociation(APIView):
