@@ -29,16 +29,16 @@ Wherever you take your badge, portable information about your achievement will
 be locked inside. You can use any Open Badges backpack service, but if you choose
 to create a {{ site_name }} ( {{ site_url }} ) account, your badges awarded from this issuer will
 be automatically added.
-
+{% if GDPR_INFO_URL %}
 -----------
 Know your Rights
 -----------
 The issuer of this badge has provided {{ site_name }} with your email address and the
 data about your achievement contained in this badge.  If you have questions about this badge,
 please contact the issuer at {{ issuer_email }}. You may request a copy of your data, request
-removal of data about you, or request to have incorrect information updated by contacting
-{{ help_email }}.
-
+removal of data about you, or request to have incorrect information updated. Learn more at
+{{ GDPR_INFO_URL }}
+{% endif %}
 -----------
 Open Badges: Portable Digital Credentials
 -----------
@@ -52,3 +52,6 @@ Learn more at http://openbadges.org
 Unsubscribe: If you wish not to be notified of any future badge awards from
 this service, click the link below:
 {{ unsubscribe_url }}
+
+{% if PRIVACY_POLICY_URL %}Privacy Policy: {{ PRIVACY_POLICY_URL }}{% endif %}
+{% if TERMS_OF_SERVICE_URL %}Terms of Service: {{ TERMS_OF_SERVICE_URL }}{% endif %}

@@ -67,6 +67,7 @@ badgr_admin.register(EmailBlacklist, EmailBlacklistAdmin)
 
 # 3rd party apps
 
+
 class LegacyTokenAdmin(ModelAdmin):
     list_display = ('obscured_token','user','created')
     list_filter = ('created',)
@@ -74,8 +75,8 @@ class LegacyTokenAdmin(ModelAdmin):
     search_fields = ('user__email', 'user__first_name', 'user__last_name')
     readonly_fields = ('obscured_token','created')
     fields = ('obscured_token', 'user', 'created')
-
 badgr_admin.register(LegacyTokenProxy, LegacyTokenAdmin)
+
 
 from allauth.account.admin import EmailAddressAdmin, EmailConfirmationAdmin
 from allauth.socialaccount.admin import SocialApp, SocialAppAdmin, SocialTokenAdmin, SocialAccountAdmin
