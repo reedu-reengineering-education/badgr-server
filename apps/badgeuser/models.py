@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.core.validators import URLValidator
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
@@ -29,6 +30,9 @@ from entity.models import BaseVersionedEntity
 from issuer.models import Issuer, BadgeInstance, BaseAuditedModel
 from badgeuser.managers import CachedEmailAddressManager, BadgeUserManager
 from mainsite.models import ApplicationInfo
+
+
+AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 
 class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
@@ -145,6 +149,51 @@ class EmailAddressVariant(models.Model):
             fail("New EmailAddressVariant does not match stored email address.")
 
         return True
+
+
+class UserRecipientIdentifier(cachemodel.CacheModel):
+
+    IDENTIFIER_TYPE_URL = 'url'
+    IDENTIFIER_TYPE_CHOICES = (
+        (IDENTIFIER_TYPE_URL, 'URL'),
+    )
+    IDENTIFIER_VALIDATORS = {
+        IDENTIFIER_TYPE_URL: (URLValidator(),),
+    }
+    format = models.CharField(max_length=3, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
+    identifier = models.CharField(max_length=255)
+    user = models.ForeignKey(AUTH_USER_MODEL)
+    verified = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('user', 'format', 'identifier')
+
+    def get_identifier_validators(self):
+        return UserRecipientIdentifier.IDENTIFIER_VALIDATORS[self.format]
+
+    def validate_identifier(self):
+        # format-specific validation
+        for validator in self.get_identifier_validators():
+            validator(self.identifier)
+
+        # regardless of format, only one user may have verified a given identifier
+        if self.verified and UserRecipientIdentifier.objects\
+                .filter(identifier=self.identifier, format=self.format, verified=True)\
+                .exclude(pk=self.pk)\
+                .exists():
+            raise ValidationError('Identifier already verified by another user.')
+
+    def clean_fields(self, exclude=None):
+        super(UserRecipientIdentifier, self).clean_fields(exclude=exclude)
+        self.validate_identifier()
+
+    def save(self, *args, **kwargs):
+        self.validate_identifier()
+        return super(UserRecipientIdentifier, self).save(*args, **kwargs)
+
+    def publish(self):
+        super(UserRecipientIdentifier, self).publish()
+        self.user.publish()
 
 
 class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
