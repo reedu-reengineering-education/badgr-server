@@ -6,7 +6,9 @@ from django_object_actions import DjangoObjectActions
 from externaltools.models import ExternalToolUserActivation
 from mainsite.admin import badgr_admin
 from mainsite.utils import backoff_cache_key
-from .models import BadgeUser, EmailAddressVariant, TermsVersion, TermsAgreement, CachedEmailAddress
+from .models import (BadgeUser, EmailAddressVariant, TermsVersion, TermsAgreement, CachedEmailAddress,
+                     UserRecipientIdentifier)
+
 
 
 class ExternalToolInline(TabularInline):
@@ -33,6 +35,13 @@ class EmailAddressInline(TabularInline):
     fields = ('email','verified','primary')
 
 
+class UserRecipientIdentifierInline(TabularInline):
+    model = UserRecipientIdentifier
+    fk_name = 'user'
+    extra = 0
+    fields = ('format', 'identifier', 'verified')
+
+
 class BadgeUserAdmin(DjangoObjectActions, ModelAdmin):
     readonly_fields = ('entity_id', 'date_joined', 'last_login', 'username', 'entity_id', 'agreed_terms_version', 'login_backoff')
     list_display = ('email', 'first_name', 'last_name', 'is_active', 'is_staff', 'entity_id', 'date_joined')
@@ -46,6 +55,7 @@ class BadgeUserAdmin(DjangoObjectActions, ModelAdmin):
     )
     inlines = [
         EmailAddressInline,
+        UserRecipientIdentifierInline,
         ExternalToolInline,
         TermsAgreementInline,
     ]
@@ -104,3 +114,13 @@ class TermsVersionAdmin(ModelAdmin):
     latest_terms_version.short_description = "Current Terms Version"
 
 badgr_admin.register(TermsVersion, TermsVersionAdmin)
+
+
+class RecipientIdentifierAdmin(ModelAdmin):
+    list_display = ('identifier', 'user', 'verified')
+    list_filter = ('verified',)
+    search_fields = ('identifier', 'user__email')
+    raw_id_fields = ('user',)
+
+
+badgr_admin.register(UserRecipientIdentifier, RecipientIdentifierAdmin)
