@@ -459,7 +459,18 @@ BADGERANK_NOTIFY_ON_BADGECLASS_CREATE = True
 BADGERANK_NOTIFY_ON_FIRST_ASSERTION = True
 BADGERANK_NOTIFY_URL = 'https://api.badgerank.org/v1/badgeclass/submit'
 
+# Feature options
+GDPR_COMPLIANCE_NOTIFY_ON_FIRST_AWARD = True  # Notify recipients of first award on server even if issuer didn't opt to.
 
+# Email footer operator information
+PRIVACY_POLICY_URL = None
+TERMS_OF_SERVICE_URL = None
+GDPR_INFO_URL = None
+OPERATOR_STREET_ADDRESS = None
+OPERATOR_NAME = None
+OPERATOR_URL = None
+
+# OVERRIDE THESE VALUES WITH YOUR OWN STABLE VALUES IN LOCAL SETTINGS
 from cryptography.fernet import Fernet
 PAGINATION_SECRET_KEY = Fernet.generate_key()
 AUTHCODE_SECRET_KEY = Fernet.generate_key()

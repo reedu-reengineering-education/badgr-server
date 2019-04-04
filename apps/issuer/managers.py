@@ -240,8 +240,8 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         if check_completions:
             award_badges_for_pathway_completion.delay(badgeinstance_pk=new_instance.pk)
 
-        if not notify:
-            # always notify if this is the first time issuing to a recipient
+        if not notify and getattr(settings, 'GDPR_COMPLIANCE_NOTIFY_ON_FIRST_AWARD'):
+            # always notify if this is the first time issuing to a recipient if configured for GDPR compliance
             if self.filter(recipient_identifier=recipient_identifier).count() == 1:
                 notify = True
 
