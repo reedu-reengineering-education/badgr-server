@@ -42,6 +42,7 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     password = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False, validators=[PasswordValidator()])
     currentPassword = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False)
     emails = BadgeUserEmailSerializerV2(many=True, source='email_items', required=False)
+    urls = serializers.ListField(read_only=True, source='cached_verified_recipient_identifiers')
     agreedTermsVersion = serializers.IntegerField(source='agreed_terms_version', required=False)
     marketingOptIn = serializers.BooleanField(source='marketing_opt_in', required=False)
     badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
