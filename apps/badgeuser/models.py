@@ -152,6 +152,11 @@ class EmailAddressVariant(models.Model):
 
 
 class UserRecipientIdentifier(cachemodel.CacheModel):
+    """
+    Holds recipient identifiers that are not email addresses (emails are in allauth.account.models.EmailAddress).
+
+    In the long term, this should be extended to support email address identifiers as well.
+    """
 
     IDENTIFIER_TYPE_URL = 'url'
     IDENTIFIER_TYPE_TELEPHONE = 'telephone'

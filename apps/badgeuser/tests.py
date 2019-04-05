@@ -17,12 +17,15 @@ from badgeuser.authcode import encrypt_authcode, decrypt_authcode, authcode_for_
 from mainsite import TOP_DIR
 from rest_framework.authtoken.models import Token
 
-from badgeuser.models import BadgeUser, BadgrAccessToken, UserRecipientIdentifier
-from badgeuser.models import EmailAddressVariant, CachedEmailAddress
+from badgeuser.models import (
+    BadgeUser, BadgrAccessToken, UserRecipientIdentifier, EmailAddressVariant, CachedEmailAddress)
+from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1
+from badgeuser.serializers_v2 import BadgeUserSerializerV2
 from issuer.models import BadgeClass, Issuer
 from mainsite.models import BadgrApp, ApplicationInfo
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import backoff_cache_key
+
 
 
 class AuthTokenTests(BadgrTestCase):
@@ -679,6 +682,26 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
         self.first_user.userrecipientidentifier_set.create(
             type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL, identifier=identifier, verified=True)
         self.assertIn(identifier, self.first_user.all_recipient_identifiers)
+
+    def test_identifiers_serialized_to_correct_fields(self):
+        url = 'http://example.com'
+        phone = '+15413428456'
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL, identifier=url, verified=True)
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier=phone, verified=True)
+        v1serialized = BadgeUserProfileSerializerV1(self.first_user).data
+        v2serialized = BadgeUserSerializerV2(self.first_user).data['result'][0]
+
+        self.assertIn(url, v1serialized['url'])
+        self.assertIn(url, v2serialized['url'])
+        self.assertIn(phone, v1serialized['telephone'])
+        self.assertIn(phone, v2serialized['telephone'])
+
+        self.assertNotIn(phone, v1serialized['url'])
+        self.assertNotIn(phone, v2serialized['url'])
+        self.assertNotIn(url, v1serialized['telephone'])
+        self.assertNotIn(url, v2serialized['telephone'])
 
     def test_verified_recipient_receives_assertion(self):
         url = 'http://example.com'
