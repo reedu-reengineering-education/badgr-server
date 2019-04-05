@@ -668,6 +668,17 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
             self.first_user.userrecipientidentifier_set.create(
                 type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='(541) 342-8456')
 
+    def test_verified_phone_included_in_all_recipient_identifiers(self):
+        identifier = '3428456'
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier=identifier, verified=True)
+        self.assertIn(identifier, self.first_user.all_recipient_identifiers)
+
+    def test_verified_url_included_in_all_recipient_identifiers(self):
+        identifier = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL, identifier=identifier, verified=True)
+        self.assertIn(identifier, self.first_user.all_recipient_identifiers)
 
     def test_verified_recipient_receives_assertion(self):
         url = 'http://example.com'

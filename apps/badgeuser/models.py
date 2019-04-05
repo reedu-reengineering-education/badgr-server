@@ -247,6 +247,13 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
                 verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)]
 
     @cachemodel.cached_method(auto_publish=True)
+    def cached_verified_phone_numbers(self):
+        return [
+            r.identifier for r in
+            self.userrecipientidentifier_set.filter(
+                verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE)]
+
+    @cachemodel.cached_method(auto_publish=True)
     def cached_emails(self):
         return CachedEmailAddress.objects.filter(user=self)
 
@@ -347,7 +354,8 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     def all_recipient_identifiers(self):
         return ([e.email for e in self.cached_emails() if e.verified]
                 + [e.email for e in self.cached_email_variants()]
-                + self.cached_verified_urls())
+                + self.cached_verified_urls()
+                + self.cached_verified_phone_numbers())
 
     def is_email_verified(self, email):
         if email in self.all_recipient_identifiers:
