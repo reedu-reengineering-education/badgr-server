@@ -117,8 +117,8 @@ badgr_admin.register(TermsVersion, TermsVersionAdmin)
 
 
 class RecipientIdentifierAdmin(ModelAdmin):
-    list_display = ('identifier', 'user', 'verified')
-    list_filter = ('verified',)
+    list_display = ('type', 'identifier', 'user', 'verified')
+    list_filter = ('type', 'verified',)
     search_fields = ('identifier', 'user__email')
     raw_id_fields = ('user',)
 

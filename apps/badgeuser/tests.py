@@ -628,7 +628,7 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
             second_identifier.verified = True
             second_identifier.save()
 
-    def test_format_validation(self):
+    def test_url_format_validation(self):
         self.first_user.userrecipientidentifier_set.create(identifier='http://example.com')
         self.first_user.userrecipientidentifier_set.create(identifier='ftp://example.com')
         self.first_user.userrecipientidentifier_set.create(identifier='https://withpath.com/12345678')
@@ -650,6 +650,24 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
             self.first_user.userrecipientidentifier_set.create(identifier='http://singlepart')
         with self.assertRaisesRegex(ValidationError, 'valid'):
             self.first_user.userrecipientidentifier_set.create(identifier='/relative/url')
+
+    def test_phone_format_validation(self):
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='3428456')
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='5413428456')
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='15413428456')
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='+15413428456')
+
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(
+                type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='+1541342845612345')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(
+                type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='(541) 342-8456')
+
 
     def test_verified_recipient_receives_assertion(self):
         url = 'http://example.com'

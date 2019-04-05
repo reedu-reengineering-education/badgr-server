@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.core.validators import URLValidator
+from django.core.validators import URLValidator, RegexValidator
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
@@ -154,13 +154,16 @@ class EmailAddressVariant(models.Model):
 class UserRecipientIdentifier(cachemodel.CacheModel):
 
     IDENTIFIER_TYPE_URL = 'url'
+    IDENTIFIER_TYPE_TELEPHONE = 'telephone'
     IDENTIFIER_TYPE_CHOICES = (
         (IDENTIFIER_TYPE_URL, 'URL'),
+        (IDENTIFIER_TYPE_TELEPHONE, 'Phone Number'),
     )
     IDENTIFIER_VALIDATORS = {
         IDENTIFIER_TYPE_URL: (URLValidator(),),
+        IDENTIFIER_TYPE_TELEPHONE: (RegexValidator(regex=r"^\+?[1-9]\d{1,14}$", message="Enter a valid Phone Number."),),
     }
-    type = models.CharField(max_length=3, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
+    type = models.CharField(max_length=9, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
     identifier = models.CharField(max_length=255)
     user = models.ForeignKey(AUTH_USER_MODEL)
     verified = models.BooleanField(default=False)
