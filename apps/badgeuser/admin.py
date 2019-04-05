@@ -39,7 +39,7 @@ class UserRecipientIdentifierInline(TabularInline):
     model = UserRecipientIdentifier
     fk_name = 'user'
     extra = 0
-    fields = ('format', 'identifier', 'verified')
+    fields = ('type', 'identifier', 'verified')
 
 
 class BadgeUserAdmin(DjangoObjectActions, ModelAdmin):

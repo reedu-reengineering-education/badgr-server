@@ -160,16 +160,16 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
     IDENTIFIER_VALIDATORS = {
         IDENTIFIER_TYPE_URL: (URLValidator(),),
     }
-    format = models.CharField(max_length=3, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
+    type = models.CharField(max_length=3, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
     identifier = models.CharField(max_length=255)
     user = models.ForeignKey(AUTH_USER_MODEL)
     verified = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('user', 'format', 'identifier')
+        unique_together = ('user', 'type', 'identifier')
 
     def get_identifier_validators(self):
-        return UserRecipientIdentifier.IDENTIFIER_VALIDATORS[self.format]
+        return UserRecipientIdentifier.IDENTIFIER_VALIDATORS[self.type]
 
     def validate_identifier(self):
         # format-specific validation
@@ -178,7 +178,7 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
 
         # regardless of format, only one user may have verified a given identifier
         if self.verified and UserRecipientIdentifier.objects\
-                .filter(identifier=self.identifier, format=self.format, verified=True)\
+                .filter(identifier=self.identifier, type=self.type, verified=True)\
                 .exclude(pk=self.pk)\
                 .exists():
             raise ValidationError('Identifier already verified by another user.')
