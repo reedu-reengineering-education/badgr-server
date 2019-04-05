@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth.hashers import is_password_usable
 from rest_framework import serializers
 
 from mainsite.models import BadgrApp
@@ -46,8 +47,7 @@ class BadgeUserProfileSerializerV1(serializers.Serializer):
     has_password_set = serializers.SerializerMethodField()
 
     def get_has_password_set(self, obj):
-        return obj.password != None and obj.password != ''
-
+        return is_password_usable(obj.password)
 
     class Meta:
         apispec_definition = ('BadgeUser', {})
