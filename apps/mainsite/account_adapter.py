@@ -94,9 +94,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         activate_url = self.get_email_confirmation_url(
             request,
             emailconfirmation)
-        badgr_app = get_session_badgr_app(request)
-        if not badgr_app:
-            badgr_app = BadgrApp.objects.get_current(request, raise_exception=False)
+        badgr_app = BadgrApp.objects.get_current(request, raise_exception=False)
         ctx = {
             "user": emailconfirmation.email_address.user,
             "email": emailconfirmation.email_address,
@@ -118,7 +116,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         If successfully logged in, redirect to the front-end, including an authToken query parameter.
         """
         if request.user.is_authenticated():
-            badgr_app = get_session_badgr_app(request)
+            badgr_app = BadgrApp.objects.get_current(self.request)
 
             if badgr_app is not None:
                 accesstoken = BadgrAccessToken.objects.generate_new_token_for_user(
