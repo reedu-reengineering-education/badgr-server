@@ -35,7 +35,7 @@ from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerial
 from badgeuser.tasks import process_email_verification
 from badgrsocialauth.utils import set_url_query_params, redirect_to_frontend_error_toast
 import badgrlog
-from entity.api import BaseEntityDetailView, BaseEntityListView,
+from entity.api import BaseEntityDetailView, BaseEntityListView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
 from mainsite.models import BadgrApp
