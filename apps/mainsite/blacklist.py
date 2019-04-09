@@ -15,8 +15,7 @@ blacklist_query_endpoint = getattr(settings, 'BADGR_BLACKLIST_QUERY_ENDPOINT', N
 
 def api_submit_email(email):
     if blacklist_api_key and blacklist_query_endpoint:
-        email_encoded, email_hash, expiration_timestamp, timestamp_hash = \
-            generate_email_signature(email)
+        email_hash = generate_hash('email', email)
 
         request_body = '{ "id": "%s" }' % email_hash
         request_query = "{endpoint}".format(endpoint=blacklist_query_endpoint)
@@ -37,8 +36,7 @@ def api_submit_email(email):
 
 def api_query_email(email):
     if blacklist_api_key and blacklist_query_endpoint:
-        email_encoded, email_hash, expiration_timestamp, timestamp_hash = \
-            generate_email_signature(email)
+        email_hash = generate_hash('email', email)
 
         request_query = "{endpoint}?id={email_hash}".format(
             endpoint=blacklist_query_endpoint,
@@ -72,6 +70,11 @@ def api_query_is_in_blacklist(email):
     return is_in_blacklist
 
 
+def generate_hash(id_type, id_value):
+    return "${id_type}$sha256${hash}".format(id_type=id_type,
+                                             hash=sha256(id_value).hexdigest())
+
+
 def generate_email_signature(email):
     secret_key = settings.UNSUBSCRIBE_SECRET_KEY
 
@@ -80,7 +83,7 @@ def generate_email_signature(email):
         int((expiration - datetime(1970, 1, 1)).total_seconds())
 
     email_encoded = base64.b64encode(email)
-    email_hash = "email$sha256${hash}".format(hash=sha256(email).hexdigest())
+    email_hash = generate_hash('email', email)
     timestamp_hash = hmac.new(
         secret_key, email_encoded + str(expiration_timestamp), sha1)
 
@@ -89,7 +92,7 @@ def generate_email_signature(email):
 
 
 def generate_unsubscribe_path(email):
-    email_encoded, email_hash, timestamp, timestamp_hash = \
+    email_encoded, _, timestamp, timestamp_hash = \
         generate_email_signature(email)
 
     return reverse('unsubscribe', kwargs={
