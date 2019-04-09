@@ -3,6 +3,8 @@ import urlparse
 
 from django.http import HttpResponseRedirect
 
+from rest_framework.response import Response
+from rest_framework.status import HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.authentication import TokenAuthentication
 
 from mainsite.models import BadgrApp
