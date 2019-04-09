@@ -7,8 +7,8 @@ import urlparse
 from allauth.account.adapter import get_adapter
 from allauth.account.models import EmailConfirmationHMAC
 from allauth.account.utils import user_pk_to_url_str, url_str_to_user_pk
-from apispec_drf.decorators import apispec_get_operation, apispec_put_operation, apispec_operation, \
-    apispec_delete_operation, apispec_list_operation
+from apispec_drf.decorators import (apispec_get_operation, apispec_put_operation, apispec_operation,
+    apispec_delete_operation, apispec_list_operation,)
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -24,10 +24,10 @@ from rest_framework import permissions, serializers, status
 from rest_framework.exceptions import ValidationError as RestframeworkValidationError
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
-from rest_framework.status import HTTP_302_FOUND, HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_201_CREATED, \
-    HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
+from rest_framework.status import (HTTP_302_FOUND, HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_201_CREATED,
+    HTTP_400_BAD_REQUEST,)
 
-from badgeuser.authcode import accesstoken_for_authcode, authcode_for_accesstoken, decrypt_authcode
+from badgeuser.authcode import authcode_for_accesstoken, decrypt_authcode
 from badgeuser.models import BadgeUser, CachedEmailAddress, BadgrAccessToken, TermsVersion
 from badgeuser.permissions import BadgeUserIsAuthenticatedUser
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserTokenSerializerV1
@@ -35,7 +35,7 @@ from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerial
 from badgeuser.tasks import process_email_verification
 from badgrsocialauth.utils import set_url_query_params, redirect_to_frontend_error_toast
 import badgrlog
-from entity.api import BaseEntityDetailView, BaseEntityListView, BaseEntityView
+from entity.api import BaseEntityDetailView, BaseEntityListView,
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
 from mainsite.models import BadgrApp
