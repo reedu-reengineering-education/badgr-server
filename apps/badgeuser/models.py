@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.core.validators import URLValidator, RegexValidator
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
@@ -29,6 +30,9 @@ from entity.models import BaseVersionedEntity
 from issuer.models import Issuer, BadgeInstance, BaseAuditedModel
 from badgeuser.managers import CachedEmailAddressManager, BadgeUserManager
 from mainsite.models import ApplicationInfo
+
+
+AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 
 class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
@@ -147,6 +151,59 @@ class EmailAddressVariant(models.Model):
         return True
 
 
+class UserRecipientIdentifier(cachemodel.CacheModel):
+    """
+    Holds recipient identifiers that are not email addresses (emails are in allauth.account.models.EmailAddress).
+
+    In the long term, this should be extended to support email address identifiers as well.
+    """
+
+    IDENTIFIER_TYPE_URL = 'url'
+    IDENTIFIER_TYPE_TELEPHONE = 'telephone'
+    IDENTIFIER_TYPE_CHOICES = (
+        (IDENTIFIER_TYPE_URL, 'URL'),
+        (IDENTIFIER_TYPE_TELEPHONE, 'Phone Number'),
+    )
+    IDENTIFIER_VALIDATORS = {
+        IDENTIFIER_TYPE_URL: (URLValidator(),),
+        IDENTIFIER_TYPE_TELEPHONE: (RegexValidator(regex=r"^\+?[1-9]\d{1,14}$", message="Enter a valid Phone Number."),),
+    }
+    type = models.CharField(max_length=9, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
+    identifier = models.CharField(max_length=255)
+    user = models.ForeignKey(AUTH_USER_MODEL)
+    verified = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('user', 'type', 'identifier')
+
+    def get_identifier_validators(self):
+        return UserRecipientIdentifier.IDENTIFIER_VALIDATORS[self.type]
+
+    def validate_identifier(self):
+        # format-specific validation
+        for validator in self.get_identifier_validators():
+            validator(self.identifier)
+
+        # regardless of format, only one user may have verified a given identifier
+        if self.verified and UserRecipientIdentifier.objects\
+                .filter(identifier=self.identifier, type=self.type, verified=True)\
+                .exclude(pk=self.pk)\
+                .exists():
+            raise ValidationError('Identifier already verified by another user.')
+
+    def clean_fields(self, exclude=None):
+        super(UserRecipientIdentifier, self).clean_fields(exclude=exclude)
+        self.validate_identifier()
+
+    def save(self, *args, **kwargs):
+        self.validate_identifier()
+        return super(UserRecipientIdentifier, self).save(*args, **kwargs)
+
+    def publish(self):
+        super(UserRecipientIdentifier, self).publish()
+        self.user.publish()
+
+
 class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     """
     A full-featured user model that can be an Earner, Issuer, or Consumer of Open Badges
@@ -186,6 +243,20 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     def delete(self, *args, **kwargs):
         super(BadgeUser, self).delete(*args, **kwargs)
         self.publish_delete('username')
+
+    @cachemodel.cached_method(auto_publish=True)
+    def cached_verified_urls(self):
+        return [
+            r.identifier for r in
+            self.userrecipientidentifier_set.filter(
+                verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)]
+
+    @cachemodel.cached_method(auto_publish=True)
+    def cached_verified_phone_numbers(self):
+        return [
+            r.identifier for r in
+            self.userrecipientidentifier_set.filter(
+                verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE)]
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_emails(self):
@@ -286,7 +357,10 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
 
     @property
     def all_recipient_identifiers(self):
-        return [e.email for e in self.cached_emails() if e.verified] + [e.email for e in self.cached_email_variants()]
+        return ([e.email for e in self.cached_emails() if e.verified]
+                + [e.email for e in self.cached_email_variants()]
+                + self.cached_verified_urls()
+                + self.cached_verified_phone_numbers())
 
     def is_email_verified(self, email):
         if email in self.all_recipient_identifiers:
