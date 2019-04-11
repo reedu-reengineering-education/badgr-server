@@ -69,6 +69,13 @@ class EmailBlacklist(models.Model):
 
 class BadgrAppManager(Manager):
     def get_current(self, request=None, raise_exception=True):
+        """
+        A safe method for getting the current BadgrApp related to a request. It will always return a BadgrApp if
+        the server is properly configured.
+        :param request: Django Request object
+        :param raise_exception: bool
+        :return: BadgrApp
+        """
         origin = None
         existing_session_app_id = None
 

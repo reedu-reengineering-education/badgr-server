@@ -44,6 +44,18 @@ class FailedLoginAttempt(BaseBadgrEvent):
         }
 
 
+class NoBadgrApp(BaseBadgrEvent):
+
+    def __init__(self, request, badgrapp_id, **kwargs):
+        self.request = request
+        self.badgrapp_id = badgrapp_id
+
+    def to_representation(self):
+        return {
+            'badgrapp_id': self.badgrapp_id,
+        }
+
+
 class NoEmailConfirmation(BaseBadgrEvent):
 
     def to_representation(self):

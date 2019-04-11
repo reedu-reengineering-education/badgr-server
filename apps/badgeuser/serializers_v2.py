@@ -2,6 +2,7 @@ import base64
 from collections import OrderedDict
 
 from rest_framework import serializers
+from django.contrib.auth.hashers import is_password_usable
 
 from badgeuser.models import BadgeUser, TermsVersion
 from badgeuser.utils import notify_on_password_change
@@ -50,7 +51,7 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     hasPasswordSet = serializers.SerializerMethodField('get_has_password_set')
 
     def get_has_password_set(self, obj):
-        return obj.password != None and obj.password != ''
+        return is_password_usable(obj.password)
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeUser

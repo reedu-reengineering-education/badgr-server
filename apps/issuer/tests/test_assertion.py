@@ -298,6 +298,22 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
                 assertion=assertion_slug))
             self.assertEqual(response.status_code, 200)
 
+    def test_cannot_issue_email_assertion_to_non_email(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        assertion = {
+            "recipient_identifier": "example.com",
+            "recipient_type": "email",
+            "create_notification": True
+        }
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ), assertion)
+        self.assertEqual(response.status_code, 400)
+
     def test_issue_badge_with_ob1_evidence(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)

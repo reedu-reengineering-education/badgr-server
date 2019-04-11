@@ -50,14 +50,14 @@ class BadgrSocialLogin(RedirectView):
 
 class BadgrSocialLoginCancel(RedirectView):
     def get_redirect_url(self):
-        badgr_app = get_session_badgr_app(self.request)
+        badgr_app = BadgrApp.objects.get_current(self.request)
         if badgr_app is not None:
             return set_url_query_params(badgr_app.ui_login_redirect)
 
 
 class BadgrSocialEmailExists(RedirectView):
     def get_redirect_url(self):
-        badgr_app = get_session_badgr_app(self.request)
+        badgr_app = BadgrApp.objects.get_current(self.request)
         if badgr_app is not None:
             return set_url_query_params(badgr_app.ui_login_redirect,
                                         authError='An account already exists with provided email address')
@@ -65,7 +65,7 @@ class BadgrSocialEmailExists(RedirectView):
 
 class BadgrSocialAccountVerifyEmail(RedirectView):
     def get_redirect_url(self):
-        badgr_app = get_session_badgr_app(self.request)
+        badgr_app = BadgrApp.objects.get_current(self.request)
         verification_email = get_session_verification_email(self.request)
 
         if verification_email is not None:
@@ -79,6 +79,6 @@ class BadgrSocialAccountVerifyEmail(RedirectView):
 
 class BadgrAccountConnected(RedirectView):
     def get_redirect_url(self):
-        badgr_app = get_session_badgr_app(self.request)
+        badgr_app = BadgrApp.objects.get_current(self.request)
         if badgr_app is not None:
             return set_url_query_params(badgr_app.ui_connect_success_redirect)
