@@ -390,7 +390,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
                     pk=emailconfirmation.email_address.pk)
             except CachedEmailAddress.DoesNotExist:
                 logger.event(badgrlog.NoEmailConfirmationEmailAddress(
-                    request, email=emailconfirmation.email_address))
+                    request, email_address=emailconfirmation.email_address))
                 return redirect_to_frontend_error_toast(request,
                     "Your email confirmation link is invalid. Please attempt "
                     "to create an account with this email address, again.")
@@ -399,7 +399,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
             logger.event(badgrlog.InvalidEmailConfirmationToken(
-                request, token=token, email=email_address))
+                request, token=token, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your email confirmation token is invalid. You have been sent "
@@ -408,7 +408,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         key = matches.group(2)
         if not (uidb36 and key):
             logger.event(badgrlog.InvalidEmailConfirmationToken(
-                token=token, email=email_address))
+                request, token=token, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your email confirmation token is invalid. You have been sent "
@@ -421,7 +421,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         user = self._get_user(uidb36)
         if user is None or not default_token_generator.check_token(user, key):
             logger.event(badgrlog.EmailConfirmationTokenExpired(
-                request, email=email_address))
+                request, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your authorization link has expired. You have been sent a new "
@@ -429,7 +429,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
 
         if email_address.user != user:
             logger.event(badgrlog.OtherUsersEmailConfirmationToken(
-                request, token=token, email=email_address, other_user=user))
+                request, email_address=email_address, token=token, other_user=user))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your email confirmation token is associated with another "
