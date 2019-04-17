@@ -220,7 +220,10 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
                 with storage.open(image_prop.name, 'rb') as input_svg:
                     svg_buf = StringIO.StringIO()
                     out_buf = StringIO.StringIO()
-                    cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
+                    try:
+                        cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
+                    except IOError:
+                        return redirect(storage.url(image_prop.name))  # If conversion fails, return existing file.
                     img = Image.open(svg_buf)
 
                     img = _fit_to_height(img, supported_fmts[image_fmt])
