@@ -193,13 +193,11 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
     v2_serializer_class = BaseSerializerV2
 
     def get(self, request, *args, **kwargs):
-        badgr_app = None
-        badgrapp_id = self.request.GET.get('a', None)
-        if badgrapp_id is not None:
-            try:
-                badgr_app = BadgrApp.objects.get(id=badgrapp_id)
-            except BadgrApp.DoesNotExist:
-                badgr_app = BadgrApp.objects.get_current(request)
+        badgrapp_id = self.request.GET.get('a', getattr(settings, 'BADGR_APP_ID', 1))
+        try:
+            badgr_app = BadgrApp.objects.get(id=badgrapp_id)
+        except BadgrApp.DoesNotExist:
+            badgr_app = BadgrApp.objects.get_current(request)
 
         redirect_url = badgr_app.forgot_password_redirect
         token = request.GET.get('token', '')
