@@ -361,7 +361,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
               description: The token received in the recovery email
               required: true
         """
-        token = request.query_params.get('token')
+        token = request.query_params.get('token', '')
         badgrapp_id = request.query_params.get(
             'a', getattr(settings, 'BADGR_APP_ID', 1))
 
