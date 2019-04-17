@@ -193,13 +193,11 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
     v2_serializer_class = BaseSerializerV2
 
     def get(self, request, *args, **kwargs):
-        badgr_app = None
-        badgrapp_id = self.request.GET.get('a', None)
-        if badgrapp_id is not None:
-            try:
-                badgr_app = BadgrApp.objects.get(id=badgrapp_id)
-            except BadgrApp.DoesNotExist:
-                badgr_app = BadgrApp.objects.get_current(request)
+        badgrapp_id = self.request.GET.get('a', getattr(settings, 'BADGR_APP_ID', 1))
+        try:
+            badgr_app = BadgrApp.objects.get(id=badgrapp_id)
+        except BadgrApp.DoesNotExist:
+            badgr_app = BadgrApp.objects.get_current(request)
 
         redirect_url = badgr_app.forgot_password_redirect
         token = request.GET.get('token', '')
@@ -363,7 +361,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
               description: The token received in the recovery email
               required: true
         """
-        token = request.query_params.get('token')
+        token = request.query_params.get('token', '')
         badgrapp_id = request.query_params.get(
             'a', getattr(settings, 'BADGR_APP_ID', 1))
 
@@ -390,7 +388,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
                     pk=emailconfirmation.email_address.pk)
             except CachedEmailAddress.DoesNotExist:
                 logger.event(badgrlog.NoEmailConfirmationEmailAddress(
-                    request, email=emailconfirmation.email_address))
+                    request, email_address=emailconfirmation.email_address))
                 return redirect_to_frontend_error_toast(request,
                     "Your email confirmation link is invalid. Please attempt "
                     "to create an account with this email address, again.")
@@ -399,7 +397,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
             logger.event(badgrlog.InvalidEmailConfirmationToken(
-                request, token=token, email=email_address))
+                request, token=token, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your email confirmation token is invalid. You have been sent "
@@ -408,7 +406,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         key = matches.group(2)
         if not (uidb36 and key):
             logger.event(badgrlog.InvalidEmailConfirmationToken(
-                token=token, email=email_address))
+                request, token=token, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your email confirmation token is invalid. You have been sent "
@@ -421,7 +419,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         user = self._get_user(uidb36)
         if user is None or not default_token_generator.check_token(user, key):
             logger.event(badgrlog.EmailConfirmationTokenExpired(
-                request, email=email_address))
+                request, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your authorization link has expired. You have been sent a new "
@@ -429,7 +427,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
 
         if email_address.user != user:
             logger.event(badgrlog.OtherUsersEmailConfirmationToken(
-                request, token=token, email=email_address, other_user=user))
+                request, email_address=email_address, token=token, other_user=user))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your email confirmation token is associated with another "
