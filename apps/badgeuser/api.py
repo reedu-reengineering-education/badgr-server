@@ -412,7 +412,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         key = matches.group(2)
         if not (uidb36 and key):
             logger.event(badgrlog.InvalidEmailConfirmationToken(
-                token=token, email=email_address))
+                request, token=token, email=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
                 "Your email confirmation token is invalid. You have been sent "
