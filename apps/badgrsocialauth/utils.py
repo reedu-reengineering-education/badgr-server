@@ -1,6 +1,10 @@
 import urllib
 import urlparse
 
+from django.http import HttpResponseRedirect
+
+from rest_framework.response import Response
+from rest_framework.status import HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.authentication import TokenAuthentication
 
 from mainsite.models import BadgrApp
@@ -27,9 +31,14 @@ def set_session_verification_email(request, verification_email):
 
 
 def get_session_badgr_app(request):
+    """
+    This method can ONLY be used within the SSO process. The badgr_app_pk value
+    in request.session is ONLY stored prior to the external hop to the SSO.
+    All usages should expressly handle None return case.
+    """
     try:
         if request and hasattr(request, 'session'):
-            return BadgrApp.objects.get(pk=request.session.get('badgr_app_pk', None))
+            return BadgrApp.objects.get(pk=request.session.get('badgr_app_pk', -1))
     except BadgrApp.DoesNotExist:
         return None
 
@@ -50,3 +59,11 @@ def get_verified_user(auth_token):
     authenticator = TokenAuthentication()
     verified_user, _ = authenticator.authenticate_credentials(auth_token)
     return verified_user
+
+
+def redirect_to_frontend_error_toast(request, message):
+    badgr_app = BadgrApp.objects.get_current(request)
+    redirect_url = "{url}?authError={message}".format(
+        url=badgr_app.ui_login_redirect,
+        message=urllib.quote(message))
+    return HttpResponseRedirect(redirect_to=redirect_url)

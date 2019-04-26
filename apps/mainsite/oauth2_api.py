@@ -122,9 +122,9 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
             # if this is the first use of the application and there was no previous authorization.
             # This is useful for in-house applications-> assume an in-house applications
             # are already approved.
-            if application.skip_authorization:
+            if application.skip_authorization and not request.user.is_anonymous:
                 success_url = self.get_authorization_redirect_url(" ".join(kwargs['scopes']), credentials)
-                return Response({ 'success_url': success_url })
+                return Response({'success_url': success_url})
 
             elif require_approval == "auto" and not request.user.is_anonymous:
                 tokens = get_access_token_model().objects.filter(
@@ -137,7 +137,7 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
                 for token in tokens:
                     if token.allow_scopes(scopes):
                         success_url = self.get_authorization_redirect_url(" ".join(kwargs['scopes']), credentials)
-                        return Response({ 'success_url': success_url })
+                        return Response({'success_url': success_url})
 
             return Response(kwargs)
 

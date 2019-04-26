@@ -17,12 +17,15 @@ from badgeuser.authcode import encrypt_authcode, decrypt_authcode, authcode_for_
 from mainsite import TOP_DIR
 from rest_framework.authtoken.models import Token
 
-from badgeuser.models import BadgeUser, BadgrAccessToken
-from badgeuser.models import EmailAddressVariant, CachedEmailAddress
+from badgeuser.models import (
+    BadgeUser, BadgrAccessToken, UserRecipientIdentifier, EmailAddressVariant, CachedEmailAddress)
+from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1
+from badgeuser.serializers_v2 import BadgeUserSerializerV2
 from issuer.models import BadgeClass, Issuer
 from mainsite.models import BadgrApp, ApplicationInfo
-from mainsite.tests.base import BadgrTestCase
+from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import backoff_cache_key
+
 
 
 class AuthTokenTests(BadgrTestCase):
@@ -583,6 +586,167 @@ class UserEmailTests(BadgrTestCase):
             self.assertEqual(e.message, "New EmailAddressVariant does not match stored email address.")
         else:
             raise self.fail("ValidationError expected on nonmatch.")
+
+
+@override_settings(
+    CELERY_ALWAYS_EAGER=True,
+    SESSION_ENGINE='django.contrib.sessions.backends.cache',
+)
+class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
+    def setUp(self):
+        super(UserRecipientIdentifierTests, self).setUp()
+
+        self.badgr_app = BadgrApp(cors='testserver',
+                                  email_confirmation_redirect='http://testserver/login/',
+                                  forgot_password_redirect='http://testserver/reset-password/')
+        self.badgr_app.save()
+
+        self.first_user_email = 'first.user@newemail.test'
+        self.first_user_email_secondary = 'first.user+2@newemail.test'
+        self.first_user = self.setup_user(email=self.first_user_email, authenticate=True)
+        CachedEmailAddress.objects.create(user=self.first_user, email=self.first_user_email_secondary, verified=True)
+        response = self.client.get('/v1/user/auth-token')
+        self.assertEqual(response.status_code, 200)
+
+        self.issuer = self.setup_issuer(owner=self.first_user)
+        self.badgeclass = self.setup_badgeclass(self.issuer)
+
+    def test_two_users_can_have_same_identifier(self):
+        url = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(identifier=url)
+        second_user_email = 'second.user@email.com'
+        second_user = self.setup_user(email=second_user_email, authenticate=True)
+        second_user.userrecipientidentifier_set.create(identifier=url)
+
+        self.assertGreater(UserRecipientIdentifier.objects.filter(identifier=url).count(), 1)
+
+    def test_only_one_user_can_have_verified_identifier(self):
+        url = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
+        second_user_email = 'second.user@email.com'
+        second_user = self.setup_user(email=second_user_email, authenticate=True)
+        second_identifier = second_user.userrecipientidentifier_set.create(identifier=url)
+
+        with self.assertRaisesRegex(ValidationError, re.compile('identifier', re.I)):
+            second_identifier.verified = True
+            second_identifier.save()
+
+    def test_url_format_validation(self):
+        self.first_user.userrecipientidentifier_set.create(identifier='http://example.com')
+        self.first_user.userrecipientidentifier_set.create(identifier='ftp://example.com')
+        self.first_user.userrecipientidentifier_set.create(identifier='https://withpath.com/12345678')
+        self.first_user.userrecipientidentifier_set.create(identifier='https://withhash.com/12345678/bar.html#fooey')
+
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(identifier='http')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(identifier='(541) 342-8456')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(identifier='')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(identifier='12345678')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(identifier='email@test.com')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(identifier='customprotocol://example.com')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(identifier='http://singlepart')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(identifier='/relative/url')
+
+    def test_phone_format_validation(self):
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='3428456')
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='5413428456')
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='15413428456')
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='+15413428456')
+
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(
+                type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='+1541342845612345')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(
+                type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='(541) 342-8456')
+
+    def test_verified_phone_included_in_all_recipient_identifiers(self):
+        identifier = '3428456'
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier=identifier, verified=True)
+        self.assertIn(identifier, self.first_user.all_recipient_identifiers)
+
+    def test_verified_url_included_in_all_recipient_identifiers(self):
+        identifier = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL, identifier=identifier, verified=True)
+        self.assertIn(identifier, self.first_user.all_recipient_identifiers)
+
+    def test_identifiers_serialized_to_correct_fields(self):
+        url = 'http://example.com'
+        phone = '+15413428456'
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL, identifier=url, verified=True)
+        self.first_user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier=phone, verified=True)
+        v1serialized = BadgeUserProfileSerializerV1(self.first_user).data
+        v2serialized = BadgeUserSerializerV2(self.first_user).data['result'][0]
+
+        self.assertIn(url, v1serialized['url'])
+        self.assertIn(url, v2serialized['url'])
+        self.assertIn(phone, v1serialized['telephone'])
+        self.assertIn(phone, v2serialized['telephone'])
+
+        self.assertNotIn(phone, v1serialized['url'])
+        self.assertNotIn(phone, v2serialized['url'])
+        self.assertNotIn(url, v1serialized['telephone'])
+        self.assertNotIn(url, v2serialized['telephone'])
+
+    def test_verified_recipient_receives_assertion(self):
+        url = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
+        self.badgeclass.issue(recipient_id=url)
+        self.assertEqual(len(self.first_user.cached_badgeinstances()), 1)
+
+    def test_unverified_recipient_receives_no_assertion(self):
+        url = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(identifier=url)
+        self.badgeclass.issue(recipient_id=url)
+        self.assertEqual(len(self.first_user.cached_badgeinstances()), 0)
+
+    def test_verified_recipient_v1_badges_endpoint(self):
+        url = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
+        self.badgeclass.issue(recipient_id=url)
+
+        response = self.client.get('/v1/earner/badges')
+        self.assertEqual(len(response.data), 1)
+
+    def test_verified_recipient_v2_assertions_endpoint(self):
+        url = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
+        self.badgeclass.issue(recipient_id=url)
+
+        response = self.client.get('/v2/backpack/assertions')
+        self.assertEqual(len(response.data['result']), 1)
+
+    def test_unverified_recipient_v1_badges_endpoint(self):
+        url = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(identifier=url)
+        self.badgeclass.issue(recipient_id=url)
+
+        response = self.client.get('/v1/earner/badges')
+        self.assertEqual(len(response.data), 0)
+
+    def test_unverified_recipient_v2_assertions_endpoint(self):
+        url = 'http://example.com'
+        self.first_user.userrecipientidentifier_set.create(identifier=url)
+        self.badgeclass.issue(recipient_id=url)
+
+        response = self.client.get('/v2/backpack/assertions')
+        self.assertEqual(len(response.data['result']), 0)
+
 
 @override_settings(
     SESSION_ENGINE='django.contrib.sessions.backends.cache',

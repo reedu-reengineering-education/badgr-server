@@ -7,8 +7,8 @@ import urlparse
 from allauth.account.adapter import get_adapter
 from allauth.account.models import EmailConfirmationHMAC
 from allauth.account.utils import user_pk_to_url_str, url_str_to_user_pk
-from apispec_drf.decorators import apispec_get_operation, apispec_put_operation, apispec_operation, \
-    apispec_delete_operation, apispec_list_operation
+from apispec_drf.decorators import (apispec_get_operation, apispec_put_operation, apispec_operation,
+    apispec_delete_operation, apispec_list_operation,)
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -24,23 +24,26 @@ from rest_framework import permissions, serializers, status
 from rest_framework.exceptions import ValidationError as RestframeworkValidationError
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
-from rest_framework.status import HTTP_302_FOUND, HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_201_CREATED, \
-    HTTP_400_BAD_REQUEST
+from rest_framework.status import (HTTP_302_FOUND, HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_201_CREATED,
+    HTTP_400_BAD_REQUEST,)
 
-from badgeuser.authcode import accesstoken_for_authcode, authcode_for_accesstoken, decrypt_authcode
+from badgeuser.authcode import authcode_for_accesstoken, decrypt_authcode
 from badgeuser.models import BadgeUser, CachedEmailAddress, BadgrAccessToken, TermsVersion
 from badgeuser.permissions import BadgeUserIsAuthenticatedUser
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserTokenSerializerV1
 from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerializerV2, AccessTokenSerializerV2
 from badgeuser.tasks import process_email_verification
-from badgrsocialauth.utils import set_url_query_params
-from entity.api import BaseEntityDetailView, BaseEntityListView, BaseEntityView
+from badgrsocialauth.utils import set_url_query_params, redirect_to_frontend_error_toast
+import badgrlog
+from entity.api import BaseEntityDetailView, BaseEntityListView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
 from mainsite.models import BadgrApp
 from mainsite.utils import OriginSetting, backoff_cache_key
 
 RATE_LIMIT_DELTA = datetime.timedelta(minutes=5)
+
+logger = badgrlog.BadgrLogger()
 
 
 class BadgeUserDetail(BaseEntityDetailView):
@@ -190,15 +193,12 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
     v2_serializer_class = BaseSerializerV2
 
     def get(self, request, *args, **kwargs):
-        badgr_app = None
-        badgrapp_id = self.request.GET.get('a', None)
-        if badgrapp_id is not None:
-            try:
-                badgr_app = BadgrApp.objects.get(id=badgrapp_id)
-            except BadgrApp.DoesNotExist:
-                pass
-        if not badgr_app:
+        badgrapp_id = self.request.GET.get('a', getattr(settings, 'BADGR_APP_ID', 1))
+        try:
+            badgr_app = BadgrApp.objects.get(id=badgrapp_id)
+        except BadgrApp.DoesNotExist:
             badgr_app = BadgrApp.objects.get_current(request)
+
         redirect_url = badgr_app.forgot_password_redirect
         token = request.GET.get('token', '')
         tokenized_url = "{}{}".format(redirect_url, token)
@@ -281,7 +281,7 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
             "site": get_current_site(request),
             "user": user,
             "password_reset_url": reset_url,
-            'badgr_app': badgrapp
+            'badgr_app': badgrapp,
         }
         get_adapter().send_mail('account/email/password_reset_key', email, email_context)
 
@@ -361,40 +361,80 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
               description: The token received in the recovery email
               required: true
         """
+        token = request.query_params.get('token', '')
+        badgrapp_id = request.query_params.get(
+            'a', getattr(settings, 'BADGR_APP_ID', 1))
 
-        token = request.query_params.get('token')
-        badgrapp_id = request.query_params.get('a', None)
-        if badgrapp_id is None:
-            badgrapp_id = getattr(settings, 'BADGR_APP_ID', 1)
+        # Get BadgrApp instance
         try:
             badgrapp = BadgrApp.objects.get(id=badgrapp_id)
         except BadgrApp.DoesNotExist:
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.NoBadgrApp(request, badgrapp_id=badgrapp_id))
+            message = ("This Badgr server may be misconfigured; could not "
+                       "find a Badgr application associated to redirect to.")
+            return Response(message, status=HTTP_404_NOT_FOUND)
 
+        # Get EmailConfirmation instance
         emailconfirmation = EmailConfirmationHMAC.from_key(kwargs.get('confirm_id'))
         if emailconfirmation is None:
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.NoEmailConfirmation())
+            return redirect_to_frontend_error_toast(request,
+                "Your email confirmation link is invalid. Please attempt to "
+                "create an account with this email address, again.")
+        # Get EmailAddress instance
+        else:
+            try:
+                email_address = CachedEmailAddress.cached.get(
+                    pk=emailconfirmation.email_address.pk)
+            except CachedEmailAddress.DoesNotExist:
+                logger.event(badgrlog.NoEmailConfirmationEmailAddress(
+                    request, email_address=emailconfirmation.email_address))
+                return redirect_to_frontend_error_toast(request,
+                    "Your email confirmation link is invalid. Please attempt "
+                    "to create an account with this email address, again.")
 
-        try:
-            email_address = CachedEmailAddress.cached.get(pk=emailconfirmation.email_address.pk)
-        except CachedEmailAddress.DoesNotExist:
-            return Response(status=HTTP_404_NOT_FOUND)
-
+        # Validate 'token' syntax from query param
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.InvalidEmailConfirmationToken(
+                request, token=token, email_address=email_address))
+            email_address.send_confirmation(request=request, signup=True)
+            return redirect_to_frontend_error_toast(request,
+                "Your email confirmation token is invalid. You have been sent "
+                "a new link. Please check your email and try again.")
         uidb36 = matches.group(1)
         key = matches.group(2)
         if not (uidb36 and key):
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.InvalidEmailConfirmationToken(
+                request, token=token, email_address=email_address))
+            email_address.send_confirmation(request=request, signup=True)
+            return redirect_to_frontend_error_toast(request,
+                "Your email confirmation token is invalid. You have been sent "
+                "a new link. Please check your email and try again.")
 
+        redirect_url = get_adapter().get_email_confirmation_redirect_url(
+            request, badgr_app=badgrapp)
+
+        # Get User instance from literal 'token' value
         user = self._get_user(uidb36)
         if user is None or not default_token_generator.check_token(user, key):
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.EmailConfirmationTokenExpired(
+                request, email_address=email_address))
+            email_address.send_confirmation(request=request, signup=True)
+            return redirect_to_frontend_error_toast(request,
+                "Your authorization link has expired. You have been sent a new "
+                "link. Please check your email and try again.")
 
         if email_address.user != user:
-            return Response(status=HTTP_404_NOT_FOUND)
+            logger.event(badgrlog.OtherUsersEmailConfirmationToken(
+                request, email_address=email_address, token=token, other_user=user))
+            email_address.send_confirmation(request=request, signup=True)
+            return redirect_to_frontend_error_toast(request,
+                "Your email confirmation token is associated with another "
+                "user. You have been sent a new link. Please check your email "
+                "and try again.")
 
+        # Perform main operation, set EmaiAddress .verified and .primary True
         old_primary = CachedEmailAddress.objects.get_primary(user)
         if old_primary is None:
             email_address.primary = True
@@ -403,10 +443,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
 
         process_email_verification.delay(email_address.pk)
 
-        # get badgr_app url redirect
-        redirect_url = get_adapter().get_email_confirmation_redirect_url(request, badgr_app=badgrapp)
-
-        # generate an AccessToken for the user
+        # Create an OAuth BadgrAccessToken instance for this user
         accesstoken = BadgrAccessToken.objects.generate_new_token_for_user(
             user,
             application=badgrapp.oauth_application if badgrapp.oauth_application_id else None,

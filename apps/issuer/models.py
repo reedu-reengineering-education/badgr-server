@@ -26,16 +26,20 @@ from jsonfield import JSONField
 from openbadges_bakery import bake
 from django.utils import timezone
 
+import badgrlog
 from entity.models import BaseVersionedEntity
 from issuer.managers import BadgeInstanceManager, IssuerManager, BadgeClassManager, BadgeInstanceEvidenceManager
 from mainsite.managers import SlugOrJsonIdCacheModelManager
 from mainsite.mixins import ResizeUploadedImage, ScrubUploadedSvgImage
-from mainsite.models import (BadgrApp, EmailBlacklist)
+from mainsite.models import BadgrApp, EmailBlacklist
+from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri
 from .utils import generate_sha256_hashstring, CURRENT_OBI_VERSION, get_obi_context, add_obi_version_ifneeded, \
     UNVERSIONED_BAKED_VERSION
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
+
+logger = badgrlog.BadgrLogger()
 
 
 class BaseAuditedModel(cachemodel.CacheModel):
@@ -782,6 +786,14 @@ class BadgeInstance(BaseAuditedModel,
 
     def save(self, *args, **kwargs):
         if self.pk is None:
+            is_in_blacklist = \
+                blacklist.api_query_is_in_blacklist(self.recipient_identifier)
+
+            if is_in_blacklist == True:
+                badge_instance = self
+                logger.event(badgrlog.BlacklistAssertionNotCreatedEvent(badge_instance))
+                return
+
             self.salt = uuid.uuid4().hex
             self.created_at = datetime.datetime.now()
 
@@ -922,8 +934,6 @@ class BadgeInstance(BaseAuditedModel,
                 'badge_instance_url': self.public_url,
                 'image_url': self.public_url + '/image',
                 'download_url': self.public_url + "?action=download",
-                'unsubscribe_url': getattr(settings, 'HTTP_ORIGIN') + EmailBlacklist.generate_email_signature(
-                    self.recipient_identifier),
                 'site_name': badgr_app.name,
                 'site_url': badgr_app.signup_redirect,
                 'badgr_app': badgr_app,

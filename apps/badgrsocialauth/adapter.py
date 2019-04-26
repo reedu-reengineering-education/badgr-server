@@ -1,3 +1,4 @@
+import logging
 import urllib
 
 from allauth.account.utils import user_email
@@ -8,12 +9,19 @@ from rest_framework.exceptions import AuthenticationFailed
 
 from badgeuser.authcode import accesstoken_for_authcode
 from badgrsocialauth.utils import set_session_verification_email, get_session_badgr_app, get_session_authcode
+from mainsite.models import BadgrApp
 
 
 class BadgrSocialAccountAdapter(DefaultSocialAccountAdapter):
 
     def authentication_error(self, request, provider_id, error=None, exception=None, extra_context=None):
-        badgr_app = get_session_badgr_app(self.request)
+        logging.getLogger(__name__).info(
+            'social login authentication error: %s' % {
+                'error': error,
+                'exception': exception,
+                'extra_context': extra_context,
+            })
+        badgr_app = BadgrApp.objects.get_current(self.request)
         redirect_url = "{url}?authError={message}".format(
             url=badgr_app.ui_login_redirect,
             message=urllib.quote("Authentication error"))
@@ -46,7 +54,7 @@ class BadgrSocialAccountAdapter(DefaultSocialAccountAdapter):
 
                 request.user = accesstoken.user
                 if sociallogin.is_existing and accesstoken.user != sociallogin.user:
-                    badgr_app = get_session_badgr_app(self.request)
+                    badgr_app = BadgrApp.objects.get_current(self.request)
                     redirect_url = "{url}?authError={message}".format(
                         url=badgr_app.ui_connect_success_redirect,
                         message=urllib.quote("Could not add social login. This account is already associated with a user."))

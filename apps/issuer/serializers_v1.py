@@ -2,8 +2,9 @@ import uuid
 
 import os
 from django.apps import apps
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.urlresolvers import reverse
-from django.core.validators import URLValidator
+from django.core.validators import EmailValidator, URLValidator
 from django.utils.html import strip_tags
 from rest_framework import serializers
 
@@ -14,7 +15,7 @@ from mainsite.models import BadgrApp
 from mainsite.serializers import HumanReadableBooleanField, StripTagsCharField, MarkdownCharField, \
     OriginalJsonSerializerMixin
 from mainsite.utils import OriginSetting
-from mainsite.validators import ChoicesValidator, BadgeExtensionValidator, PositiveIntegerValidator
+from mainsite.validators import ChoicesValidator, BadgeExtensionValidator, PositiveIntegerValidator, TelephoneValidator
 from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance
 
 
@@ -303,12 +304,25 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
         apispec_definition = ('Assertion', {})
 
     def validate(self, data):
-        if data.get('email') and not data.get('recipient_identifier'):
+        recipient_type = data.get('recipient_type')
+        if data.get('recipient_identifier') and data.get('email') is None:
+            if recipient_type == BadgeInstance.RECIPIENT_TYPE_EMAIL:
+                recipient_validator = EmailValidator()
+            elif recipient_type in (BadgeInstance.RECIPIENT_TYPE_URL, BadgeInstance.RECIPIENT_TYPE_ID):
+                recipient_validator = URLValidator()
+            else:
+                recipient_validator = TelephoneValidator()
+
+            try:
+                recipient_validator(data['recipient_identifier'])
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(e.message)
+
+        elif data.get('email') and data.get('recipient_identifier') is None:
             data['recipient_identifier'] = data.get('email')
 
         hashed = data.get('hashed', None)
         if hashed is None:
-            recipient_type = data.get('recipient_type')
             if recipient_type in (BadgeInstance.RECIPIENT_TYPE_URL, BadgeInstance.RECIPIENT_TYPE_ID):
                 data['hashed'] = False
             else:

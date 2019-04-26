@@ -8,6 +8,7 @@ from django.core.validators import URLValidator, EmailValidator, RegexValidator
 from rest_framework import serializers
 
 from badgeuser.models import BadgeUser
+from badgeuser.serializers_v2 import BadgeUserEmailSerializerV2
 from entity.serializers import DetailSerializerV2, EntityRelatedFieldV2, BaseSerializerV2
 from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance
 from issuer.utils import generate_sha256_hashstring
@@ -30,7 +31,15 @@ class IssuerAccessTokenSerializerV2(BaseSerializerV2):
         return super(IssuerAccessTokenSerializerV2, self).to_representation(instance)
 
 
+class StaffUserProfileSerializerV2(DetailSerializerV2):
+    firstName = StripTagsCharField(source='first_name', read_only=True)
+    lastName = StripTagsCharField(source='last_name', read_only=True)
+    emails = BadgeUserEmailSerializerV2(many=True, source='email_items', required=False, read_only=True)
+    badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
+
+
 class IssuerStaffSerializerV2(DetailSerializerV2):
+    userProfile = StaffUserProfileSerializerV2(source='cached_user', read_only=True)
     user = EntityRelatedFieldV2(source='cached_user', queryset=BadgeUser.cached)
     role = serializers.CharField(validators=[ChoicesValidator(dict(IssuerStaff.ROLE_CHOICES).keys())])
 
@@ -57,6 +66,7 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     url = serializers.URLField(max_length=1024, required=True)
     staff = IssuerStaffSerializerV2(many=True, source='staff_items', required=False)
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
+    badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
 
     class Meta(DetailSerializerV2.Meta):
         model = Issuer
@@ -335,7 +345,7 @@ class BadgeRecipientSerializerV2(BaseSerializerV2):
         if hashed is None:
             attrs['hashed'] = self.HASHED_DEFAULTS.get(recipient_type, True)
         return attrs
-        
+
     def to_representation(self, instance):
         representation = super(BadgeRecipientSerializerV2, self).to_representation(instance)
         if instance.hashed:

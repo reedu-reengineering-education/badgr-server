@@ -2,6 +2,7 @@ import base64
 from collections import OrderedDict
 
 from rest_framework import serializers
+from django.contrib.auth.hashers import is_password_usable
 
 from badgeuser.models import BadgeUser, TermsVersion
 from badgeuser.utils import notify_on_password_change
@@ -42,8 +43,15 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     password = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False, validators=[PasswordValidator()])
     currentPassword = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False)
     emails = BadgeUserEmailSerializerV2(many=True, source='email_items', required=False)
+    url = serializers.ListField(read_only=True, source='cached_verified_urls')
+    telephone = serializers.ListField(read_only=True, source='cached_verified_phone_numbers')
     agreedTermsVersion = serializers.IntegerField(source='agreed_terms_version', required=False)
     marketingOptIn = serializers.BooleanField(source='marketing_opt_in', required=False)
+    badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
+    hasPasswordSet = serializers.SerializerMethodField('get_has_password_set')
+
+    def get_has_password_set(self, obj):
+        return is_password_usable(obj.password)
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeUser
@@ -79,12 +87,12 @@ class BadgeUserSerializerV2(DetailSerializerV2):
 
         if password:
             if not current_password:
-                raise serializers.ValidationError({'currrent_password': "Field is required"})
+                raise serializers.ValidationError({'current_password': "Field is required"})
             if instance.check_password(current_password):
                 instance.set_password(password)
                 notify_on_password_change(instance)
             else:
-                raise serializers.ValidationError({'currrent_password': "Incorrect password"})
+                raise serializers.ValidationError({'current_password': "Incorrect password"})
 
         instance.badgrapp = BadgrApp.objects.get_current(request=self.context.get('request', None))
 

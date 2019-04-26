@@ -24,7 +24,20 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
     def send_mail(self, template_prefix, email, context):
         context['STATIC_URL'] = getattr(settings, 'STATIC_URL')
         context['HTTP_ORIGIN'] = getattr(settings, 'HTTP_ORIGIN')
-        context['unsubscribe_url'] = getattr(settings, 'HTTP_ORIGIN') + EmailBlacklist.generate_email_signature(email)
+        context['PRIVACY_POLICY_URL'] = getattr(settings, 'PRIVACY_POLICY_URL', None)
+        context['TERMS_OF_SERVICE_URL'] = getattr(settings, 'TERMS_OF_SERVICE_URL', None)
+        context['GDPR_INFO_URL'] = getattr(settings, 'GDPR_INFO_URL', None)
+        context['OPERATOR_STREET_ADDRESS'] = getattr(settings, 'OPERATOR_STREET_ADDRESS', None)
+        context['OPERATOR_NAME'] = getattr(settings, 'OPERATOR_NAME', None)
+        context['OPERATOR_URL'] = getattr(settings, 'OPERATOR_URL', None)
+
+        if context.get('unsubscribe_url', None) is None:
+            try:
+                badgrapp_pk = context['badgr_app'].pk
+            except (KeyError, AttributeError):
+                badgrapp_pk = None
+            context['unsubscribe_url'] = getattr(settings, 'HTTP_ORIGIN') + EmailBlacklist.generate_email_signature(
+                email, badgrapp_pk)
 
         msg = self.render_mail(template_prefix, email, context)
         msg.send()
@@ -81,20 +94,16 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         activate_url = self.get_email_confirmation_url(
             request,
             emailconfirmation)
-        badgr_app = get_session_badgr_app(request)
-        if not badgr_app:
-            badgr_app = BadgrApp.objects.get_current(request, raise_exception=False)
+        badgr_app = BadgrApp.objects.get_current(request, raise_exception=False)
         ctx = {
             "user": emailconfirmation.email_address.user,
             "email": emailconfirmation.email_address,
             "activate_url": activate_url,
             "current_site": current_site,
             "key": emailconfirmation.key,
-            "badgr_app": badgr_app
+            "badgr_app": badgr_app,
         }
-        if signup == 'canvas':
-            email_template = 'account/email/email_confirmation_canvas'
-        elif signup:
+        if signup:
             email_template = 'account/email/email_confirmation_signup'
         else:
             email_template = 'account/email/email_confirmation'
@@ -107,7 +116,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         If successfully logged in, redirect to the front-end, including an authToken query parameter.
         """
         if request.user.is_authenticated():
-            badgr_app = get_session_badgr_app(request)
+            badgr_app = BadgrApp.objects.get_current(self.request)
 
             if badgr_app is not None:
                 accesstoken = BadgrAccessToken.objects.generate_new_token_for_user(

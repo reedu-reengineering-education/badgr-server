@@ -22,10 +22,13 @@ class BadgeClassCreatedEvent(BaseBadgrEvent):
         self.badge_class = badge_class
 
     def to_representation(self):
+        try:
+            image_data = {
+                'id': self.badge_class.image.url,
+            }
+        except ValueError:
+            image_data = {}
 
-        image_data = {
-            'id': self.badge_class.image.url,
-        }
         if hasattr(self.badge_class.image, 'size'):
             image_data['size'] = self.badge_class.image.size
         if hasattr(self.badge_class.image, 'content_type'):

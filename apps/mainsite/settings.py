@@ -90,7 +90,6 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.contrib.auth.context_processors.auth',
@@ -99,19 +98,20 @@ TEMPLATES = [
                 'django.template.context_processors.media',
                 'django.template.context_processors.static',
                 'django.template.context_processors.tz',
-                # 'django.template.context_processors.request',
                 'django.contrib.messages.context_processors.messages',
 
                 'mainsite.context_processors.extra_settings'
             ],
+            'loaders': (
+                'django.template.loaders.app_directories.Loader',
+                'django.template.loaders.filesystem.Loader',
+            ),
         },
+        
     },
 ]
 
-TEMPLATE_LOADERS = [
-    'django.template.loaders.filesystem.Loader',
-    'django.template.loaders.app_directories.Loader',
-]
+
 
 
 ##
@@ -412,14 +412,14 @@ MARKDOWNIFY_WHITELIST_TAGS = [
 
 OAUTH2_PROVIDER = {
     'SCOPES': {
-        'r:profile': 'See who you are',
-        'rw:profile': 'Update your own User profile',
-        'r:backpack': "List assertions in a User's Backpack",
-        'rw:backpack': "Upload badges into a User's Backpack",
-        'rw:issuer': 'Create and update Issuers, create and update Badgeclasses, and award Assertions',
+        'r:profile':   'See who you are',
+        'rw:profile':  'Update your own user profile',
+        'r:backpack':  'List assertions in your backpack',
+        'rw:backpack': 'Upload badges into a backpack',
+        'rw:issuer':   'Create and update issuers, create and update badge classes, and award assertions',
 
         # private scopes used for integrations
-        'rw:issuer:*': 'Create and update Badgeclasses, and award Assertions for a single Issuer',
+        'rw:issuer:*':  'Create and update badge classes, and award assertions for a single issuer',
         'r:assertions': 'Batch receive assertions',
     },
     'DEFAULT_SCOPES': ['r:profile'],
@@ -459,7 +459,18 @@ BADGERANK_NOTIFY_ON_BADGECLASS_CREATE = True
 BADGERANK_NOTIFY_ON_FIRST_ASSERTION = True
 BADGERANK_NOTIFY_URL = 'https://api.badgerank.org/v1/badgeclass/submit'
 
+# Feature options
+GDPR_COMPLIANCE_NOTIFY_ON_FIRST_AWARD = True  # Notify recipients of first award on server even if issuer didn't opt to.
 
+# Email footer operator information
+PRIVACY_POLICY_URL = None
+TERMS_OF_SERVICE_URL = None
+GDPR_INFO_URL = None
+OPERATOR_STREET_ADDRESS = None
+OPERATOR_NAME = None
+OPERATOR_URL = None
+
+# OVERRIDE THESE VALUES WITH YOUR OWN STABLE VALUES IN LOCAL SETTINGS
 from cryptography.fernet import Fernet
 PAGINATION_SECRET_KEY = Fernet.generate_key()
 AUTHCODE_SECRET_KEY = Fernet.generate_key()

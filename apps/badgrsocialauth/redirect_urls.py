@@ -1,4 +1,5 @@
 import importlib
+import logging
 
 from allauth.socialaccount import providers
 from django.conf.urls import url
@@ -27,6 +28,9 @@ for provider in providers.registry.get_list():
     try:
         prov_mod = importlib.import_module(provider.get_package() + '.urls')
     except ImportError:
+        logging.getLogger(__name__).warning(
+            'url import failed for %s socialaccount provider' % provider.id,
+            exc_info=True)
         continue
     prov_urlpatterns = getattr(prov_mod, 'urlpatterns', None)
     if prov_urlpatterns:

@@ -33,6 +33,7 @@ from .mixins import ResizeUploadedImage
 
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
+DEFAULT_BADGRAPP_PK = getattr(settings, 'BADGR_APP_ID', None)
 
 
 class EmailBlacklist(models.Model):
@@ -43,7 +44,7 @@ class EmailBlacklist(models.Model):
         verbose_name_plural = 'Blacklisted emails'
 
     @staticmethod
-    def generate_email_signature(email):
+    def generate_email_signature(email, badgrapp_pk=DEFAULT_BADGRAPP_PK):
         secret_key = settings.UNSUBSCRIBE_SECRET_KEY
 
         expiration = datetime.utcnow() + timedelta(days=7)  # In one week.
@@ -56,7 +57,7 @@ class EmailBlacklist(models.Model):
             'email_encoded': email_encoded,
             'expiration': timestamp,
             'signature': hashed.hexdigest(),
-        })
+        }) + '?a={}'.format(badgrapp_pk)
 
     @staticmethod
     def verify_email_signature(email_encoded, expiration, signature):
@@ -68,6 +69,13 @@ class EmailBlacklist(models.Model):
 
 class BadgrAppManager(Manager):
     def get_current(self, request=None, raise_exception=True):
+        """
+        A safe method for getting the current BadgrApp related to a request. It will always return a BadgrApp if
+        the server is properly configured.
+        :param request: Django Request object
+        :param raise_exception: bool
+        :return: BadgrApp
+        """
         origin = None
         existing_session_app_id = None
 
