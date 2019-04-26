@@ -1,3 +1,4 @@
+import logging
 import urllib
 
 from allauth.account.utils import user_email
@@ -14,6 +15,12 @@ from mainsite.models import BadgrApp
 class BadgrSocialAccountAdapter(DefaultSocialAccountAdapter):
 
     def authentication_error(self, request, provider_id, error=None, exception=None, extra_context=None):
+        logging.getLogger(__name__).info(
+            'social login authentication error: %s' % {
+                'error': error,
+                'exception': exception,
+                'extra_context': extra_context,
+            })
         badgr_app = BadgrApp.objects.get_current(self.request)
         redirect_url = "{url}?authError={message}".format(
             url=badgr_app.ui_login_redirect,
