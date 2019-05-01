@@ -356,35 +356,6 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
         self.assertTrue(BadgeClass.objects.filter(entity_id=test_badgeclass.entity_id).exists())
 
-    # TODO: review this test for deprecation -- we no longer allow writable slugs
-    # def test_create_badgeclass_with_underscore_slug(self):
-    #     """
-    #     Tests that a manually-defined slug that includes underscores does not
-    #     trigger an error when defining a new BadgeClass
-    #     """
-    #     with open(
-    #             os.path.join(os.path.dirname(__file__), 'testfiles', 'guinea_pig_testing_badge.png'), 'r'
-    #     ) as badge_image:
-    #
-    #         badgeclass_props = {
-    #             'name': 'Badge of Slugs',
-    #             'slug': 'badge_of_slugs_99',
-    #             'description': "Recognizes slimy learners with a penchant for lettuce",
-    #             'image': badge_image,
-    #             'criteria': 'The earner of this badge must slither through a garden and return home before morning.',
-    #         }
-    #
-    #         self.client.force_authenticate(user=get_user_model().objects.get(pk=1))
-    #         response = self.client.post(
-    #             '/v1/issuer/issuers/test-issuer/badges',
-    #             badgeclass_props
-    #         )
-    #         self.assertEqual(response.status_code, 201)
-    #         self.assertRegexpMatches(response.data.get(
-    #             'json', {}).get('criteria'),
-    #                                  r'badge_of_slugs_99/criteria$'
-    #                                  )
-
     def test_cannot_create_badgeclass_with_invalid_markdown(self):
         with open(self.get_test_image_path(), 'r') as badge_image:
             badgeclass_props = {
