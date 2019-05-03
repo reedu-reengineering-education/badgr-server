@@ -81,6 +81,30 @@ class UserCreateTests(BadgrTestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(len(mail.outbox), 1)
+    
+    def test_create_user_from_mozilla(self):
+        user_data = {
+            'first_name': 'Test',
+            'last_name': 'User',
+            'email': 'mozillauser@example.com',
+            'password': 'secr3t4nds3cur3',
+            'source': 'mozilla'
+        }
+
+        response = self.client.post('/v1/user/profile', user_data)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("mozilla", mail.outbox[0].body)
+        self.assertIn("signup=true", mail.outbox[0].body)
+
+    def test_user_can_add_secondary_email_without_welcome_query_param(self):
+        email = "unclaimed3@example.com"
+        first_user = self.setup_user(authenticate=False)
+        CachedEmailAddress.objects.create(user=first_user, email=email, primary=False, verified=False)
+        second_user = self.setup_user(email='second@user.fake', authenticate=True)
+        response = self.client.post('/v1/user/emails', {'email': email})
+        self.assertEqual(response.status_code, 201)
+        self.assertNotIn("signup=true", mail.outbox[0].body)
 
     def test_create_user_with_already_claimed_email(self):
         email = 'test2@example.com'
