@@ -464,6 +464,28 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
             self.assertEqual(len(list(test_user.cached_badgeclasses())), number_of_badgeclasses + 1)
 
+    def test_issuer_edits_reflected_in_badgeclass(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user, name='1')
+
+        badgeclass = self.setup_badgeclass(test_issuer, name='test badgeclass 1')
+
+        response = self.client.get('/v2/issuers/{}/badgeclasses'.format(test_issuer.entity_id))  # populate cache
+        response = self.client.get('/public/badges/{}?expand=issuer'.format(badgeclass.entity_id))
+
+        issuer_data = {
+            'name': '2',
+            'description': test_issuer.description,
+            'email': test_user.email,
+            'url': 'http://example.com'
+        }
+        response = self.client.put('/v2/issuers/{}'.format(test_issuer.entity_id), data=issuer_data)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get('/public/badges/{}?expand=issuer'.format(badgeclass.entity_id))
+        issuer_name = response.data['issuer']['name']
+        self.assertEqual(issuer_name, '2')
+
     def test_new_badgeclass_updates_cached_user_badgeclasses(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
