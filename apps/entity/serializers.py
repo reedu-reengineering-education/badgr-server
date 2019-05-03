@@ -149,6 +149,13 @@ class V2ErrorSerializer(BaseSerializerV2):
         super(V2ErrorSerializer, self).__init__(*args, **kwargs)
 
     def to_representation(self, instance):
+        try:
+            self.validation_errors = self.validation_errors + self.field_errors.pop('non_field_errors', [])
+        except TypeError:
+            # In the case where field_errors is a list of dicts, we keep non_field_errors grouped with other field
+            # errors for that object
+            pass
+
         return BaseSerializerV2.response_envelope(result=[],
                                                   success=self.success,
                                                   description=self.description,
