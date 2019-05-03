@@ -1,11 +1,12 @@
+import os
 import uuid
 
-import os
-from django.apps import apps
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.urlresolvers import reverse
 from django.core.validators import EmailValidator, URLValidator
+from django.db.models import Q
 from django.utils.html import strip_tags
+from django.utils import timezone
 from rest_framework import serializers
 
 import utils
@@ -295,7 +296,7 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
     expires = serializers.DateTimeField(source='expires_at', required=False, allow_null=True)
 
     create_notification = HumanReadableBooleanField(write_only=True, required=False, default=False)
-
+    allow_duplicate_awards = serializers.BooleanField(write_only=True, required=False, default=True)
     hashed = serializers.NullBooleanField(default=None, required=False)
 
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
@@ -320,6 +321,17 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
 
         elif data.get('email') and data.get('recipient_identifier') is None:
             data['recipient_identifier'] = data.get('email')
+
+        allow_duplicate_awards = data.pop('allow_duplicate_awards')
+        if allow_duplicate_awards is False and self.context.get('badgeclass') is not None:
+            previous_awards = BadgeInstance.objects.filter(
+                recipient_identifier=data['recipient_identifier'], badgeclass=self.context['badgeclass']
+            ).filter(
+                Q(expires_at__isnull=True) | Q(expires_at__lt=timezone.now())
+            )
+            if previous_awards.exists():
+                raise serializers.ValidationError(
+                    "A previous award of this badge already exists for this recipient.")
 
         hashed = data.get('hashed', None)
         if hashed is None:

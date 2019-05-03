@@ -952,3 +952,34 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
         response = self.client.get('/v2/assertions/changed?since={}'.format(quote_plus(timestamp)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 0)
+
+
+class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
+    def test_single_award_allow_duplicates(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_badgeclass.issue('test3@example.com')
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'test3@example.com'
+            },
+            'allowDuplicateAwards': False
+        }
+        response = self.client.post('/v2/badgeclasses/{}/assertions'.format(
+            test_badgeclass.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 400)
+
+        # can issue assertion with expiration
+        new_assertion_props_v1 = {
+            "email": 'test3@example.com',
+            "create_notification": False,
+            "allow_duplicate_awards": False
+        }
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ), new_assertion_props_v1)
+        self.assertEqual(response.status_code, 400)
