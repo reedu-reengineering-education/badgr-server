@@ -24,7 +24,8 @@ class BadgeUserManager(UserManager):
                plaintext_password=None,
                send_confirmation=True,
                create_email_address=True,
-               marketing_opt_in=False
+               marketing_opt_in=False,
+               source=''
                ):
         from badgeuser.models import CachedEmailAddress, TermsVersion
 
@@ -52,7 +53,8 @@ class BadgeUserManager(UserManager):
                   last_name=last_name,
                   badgrapp_id=badgrapp.id,
                   marketing_opt_in=marketing_opt_in,
-                  plaintext_password=plaintext_password
+                  plaintext_password=plaintext_password,
+                  source=source
                 )
                 return self.model(email=email)
             elif existing_email.verified:
@@ -88,6 +90,7 @@ class BadgeUserManager(UserManager):
             return
 
         email = kwargs['email']
+        source = kwargs['source']
         expires_seconds = getattr(settings, 'AUTH_TIMEOUT_SECONDS', 7 * 86400)
         payload = kwargs.copy()
         payload['nonce'] = b''.join(random.choice(string.ascii_uppercase) for _ in range(random.randint(20, 30)))
@@ -98,6 +101,8 @@ class BadgeUserManager(UserManager):
             origin=OriginSetting.HTTP,
             path=reverse('v2_api_account_confirm', kwargs=dict(authcode=authcode)),
         )
+        if source:
+            confirmation_url = set_url_query_params(confirmation_url, source=source)
 
         get_adapter().send_mail('account/email/email_confirmation_signup', email, {
             'HTTP_ORIGIN': settings.HTTP_ORIGIN,

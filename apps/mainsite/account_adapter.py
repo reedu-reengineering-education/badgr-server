@@ -62,38 +62,59 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             # publish changes to cache
             email_address = CachedEmailAddress.objects.get(pk=confirmation.email_address.pk)
             email_address.save()
-
             redirect_url = urlparse.urljoin(
                 badgr_app.email_confirmation_redirect.rstrip('/') + '/',
                 urllib.quote(email_address.user.first_name.encode('utf8'))
             )
             redirect_url = set_url_query_params(redirect_url, email=email_address.email.encode('utf8'))
 
+            # Pass source and signup along to UI
+            source = request.query_params.get('source', None)
+            if source:
+                redirect_url = set_url_query_params(redirect_url, source=source)
+            
+            signup = request.query_params.get('signup', None)
+            if signup:
+                redirect_url = set_url_query_params(redirect_url, signup="true")
+
             return redirect_url
 
         except Resolver404, EmailConfirmation.DoesNotExist:
             return badgr_app.email_confirmation_redirect
 
-    def get_email_confirmation_url(self, request, emailconfirmation):
+    def get_email_confirmation_url(self, request, emailconfirmation, signup=False):
         url_name = "v1_api_user_email_confirm"
         temp_key = default_token_generator.make_token(emailconfirmation.email_address.user)
         token = "{uidb36}-{key}".format(uidb36=user_pk_to_url_str(emailconfirmation.email_address.user),
                                         key=temp_key)
         activate_url = OriginSetting.HTTP + reverse(url_name, kwargs={'confirm_id': emailconfirmation.key})
         badgrapp = BadgrApp.objects.get_current(request=request)
-
         tokenized_activate_url = "{url}?token={token}&a={badgrapp}".format(
             url=activate_url,
             token=token,
             badgrapp=badgrapp.id
         )
+
+        # Add source and signup query params to the confimation url
+        if request:
+            if hasattr(request, 'session'):
+                source = request.session.get('source', None)
+            source = request.data.get('source', None)
+
+            if source:
+                tokenized_activate_url = set_url_query_params(tokenized_activate_url, source=source)
+
+            if signup:
+                tokenized_activate_url = set_url_query_params(tokenized_activate_url, signup="true")
+
         return tokenized_activate_url
 
     def send_confirmation_mail(self, request, emailconfirmation, signup):
         current_site = get_current_site(request)
         activate_url = self.get_email_confirmation_url(
             request,
-            emailconfirmation)
+            emailconfirmation,
+            signup)
         badgr_app = BadgrApp.objects.get_current(request, raise_exception=False)
         ctx = {
             "user": emailconfirmation.email_address.user,
