@@ -81,6 +81,7 @@ class UserCreateTests(BadgrTestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("signup=true", mail.outbox[0].body)
     
     def test_create_user_from_mozilla(self):
         user_data = {
