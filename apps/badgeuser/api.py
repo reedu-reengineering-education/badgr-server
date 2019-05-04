@@ -7,7 +7,7 @@ import urlparse
 from allauth.account.adapter import get_adapter
 from allauth.account.models import EmailConfirmationHMAC
 from allauth.account.utils import user_pk_to_url_str, url_str_to_user_pk
-from apispec_drf.decorators import (apispec_get_operation, apispec_put_operation, apispec_operation,
+from apispec_drf.decorators import (apispec_get_operation, apispec_put_operation, apispec_post_operation, apispec_operation,
     apispec_delete_operation, apispec_list_operation,)
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -57,6 +57,11 @@ class BadgeUserDetail(BaseEntityDetailView):
         "put": ["rw:profile"],
     }
 
+    @apispec_post_operation('BadgeUser',
+        summary="Post a single BadgeUser profile",
+        description="Make an account",
+        tags=['BadgeUsers']
+    )
     def post(self, request, **kwargs):
         """
         Signup for a new account
