@@ -15,6 +15,8 @@ from mainsite import TOP_DIR, blacklist
 from mainsite.tests.base import BadgrTestCase
 from hashlib import sha256
 import responses
+from issuer.models import BadgeClass, Issuer, BadgeInstance
+import mock
 
 
 class TestCacheSettings(TransactionTestCase):
@@ -153,6 +155,32 @@ class TestEmailCleanupCommand(BadgrTestCase):
     BADGR_BLACKLIST_QUERY_ENDPOINT='http://example.com',
 )
 class TestBlacklist(BadgrTestCase):
+    def setUp(self):
+        super(TestBlacklist, self).setUp()
+        self.user, _ = BadgeUser.objects.get_or_create(email='test@example.com')
+        self.cached_email, _ = CachedEmailAddress.objects.get_or_create(user=self.user, email='test@example.com', verified=True, primary=True)
+        self.issuer = Issuer.objects.create(
+            name="Open Badges",
+            created_at="2015-12-15T15:55:51Z",
+            created_by=None,
+            slug="open-badges",
+            source_url="http://badger.openbadges.org/program/meta/bda68a0b505bc0c7cf21bc7900280ee74845f693",
+            source="test-fixture",
+            image=""
+        )
+
+        self.badge_class = BadgeClass.objects.create(
+            name="MozFest Reveler",
+            created_at="2015-12-15T15:55:51Z",
+            created_by=None,
+            slug="mozfest-reveler",
+            criteria_text=None,
+            source_url="http://badger.openbadges.org/badge/meta/mozfest-reveler",
+            source="test-fixture",
+            image="",
+            issuer=self.issuer
+        )
+
     Inputs = [('email', 'test@example.com'),
               ('url', 'http://example.com'),
               ('telephone', '+16175551212'),
@@ -163,7 +191,7 @@ class TestBlacklist(BadgrTestCase):
         id_type, id_value = self.Inputs[0]
 
         responses.add(
-            responses.GET, 'http://example.com?id='+blacklist._generate_hash(id_type, id_value),
+            responses.GET, 'http://example.com?id='+blacklist.generate_hash(id_type, id_value),
             body="{\"msg\": \"ok\"}", status=200
         )
 
@@ -171,20 +199,33 @@ class TestBlacklist(BadgrTestCase):
         self.assertTrue(in_blacklist)
 
     @responses.activate
+    def test_blacklist_assertion_to_recipient_in_blacklist(self):
+        id_type, id_value = self.Inputs[0]
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist', new=lambda type, val: True):
+            BadgeInstance.objects.create(
+                recipient_identifier="test@example.com",
+                badgeclass=self.badge_class,
+                issuer=self.issuer,
+                image="uploads/badges/local_badgeinstance_174e70bf-b7a8-4b71-8125-c34d1a994a7c.png",
+                acceptance=BadgeInstance.ACCEPTANCE_ACCEPTED
+            )
+        self.assertIsNone(BadgeInstance.objects.first())
+
+    @responses.activate
     def test_blacklist_api_query_is_in_blacklist_false(self):
         id_type, id_value = self.Inputs[1]
 
         responses.add(
-            responses.GET, 'http://example.com?id='+blacklist._generate_hash(id_type, id_value),
+            responses.GET, 'http://example.com?id='+blacklist.generate_hash(id_type, id_value),
             body="{\"msg\": \"no\"}", status=404
         )
 
         in_blacklist = blacklist.api_query_is_in_blacklist(id_type, id_value)
         self.assertFalse(in_blacklist)
 
-    def test_blacklist_generate_hash(self):
-        # The _generate_hash function implementation should not change; We risk contacting people on the blacklist
+    def test_blacklistgenerate_hash(self):
+        # The generate_hash function implementation should not change; We risk contacting people on the blacklist
         for (id_type, id_value) in self.Inputs:
-            got = blacklist._generate_hash(id_type, id_value)
+            got = blacklist.generate_hash(id_type, id_value)
             expected = "${id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value).hexdigest())
             self.assertEqual(got, expected)
