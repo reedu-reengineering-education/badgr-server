@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
-
 from rest_framework.exceptions import ValidationError as RestframeworkValidationError
 
 
@@ -94,6 +93,26 @@ class ListSerializerV2(serializers.ListSerializer, BaseSerializerV2):
     @property
     def data(self):
         return super(serializers.ListSerializer, self).data
+
+    @property
+    def errors(self):
+        if not hasattr(self, '_errors'):
+            msg = 'You must call `.is_valid()` before accessing `.errors`.'
+            raise AssertionError(msg)
+        base_errors_list = self._errors
+
+        return_errors = {}
+        try:
+            for field_errors in base_errors_list:
+                for fe_key, fe_value in field_errors.items():
+                    if return_errors.get(fe_key) is None:
+                        return_errors[fe_key] = field_errors[fe_key]
+                    else:
+                        return_errors[fe_key] += field_errors[fe_key]
+
+            return return_errors
+        except TypeError:
+            return base_errors_list
 
 
 class DetailSerializerV2(BaseSerializerV2):

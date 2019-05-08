@@ -62,7 +62,6 @@ def exception_handler(exc, context):
             # Unrecognized exception, return 500 error
             return None
 
-
         serializer = V2ErrorSerializer(instance={},
                                        success=False,
                                        description=description,
