@@ -13,19 +13,17 @@ blacklist_api_key = getattr(settings, 'BADGR_BLACKLIST_API_KEY', None)
 blacklist_query_endpoint = getattr(settings, 'BADGR_BLACKLIST_QUERY_ENDPOINT', None)
 
 
-def api_submit_email(email):
+def api_submit_email(id_type, email):
     if blacklist_api_key and blacklist_query_endpoint:
-        email_hash = generate_hash('email', email)
-
-        request_body = '{ "id": "%s" }' % email_hash
-        request_query = "{endpoint}".format(endpoint=blacklist_query_endpoint)
+        email_hash = generate_hash(id_type, email)
 
         try:
-            response = requests.post(request_query, request_body, headers={
-                "Authorization": "BEARER {api_key}".format(
-                    api_key=blacklist_api_key
-                ),
-            })
+            response = requests.post(
+                blacklist_query_endpoint, json={"id": email_hash}, headers={
+                    "Authorization": "BEARER {api_key}".format(
+                        api_key=blacklist_api_key
+                    ),
+                })
         except ConnectionError:
             return None
 
@@ -34,9 +32,9 @@ def api_submit_email(email):
         return None
 
 
-def api_query_email(email):
+def api_query_email(id_type, email):
     if blacklist_api_key and blacklist_query_endpoint:
-        email_hash = generate_hash('email', email)
+        email_hash = generate_hash(id_type, email)
 
         request_query = "{endpoint}?id={email_hash}".format(
             endpoint=blacklist_query_endpoint,
@@ -56,18 +54,17 @@ def api_query_email(email):
         return None
 
 
-def api_query_is_in_blacklist(email):
-    response = api_query_email(email)
+def api_query_is_in_blacklist(id_type, email):
+    response = api_query_email(id_type, email)
 
-    is_in_blacklist = None
     if response and response.status_code == 200:
         query = response.json()
         if len(query) > 0:
-            is_in_blacklist = True
+            return True
         else:
-            is_in_blacklist = False
+            return False
 
-    return is_in_blacklist
+    return None
 
 
 def generate_hash(id_type, id_value):
