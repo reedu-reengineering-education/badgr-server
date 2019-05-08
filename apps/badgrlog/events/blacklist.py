@@ -1,4 +1,5 @@
 from .base import BaseBadgrEvent
+from mainsite.blacklist import generate_hash
 
 
 class BlacklistEarnerNotNotifiedEvent(BaseBadgrEvent):
@@ -14,12 +15,14 @@ class BlacklistEarnerNotNotifiedEvent(BaseBadgrEvent):
 
 class BlacklistAssertionNotCreatedEvent(BaseBadgrEvent):
     def __init__(self, badge_instance):
-        self.badge_instance = badge_instance
+        self.recipient_id_hash = \
+            generate_hash(badge_instance.recipient_type, badge_instance.recipient_identifier)
+        self.entity_id = badge_instance.badgeclass.entity_id
 
     def to_representation(self):
         return {
-            'recipient_identifier': self.badge_instance.recipient_identifier,
-            'badge_instance': self.badge_instance.json,
+            'recipient_id_hash': self.recipient_id_hash,
+            'badgeclass_entity_id': self.entity_id,
         }
 
 

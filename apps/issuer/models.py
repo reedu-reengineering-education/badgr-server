@@ -786,12 +786,9 @@ class BadgeInstance(BaseAuditedModel,
 
     def save(self, *args, **kwargs):
         if self.pk is None:
-            is_in_blacklist = \
-                blacklist.api_query_is_in_blacklist(self.recipient_identifier)
-
-            if is_in_blacklist == True:
-                badge_instance = self
-                logger.event(badgrlog.BlacklistAssertionNotCreatedEvent(badge_instance))
+            # First check if recipient is in the blacklist
+            if blacklist.api_query_is_in_blacklist(self.recipient_type, self.recipient_identifier):
+                logger.event(badgrlog.BlacklistAssertionNotCreatedEvent(self))
                 return
 
             self.salt = uuid.uuid4().hex

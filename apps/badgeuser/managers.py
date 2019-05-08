@@ -11,6 +11,7 @@ from django.urls import reverse
 
 from badgeuser.authcode import encrypt_authcode
 from mainsite.models import BadgrApp, OriginSetting
+from badgrsocialauth.utils import set_url_query_params
 
 
 class BadgeUserManager(UserManager):
@@ -48,13 +49,13 @@ class BadgeUserManager(UserManager):
                 # We shouldn't set any of the user attributes at this time until confirmation
                 user = existing_email.user
                 self.send_account_confirmation(
-                  email=email,
-                  first_name=first_name,
-                  last_name=last_name,
-                  badgrapp_id=badgrapp.id,
-                  marketing_opt_in=marketing_opt_in,
-                  plaintext_password=plaintext_password,
-                  source=source
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    badgrapp_id=badgrapp.id,
+                    marketing_opt_in=marketing_opt_in,
+                    plaintext_password=plaintext_password,
+                    source=source
                 )
                 return self.model(email=email)
             elif existing_email.verified:
