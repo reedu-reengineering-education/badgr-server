@@ -150,10 +150,6 @@ class TestEmailCleanupCommand(BadgrTestCase):
         self.assertEqual(BadgeUser.objects.count(), 1)
 
 
-@override_settings(
-    BADGR_BLACKLIST_API_KEY='123',
-    BADGR_BLACKLIST_QUERY_ENDPOINT='http://example.com',
-)
 class TestBlacklist(BadgrTestCase):
     def setUp(self):
         super(TestBlacklist, self).setUp()
@@ -186,6 +182,10 @@ class TestBlacklist(BadgrTestCase):
               ('telephone', '+16175551212'),
               ]
 
+    @override_settings(
+        BADGR_BLACKLIST_API_KEY='123',
+        BADGR_BLACKLIST_QUERY_ENDPOINT='http://example.com',
+    )
     @responses.activate
     def test_blacklist_api_query_is_in_blacklist(self):
         id_type, id_value = self.Inputs[0]
@@ -198,6 +198,10 @@ class TestBlacklist(BadgrTestCase):
         in_blacklist = blacklist.api_query_is_in_blacklist(id_type, id_value)
         self.assertTrue(in_blacklist)
 
+    @override_settings(
+        BADGR_BLACKLIST_API_KEY='123',
+        BADGR_BLACKLIST_QUERY_ENDPOINT='http://example.com',
+    )
     @responses.activate
     def test_blacklist_assertion_to_recipient_in_blacklist(self):
         id_type, id_value = self.Inputs[0]
@@ -211,6 +215,10 @@ class TestBlacklist(BadgrTestCase):
             )
         self.assertIsNone(BadgeInstance.objects.first())
 
+    @override_settings(
+        BADGR_BLACKLIST_API_KEY='123',
+        BADGR_BLACKLIST_QUERY_ENDPOINT='http://example.com',
+    )
     @responses.activate
     def test_blacklist_api_query_is_in_blacklist_false(self):
         id_type, id_value = self.Inputs[1]
@@ -223,12 +231,20 @@ class TestBlacklist(BadgrTestCase):
         in_blacklist = blacklist.api_query_is_in_blacklist(id_type, id_value)
         self.assertFalse(in_blacklist)
 
+    @override_settings(
+        BADGR_BLACKLIST_API_KEY='123',
+        BADGR_BLACKLIST_QUERY_ENDPOINT='http://example.com',
+    )
     def test_blacklist_not_configured_throws_exception(self):
         id_type, id_value = self.Inputs[1]
         with mock.patch('mainsite.blacklist.api_query_recipient_id', new=lambda a, b, c, d: None):
             with self.assertRaises(Exception):
                 blacklist.api_query_is_in_blacklist(id_type, id_value)
 
+    @override_settings(
+        BADGR_BLACKLIST_API_KEY='123',
+        BADGR_BLACKLIST_QUERY_ENDPOINT='http://example.com',
+    )
     def test_blacklistgenerate_hash(self):
         # The generate_hash function implementation should not change; We risk contacting people on the blacklist
         for (id_type, id_value) in self.Inputs:
