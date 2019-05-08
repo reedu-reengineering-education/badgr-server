@@ -61,7 +61,7 @@ def api_query_is_in_blacklist(id_type, recipient_id):
         else:
             return False
 
-    if not response:
+    if response is None:
         raise Exception("Blacklist failed to respond")
 
     return None

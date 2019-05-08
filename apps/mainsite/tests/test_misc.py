@@ -223,6 +223,10 @@ class TestBlacklist(BadgrTestCase):
         in_blacklist = blacklist.api_query_is_in_blacklist(id_type, id_value)
         self.assertFalse(in_blacklist)
 
+    def test_blacklist_not_configured_throws_exception(self):
+        id_type, id_value = self.Inputs[1]
+        self.assertRaises(Exception, blacklist.api_query_is_in_blacklist(id_type, id_value))
+
     def test_blacklistgenerate_hash(self):
         # The generate_hash function implementation should not change; We risk contacting people on the blacklist
         for (id_type, id_value) in self.Inputs:
