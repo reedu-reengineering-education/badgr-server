@@ -201,7 +201,7 @@ class TestBlacklist(BadgrTestCase):
     @responses.activate
     def test_blacklist_assertion_to_recipient_in_blacklist(self):
         id_type, id_value = self.Inputs[0]
-        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist', new=lambda _: True):
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist', new=lambda a, b: True):
             BadgeInstance.objects.create(
                 recipient_identifier="test@example.com",
                 badgeclass=self.badge_class,
@@ -225,8 +225,9 @@ class TestBlacklist(BadgrTestCase):
 
     def test_blacklist_not_configured_throws_exception(self):
         id_type, id_value = self.Inputs[1]
-        with mock.patch('mainsite.blacklist.api_query_recipient_id', new=lambda _: None):
-            self.assertRaises(Exception, blacklist.api_query_is_in_blacklist(id_type, id_value))
+        with mock.patch('mainsite.blacklist.api_query_recipient_id', new=lambda a, b, c, d: None):
+            with self.assertRaises(Exception):
+                blacklist.api_query_is_in_blacklist(id_type, id_value)
 
     def test_blacklistgenerate_hash(self):
         # The generate_hash function implementation should not change; We risk contacting people on the blacklist
