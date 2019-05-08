@@ -12,8 +12,9 @@ from django.test import override_settings, TransactionTestCase
 
 from badgeuser.models import BadgeUser, CachedEmailAddress
 from mainsite.models import BadgrApp
-from mainsite import TOP_DIR
+from mainsite import TOP_DIR, blacklist
 from mainsite.tests.base import BadgrTestCase
+from hashlib import sha256
 
 
 class TestCacheSettings(TransactionTestCase):
@@ -102,6 +103,7 @@ class TestSignup(BadgrTestCase):
             self.assertEqual(actual_query.get('email'), expected_query.get('email'))
             self.assertIsNotNone(actual_query.get('authToken'))
 
+
 @override_settings(
     ACCOUNT_EMAIL_CONFIRMATION_HMAC=False
 )
@@ -144,3 +146,19 @@ class TestEmailCleanupCommand(BadgrTestCase):
         self.assertTrue(email_record.primary)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(BadgeUser.objects.count(), 1)
+
+
+class TestBlacklist(BadgrTestCase):
+    def test_blacklist_generate_hash(self):
+        # The generate_hash function implementation should not change; We risk contacting people on the blacklist
+        inputs = [('email', 'test@example.com'),
+                  ('url', 'http://example.com'),
+                  ('telephone', '+16175551212'),
+                  ]
+
+        for (id_type, id_value) in inputs:
+            got = blacklist.generate_hash(id_type, id_value)
+            expected = "${id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value).hexdigest())
+            self.assertEqual(got, expected)
+
+
