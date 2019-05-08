@@ -15,7 +15,7 @@ blacklist_query_endpoint = getattr(settings, 'BADGR_BLACKLIST_QUERY_ENDPOINT', N
 
 def api_submit_email(id_type, email):
     if blacklist_api_key and blacklist_query_endpoint:
-        email_hash = generate_hash(id_type, email)
+        email_hash = _generate_hash(id_type, email)
 
         try:
             response = requests.post(
@@ -34,7 +34,7 @@ def api_submit_email(id_type, email):
 
 def api_query_email(id_type, email):
     if blacklist_api_key and blacklist_query_endpoint:
-        email_hash = generate_hash(id_type, email)
+        email_hash = _generate_hash(id_type, email)
 
         request_query = "{endpoint}?id={email_hash}".format(
             endpoint=blacklist_query_endpoint,
@@ -67,7 +67,7 @@ def api_query_is_in_blacklist(id_type, email):
     return None
 
 
-def generate_hash(id_type, id_value):
+def _generate_hash(id_type, id_value):
     return "${id_type}$sha256${hash}".format(id_type=id_type,
                                              hash=sha256(id_value).hexdigest())
 
@@ -80,7 +80,7 @@ def generate_email_signature(email):
         int((expiration - datetime(1970, 1, 1)).total_seconds())
 
     email_encoded = base64.b64encode(email)
-    email_hash = generate_hash('email', email)
+    email_hash = _generate_hash('email', email)
     timestamp_hash = hmac.new(
         secret_key, email_encoded + str(expiration_timestamp), sha1)
 

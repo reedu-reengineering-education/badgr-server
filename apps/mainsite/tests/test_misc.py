@@ -150,15 +150,13 @@ class TestEmailCleanupCommand(BadgrTestCase):
 
 class TestBlacklist(BadgrTestCase):
     def test_blacklist_generate_hash(self):
-        # The generate_hash function implementation should not change; We risk contacting people on the blacklist
+        # The _generate_hash function implementation should not change; We risk contacting people on the blacklist
         inputs = [('email', 'test@example.com'),
                   ('url', 'http://example.com'),
                   ('telephone', '+16175551212'),
                   ]
 
         for (id_type, id_value) in inputs:
-            got = blacklist.generate_hash(id_type, id_value)
+            got = blacklist._generate_hash(id_type, id_value)
             expected = "${id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value).hexdigest())
             self.assertEqual(got, expected)
-
-
