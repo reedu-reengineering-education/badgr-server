@@ -60,9 +60,10 @@ def api_query_is_in_blacklist(id_type, recipient_id):
             return True
         else:
             return False
-    # The assertion should not be created
-    # Raise blacklist not configured: blacklist_api_key blacklist_query_endpoint
-    raise Exception("")
+
+    if not response:
+        raise Exception("Blacklist failed to respond")
+
     return None
 
 
