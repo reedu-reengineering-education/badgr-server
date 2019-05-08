@@ -4,7 +4,6 @@ import urlparse
 import warnings
 
 import os
-from allauth.account.models import EmailConfirmation
 from django.core import mail
 from django.core.cache import cache, CacheKeyWarning
 from django.core.management import call_command
@@ -15,6 +14,7 @@ from mainsite.models import BadgrApp
 from mainsite import TOP_DIR, blacklist
 from mainsite.tests.base import BadgrTestCase
 from hashlib import sha256
+import responses
 
 
 class TestCacheSettings(TransactionTestCase):
@@ -148,15 +148,43 @@ class TestEmailCleanupCommand(BadgrTestCase):
         self.assertEqual(BadgeUser.objects.count(), 1)
 
 
+@override_settings(
+    BADGR_BLACKLIST_API_KEY='123',
+    BADGR_BLACKLIST_QUERY_ENDPOINT='http://example.com',
+)
 class TestBlacklist(BadgrTestCase):
+    Inputs = [('email', 'test@example.com'),
+              ('url', 'http://example.com'),
+              ('telephone', '+16175551212'),
+              ]
+
+    @responses.activate
+    def test_blacklist_api_query_is_in_blacklist(self):
+        id_type, id_value = self.Inputs[0]
+
+        responses.add(
+            responses.GET, 'http://example.com?id='+blacklist._generate_hash(id_type, id_value),
+            body="{\"msg\": \"ok\"}", status=200
+        )
+
+        in_blacklist = blacklist.api_query_is_in_blacklist(id_type, id_value)
+        self.assertTrue(in_blacklist)
+
+    @responses.activate
+    def test_blacklist_api_query_is_in_blacklist_false(self):
+        id_type, id_value = self.Inputs[1]
+
+        responses.add(
+            responses.GET, 'http://example.com?id='+blacklist._generate_hash(id_type, id_value),
+            body="{\"msg\": \"no\"}", status=404
+        )
+
+        in_blacklist = blacklist.api_query_is_in_blacklist(id_type, id_value)
+        self.assertFalse(in_blacklist)
+
     def test_blacklist_generate_hash(self):
         # The _generate_hash function implementation should not change; We risk contacting people on the blacklist
-        inputs = [('email', 'test@example.com'),
-                  ('url', 'http://example.com'),
-                  ('telephone', '+16175551212'),
-                  ]
-
-        for (id_type, id_value) in inputs:
+        for (id_type, id_value) in self.Inputs:
             got = blacklist._generate_hash(id_type, id_value)
             expected = "${id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value).hexdigest())
             self.assertEqual(got, expected)
