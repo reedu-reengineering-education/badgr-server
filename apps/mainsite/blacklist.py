@@ -5,13 +5,12 @@ from requests.exceptions import ConnectionError
 
 from django.conf import settings
 
-blacklist_api_key = getattr(settings, 'BADGR_BLACKLIST_API_KEY', None)
-blacklist_query_endpoint = getattr(settings, 'BADGR_BLACKLIST_QUERY_ENDPOINT', None)
-
 
 def api_submit_recipient_id(id_type, recipient_id):
+    blacklist_api_key = getattr(settings, 'BADGR_BLACKLIST_API_KEY', None)
+    blacklist_query_endpoint = getattr(settings, 'BADGR_BLACKLIST_QUERY_ENDPOINT', None)
     if blacklist_api_key and blacklist_query_endpoint:
-        recipient_id_hash = _generate_hash(id_type, recipient_id)
+        recipient_id_hash = generate_hash(id_type, recipient_id)
 
         try:
             response = requests.post(
@@ -29,8 +28,10 @@ def api_submit_recipient_id(id_type, recipient_id):
 
 
 def api_query_recipient_id(id_type, recipient_id):
+    blacklist_api_key = getattr(settings, 'BADGR_BLACKLIST_API_KEY', None)
+    blacklist_query_endpoint = getattr(settings, 'BADGR_BLACKLIST_QUERY_ENDPOINT', None)
     if blacklist_api_key and blacklist_query_endpoint:
-        recipient_id_hash = _generate_hash(id_type, recipient_id)
+        recipient_id_hash = generate_hash(id_type, recipient_id)
 
         request_query = "{endpoint}?id={recipient_id_hash}".format(
             endpoint=blacklist_query_endpoint,
@@ -59,10 +60,12 @@ def api_query_is_in_blacklist(id_type, recipient_id):
             return True
         else:
             return False
-
+    # The assertion should not be created
+    # Raise blacklist not configured: blacklist_api_key blacklist_query_endpoint
+    raise Exception("")
     return None
 
 
-def _generate_hash(id_type, id_value):
+def generate_hash(id_type, id_value):
     return "${id_type}$sha256${hash}".format(id_type=id_type,
                                              hash=sha256(id_value).hexdigest())
