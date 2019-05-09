@@ -159,8 +159,10 @@ class Issuer(ResizeUploadedImage,
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
 
     def __eq__(self, other):
+        UNUSABLE_DEFAULT = uuid.uuid4()
+
         for prop in Issuer.COMPARABLE_PROPERTIES:
-            if getattr(self, prop) != getattr(other, prop):
+            if getattr(self, prop) != getattr(other, prop, UNUSABLE_DEFAULT):
                 return False
         return True
 
