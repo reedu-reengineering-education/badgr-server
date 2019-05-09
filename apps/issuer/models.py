@@ -137,8 +137,8 @@ class Issuer(ResizeUploadedImage,
              BaseAuditedModel,
              BaseVersionedEntity,
              BaseOpenBadgeObjectModel):
+    COMPARABLE_PROPERTIES = ('badgrapp_id', 'description', 'email', 'entity_id', 'entity_version', 'name', 'pk', 'slug', 'url')
     entity_class_name = 'Issuer'
-
 
     staff = models.ManyToManyField(AUTH_USER_MODEL, through='IssuerStaff')
 
@@ -157,6 +157,12 @@ class Issuer(ResizeUploadedImage,
 
     objects = IssuerManager()
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
+
+    def __eq__(self, other):
+        for prop in Issuer.COMPARABLE_PROPERTIES:
+            if getattr(self, prop) != getattr(other, prop):
+                return False
+        return True
 
     def publish(self, *args, **kwargs):
         super(Issuer, self).publish(*args, **kwargs)
