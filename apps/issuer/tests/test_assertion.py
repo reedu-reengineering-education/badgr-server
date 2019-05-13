@@ -300,10 +300,6 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(response.status_code, 200)
 
     def test_can_issue_badge_by_class_name_success(self):
-        """
-        ValidationError("No matching BadgeClass found with name {}".format(name))
-        raise serializers.ValidationError("Could not award; {} BadgeClasses with name {}".format(len_matches, name))
-        """
         badgeclass_name = "A Badge"
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -322,10 +318,6 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 201)
 
     def test_can_issue_badge_by_class_name_error(self):
-        """
-        ValidationError("No matching BadgeClass found with name {}".format(name))
-        raise serializers.ValidationError("Could not award; {} BadgeClasses with name {}".format(len_matches, name))
-        """
         badgeclass_name = "A Badge"
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -344,10 +336,6 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         self.assertRaises(serializers.ValidationError)
     
     def test_can_issue_badge_by_class_ambiguity_error(self):
-        """
-        ValidationError("No matching BadgeClass found with name {}".format(name))
-        raise serializers.ValidationError("Could not award; {} BadgeClasses with name {}".format(len_matches, name))
-        """
         badgeclass_name = "A Badge"
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
