@@ -392,6 +392,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
     badgeclassOpenBadgeId = CachedUrlHyperlinkedRelatedField(
         source='badgeclass_jsonld_id', view_name='badgeclass_json', lookup_field='entity_id',
         queryset=BadgeClass.cached, required=False)
+    badgeclassName = serializers.CharField(write_only=True, required=False)
 
     issuer = EntityRelatedFieldV2(source='cached_issuer', required=False, queryset=Issuer.cached)
     issuerOpenBadgeId = serializers.URLField(source='issuer_jsonld_id', read_only=True)
@@ -452,6 +453,11 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                     'type': 'string',
                     'format': 'url',
                     'description': "URL of the BadgeClass to award",
+                }),
+                ('badgeclassName', {
+                    'type': 'string',
+                    'format': 'string',
+                    'description': "Name of BadgeClass to create assertion against, case insensitive",
                 }),
                 ('revoked', {
                     'type': 'boolean',
@@ -539,11 +545,12 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
 
     def validate(self, data):
         request = self.context.get('request', None)
+        expected_issuer = self.context.get('kwargs', {}).get('issuer')
 
         if request and request.method != 'PUT':
             # recipient and badgeclass are only required on create, ignored on update
             if 'recipient_identifier' not in data:
-                raise serializers.ValidationError({'recipient_identifier': ["This field is required"]})
+                raise serializers.ValidationError({'recipient': ["This field is required"]})
 
             if 'cached_badgeclass' in data:
                 # included badgeclass in request
@@ -553,6 +560,16 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                 data['badgeclass'] = self.context.get('badgeclass')
             elif 'badgeclass_jsonld_id' in data:
                 data['badgeclass'] = data.pop('badgeclass_jsonld_id')
+            elif 'badgeclassName' in data:
+                name = data.pop('badgeclassName')
+                matches = BadgeClass.objects.filter(name=name, issuer=expected_issuer)
+                len_matches = len(matches)
+                if len_matches == 1:
+                    data['badgeclass'] = matches.first()
+                elif len_matches == 0:
+                    raise serializers.ValidationError("No matching BadgeClass found with name {}".format(name))
+                else:
+                    raise serializers.ValidationError("Could not award; {} BadgeClasses with name {}".format(len_matches, name))
             else:
                 raise serializers.ValidationError({"badgeclass": ["This field is required"]})
 
@@ -567,7 +584,6 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                     raise serializers.ValidationError(
                         "A previous award of this badge already exists for this recipient.")
 
-        expected_issuer = self.context.get('kwargs', {}).get('issuer')
         if expected_issuer and data['badgeclass'].issuer != expected_issuer:
             raise serializers.ValidationError({"badgeclass": ["Could not find matching badgeclass for this issuer."]})
 
