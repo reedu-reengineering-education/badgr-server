@@ -32,9 +32,23 @@ class BackpackAssertionList(BaseEntityListView):
         'post': ['rw:backpack'],
     }
 
+    def badge_filter(self, include_pending):
+        """
+        For assertions without a source url (locally issued assertions) 
+        only list assertions which are not in a pending state (awarded to 
+        an unverified email). as long as the include_pending param is set
+        """
+        def filter(b):
+            ok = (not b.revoked) and b.acceptance != BadgeInstance.ACCEPTANCE_REJECTED
+            if include_pending:
+                if b.source_url:
+                    return ok
+            return ok and not b.pending
+        return filter
+    
     def get_objects(self, request, **kwargs):
-        return filter(lambda a: (not a.revoked) and a.acceptance != BadgeInstance.ACCEPTANCE_REJECTED,
-                      self.request.user.cached_badgeinstances())
+        include_pending = 'include_pending' in request.query_params
+        return filter(self.badge_filter(include_pending), self.request.user.cached_badgeinstances())
 
     @apispec_list_operation('Assertion',
         summary="Get a list of Assertions in authenticated user's backpack ",

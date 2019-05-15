@@ -35,7 +35,7 @@ class BackpackAssertionSerializerV2(DetailSerializerV2, OriginalJsonSerializerMi
     revoked = HumanReadableBooleanField(read_only=True)
     revocationReason = serializers.CharField(source='revocation_reason', read_only=True)
     expires = serializers.DateTimeField(source='expires_at', required=False)
-    is_recipient_email_unverified = serializers.ReadOnlyField()
+    pending = serializers.ReadOnlyField()
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeInstance
@@ -130,16 +130,15 @@ class BackpackImportSerializerV2(DetailSerializerV2):
     assertion = serializers.DictField(required=False)
 
     def validate(self, attrs):
+        # TODO: when test is run, why is assertion field blank???
         if sum(1 if v else 0 for v in attrs.values()) != 1:
             raise serializers.ValidationError("Must provide only one of 'url', 'image' or 'assertion'.")
         return attrs
 
     def create(self, validated_data):
         try:
-            kwargs = validated_data.extend({
-                'allow_unvalidated_recipient': True
-            })
-            instance, created = BadgeCheckHelper.get_or_create_assertion(**kwargs)
+            validated_data['imagefile'] = validated_data.pop('image', None)
+            instance, created = BadgeCheckHelper.get_or_create_assertion(**validated_data)
             if not created:
                 instance.acceptance = BadgeInstance.ACCEPTANCE_ACCEPTED
                 instance.save()

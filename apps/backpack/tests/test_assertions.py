@@ -7,6 +7,7 @@ from openbadges.verifier.openbadges_context import (OPENBADGES_CONTEXT_V2_URI, O
 from openbadges_bakery import bake, unbake
 import os
 import responses
+from issuer.utils import generate_sha256_hashstring
 
 from django.urls import reverse
 
@@ -892,3 +893,74 @@ class TestExpandAssertions(BadgrTestCase, SetupIssuerHelper):
             self.assertTrue(isinstance(response.data['result'][i]['badgeclass'], collections.OrderedDict))
             self.assertTrue(isinstance(response.data['result'][i]['badgeclass']['issuer'], collections.OrderedDict))
 
+
+class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
+    @responses.activate
+    def test_view_badge_i_imported(self):
+        setup_resources([
+            {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png"},
+        ])
+        unverified_email = 'test@example.com'
+        test_user = self.setup_user(email='verified@example.com', authenticate=True)
+        CachedEmailAddress.objects.add_email(test_user, unverified_email)
+        post_input = {"url": "http://a.com/assertion-embedded1"}
+
+        post_resp = self.client.post('/v2/backpack/import', post_input, format='json')
+        test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
+        test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
+        test_badgeclass_one.issue(recipient_id='verified@example.com')
+        
+        get_resp = self.client.get('/v2/backpack/assertions?include_pending=1')
+        
+        self.assertEqual(post_resp.status_code, 201)
+
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertEqual(len(get_resp.data.get('result')), 2)
+        self.assertTrue(get_resp.data.get('result')[0]['pending'])
+        self.assertFalse(get_resp.data.get('result')[1]['pending'])
+
+        get_resp2 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=1')
+        self.assertEqual(len(get_resp2.data), 2)
+        self.assertTrue(get_resp2.data[0]['pending'])
+        self.assertFalse(get_resp2.data[1]['pending'])
+
+    @responses.activate
+    def test_view_badge_i_imported_with_v1(self):
+        setup_resources([
+            {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png"},
+        ])
+        unverified_email = 'test@example.com'
+        test_user = self.setup_user(email='verified@example.com', authenticate=True)
+        CachedEmailAddress.objects.add_email(test_user, unverified_email)
+        post_input = {"url": "http://a.com/assertion-embedded1"}
+        post_resp = self.client.post('/v1/earner/badges', post_input, format='json')
+        self.assertEqual(post_resp.status_code, 201)
+
+        get_resp2 = self.client.get('/v1/earner/badges?json_format=plain')
+        self.assertEqual(len(get_resp2.data), 0)
+        
+        get_resp3 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=1')
+        self.assertEqual(len(get_resp3.data), 1)
+
+    # apps.badgeuser.tests.UserRecipientIdentifierTests.test_verified_recipient_v2_assertions_endpoint
+    # apps.badgeuser.tests.UserRecipientIdentifierTests.test_verified_recipient_v1_badges_endpoint
+
+    def test_cant_view_badge_awarded_to_unverified_that_i_did_not_import(self):
+        unverified_email = 'test@example.com'
+        test_user = self.setup_user(email='verified@example.com', authenticate=True)
+        CachedEmailAddress.objects.add_email(test_user, unverified_email)
+        test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
+        test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
+        test_badgeclass_one.issue(recipient_id='test@example.com')
+        get_resp = self.client.get('/v2/backpack/assertions?include_pending=1')
+        
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertEqual(len(get_resp.data.get('result')), 0)
+        
+        get_resp2 = self.client.get('/v1/earner/badges?json_format=plain')
+        self.assertEqual(get_resp2.status_code, 200)
+        self.assertEqual(len(get_resp2.data), 0)

@@ -566,9 +566,10 @@ class BadgeClass(ResizeUploadedImage,
     def cached_completion_elements(self):
         return [pce for pce in self.completion_elements.all()]
 
-    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, **kwargs):
+    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, recipient_type=u'email', **kwargs):
         return BadgeInstance.objects.create(
-            badgeclass=self, recipient_identifier=recipient_id, narrative=narrative, evidence=evidence,
+            badgeclass=self, recipient_identifier=recipient_id, recipient_type=recipient_type,
+            narrative=narrative, evidence=evidence,
             notify=notify, created_by=created_by, allow_uppercase=allow_uppercase,
             badgr_app=badgr_app,
             **kwargs
@@ -771,18 +772,27 @@ class BadgeInstance(BaseAuditedModel,
         return self.issuer.owners
 
     @property
-    def is_recipient_email_unverified(self):
-        from badgeuser.models import CachedEmailAddress
-        try:
-            existing_email = CachedEmailAddress.cached.get(
-                email=self.recipient_identifier)
-        except CachedEmailAddress.DoesNotExist:
-            existing_email = None
-
-        if not existing_email or existing_email.verified != True:
-            return True
+    def pending(self):
+        """
+            If the associated identifier for this BadgeInstance 
+            does not exist or is unverified the BadgeInstance is 
+            considered "pending"
+        """
+        from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
+        if self.recipient_type == BadgeInstance.RECIPIENT_TYPE_EMAIL:
+            try:
+                existing_email = CachedEmailAddress.cached.get(
+                    email=self.recipient_identifier)
+            except CachedEmailAddress.DoesNotExist:
+                existing_email = None
+            return not existing_email or not existing_email.verified
         else:
-            return False
+            try:
+                existing_identifier = UserRecipientIdentifier.cached.get(
+                    identifier=self.recipient_identifier)
+            except UserRecipientIdentifier.DoesNotExist:
+                existing_identifier = None
+            return not existing_identifier or not existing_identifier.verified
 
     def save(self, *args, **kwargs):
         if self.pk is None:

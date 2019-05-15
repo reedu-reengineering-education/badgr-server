@@ -731,8 +731,8 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
 
     def test_verified_recipient_receives_assertion(self):
         url = 'http://example.com'
-        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         self.assertEqual(len(self.first_user.cached_badgeinstances()), 1)
 
     def test_unverified_recipient_receives_no_assertion(self):
@@ -743,8 +743,8 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
 
     def test_verified_recipient_v1_badges_endpoint(self):
         url = 'http://example.com'
-        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
 
         response = self.client.get('/v1/earner/badges')
         self.assertEqual(len(response.data), 1)
@@ -752,8 +752,7 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
     def test_verified_recipient_v2_assertions_endpoint(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
-
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         response = self.client.get('/v2/backpack/assertions')
         self.assertEqual(len(response.data['result']), 1)
 

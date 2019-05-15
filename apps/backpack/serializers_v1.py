@@ -28,7 +28,7 @@ class LocalBadgeInstanceUploadSerializerV1(serializers.Serializer):
     acceptance = serializers.CharField(default='Accepted')
     narrative = MarkdownCharField(required=False, read_only=True)
     evidence_items = EvidenceItemSerializer(many=True, required=False, read_only=True)
-    is_recipient_email_unverified = serializers.ReadOnlyField()
+    pending = serializers.ReadOnlyField()
 
     extensions = serializers.DictField(source='extension_items', read_only=True)
 
@@ -104,7 +104,6 @@ class LocalBadgeInstanceUploadSerializerV1(serializers.Serializer):
                 imagefile=validated_data.get('image', None),
                 assertion=validated_data.get('assertion', None),
                 created_by=owner,
-                allow_unvalidated_recipient=True,
             )
             if not created:
                 if instance.acceptance == BadgeInstance.ACCEPTANCE_ACCEPTED:
@@ -132,7 +131,6 @@ class LocalBadgeInstanceUploadSerializerV1(serializers.Serializer):
 
 
 class CollectionBadgesSerializerV1(serializers.ListSerializer):
-
 
     def to_representation(self, data):
         filtered_data = [b for b in data if b.cached_badgeinstance.acceptance is not BadgeInstance.ACCEPTANCE_REJECTED and b.cached_badgeinstance.revoked is False]
@@ -444,7 +442,7 @@ class V1InstanceSerializer(serializers.Serializer):
     uid = BadgeStringField(required=False)
     recipient = BadgeEmailField()  # TODO: improve for richer types
     badge = V1BadgeClassSerializer()
-    issuedOn = BadgeDateTimeField(required=False) # missing in some translated v0.5.0
+    issuedOn = BadgeDateTimeField(required=False)  # missing in some translated v0.5.0
     expires = BadgeDateTimeField(required=False)
     image = BadgeImageURLField(required=False)
     evidence = BadgeURLField(required=False)
@@ -454,7 +452,7 @@ class V1BadgeInstanceSerializer(V1InstanceSerializer):
     """
     used to serialize a issuer.BadgeInstance like a composition.LocalBadgeInstance
     """
-    is_recipient_email_unverified = serializers.ReadOnlyField()
+    pending = serializers.ReadOnlyField()
 
     def to_representation(self, instance):
         localbadgeinstance_json = instance.json
@@ -475,4 +473,3 @@ class V1BadgeInstanceSerializer(V1InstanceSerializer):
             "recipient": instance.recipient_identifier,
         }
         return super(V1BadgeInstanceSerializer, self).to_representation(localbadgeinstance_json)
-
