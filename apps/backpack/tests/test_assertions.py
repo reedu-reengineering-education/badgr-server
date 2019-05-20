@@ -699,7 +699,7 @@ class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
 
         test_recipient = self.setup_user(email='test_recipient@email.test', authenticate=True)
-        assertion = test_badgeclass.issue(recipient_id='test_recipient@email.test')
+        assertion = test_badgeclass.issue(recipient_id='test_recipient@email.test', recipient_type='email')
 
         response = self.client.get(
             '/v1/earner/badges'
@@ -926,6 +926,9 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         self.assertTrue(get_resp2.data[0]['pending'])
         self.assertFalse(get_resp2.data[1]['pending'])
 
+        get_resp3 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=0')
+        self.assertEqual(len(get_resp3.data), 1)
+
     @responses.activate
     def test_view_badge_i_imported_with_v1(self):
         setup_resources([
@@ -946,6 +949,9 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         get_resp3 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=1')
         self.assertEqual(len(get_resp3.data), 1)
 
+        get_resp4 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=false')
+        self.assertEqual(len(get_resp4.data), 0)
+
     # apps.badgeuser.tests.UserRecipientIdentifierTests.test_verified_recipient_v2_assertions_endpoint
     # apps.badgeuser.tests.UserRecipientIdentifierTests.test_verified_recipient_v1_badges_endpoint
 
@@ -955,7 +961,7 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         CachedEmailAddress.objects.add_email(test_user, unverified_email)
         test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
         test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
-        test_badgeclass_one.issue(recipient_id='test@example.com')
+        test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
         get_resp = self.client.get('/v2/backpack/assertions?include_pending=1')
         
         self.assertEqual(get_resp.status_code, 200)
