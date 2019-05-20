@@ -86,6 +86,18 @@ class BaseOpenBadgeObjectModel(OriginalJsonMixin, cachemodel.CacheModel):
     def get_extensions_manager(self):
         raise NotImplementedError()
 
+    def __eq__(self, other):
+        UNUSABLE_DEFAULT = uuid.uuid4()
+
+        comparable_properties = getattr(self, 'COMPARABLE_PROPERTIES', None)
+        if comparable_properties is None:
+            return super(BaseOpenBadgeObjectModel, self).__eq__(other)
+
+        for prop in self.COMPARABLE_PROPERTIES:
+            if getattr(self, prop) != getattr(other, prop, UNUSABLE_DEFAULT):
+                return False
+        return True
+
     @cachemodel.cached_method(auto_publish=True)
     def cached_extensions(self):
         return self.get_extensions_manager().all()
@@ -138,7 +150,8 @@ class Issuer(ResizeUploadedImage,
              BaseVersionedEntity,
              BaseOpenBadgeObjectModel):
     entity_class_name = 'Issuer'
-
+    COMPARABLE_PROPERTIES = ('badgrapp_id', 'description', 'email', 'entity_id', 'entity_version', 'name', 'pk',
+                            'updated_at', 'url',)
 
     staff = models.ManyToManyField(AUTH_USER_MODEL, through='IssuerStaff')
 
@@ -387,6 +400,8 @@ class BadgeClass(ResizeUploadedImage,
                  BaseVersionedEntity,
                  BaseOpenBadgeObjectModel):
     entity_class_name = 'BadgeClass'
+    COMPARABLE_PROPERTIES = ('criteria_text', 'criteria_url', 'description', 'entity_id', 'entity_version',
+                             'expires_amount', 'expires_duration', 'name', 'pk', 'slug', 'updated_at',)
 
     EXPIRES_DURATION_DAYS = 'days'
     EXPIRES_DURATION_WEEKS = 'weeks'
@@ -663,6 +678,8 @@ class BadgeInstance(BaseAuditedModel,
                     BaseVersionedEntity,
                     BaseOpenBadgeObjectModel):
     entity_class_name = 'Assertion'
+    COMPARABLE_PROPERTIES = ('badgeclass_id', 'entity_id', 'entity_version', 'issued_on', 'pk', 'narrative',
+                             'recipient_identifier', 'recipient_type', 'revoked', 'revocation_reason', 'updated_at',)
 
     issued_on = models.DateTimeField(blank=False, null=False, default=timezone.now)
 
