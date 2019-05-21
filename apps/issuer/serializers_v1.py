@@ -17,7 +17,7 @@ from mainsite.serializers import HumanReadableBooleanField, StripTagsCharField, 
     OriginalJsonSerializerMixin
 from mainsite.utils import OriginSetting
 from mainsite.validators import ChoicesValidator, BadgeExtensionValidator, PositiveIntegerValidator, TelephoneValidator
-from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance
+from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance, RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL
 
 
 class CachedListSerializer(serializers.ListSerializer):
@@ -284,7 +284,7 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
     image = serializers.FileField(read_only=True)  # use_url=True, might be necessary
     email = serializers.EmailField(max_length=1024, required=False, write_only=True)
     recipient_identifier = serializers.CharField(max_length=1024, required=False)
-    recipient_type = serializers.CharField(default=BadgeInstance.RECIPIENT_TYPE_EMAIL)
+    recipient_type = serializers.CharField(default=RECIPIENT_TYPE_EMAIL)
     allow_uppercase = serializers.BooleanField(default=False, required=False, write_only=True)
     evidence = serializers.URLField(write_only=True, required=False, allow_blank=True, max_length=1024)
     narrative = MarkdownCharField(required=False, allow_blank=True, allow_null=True)
@@ -307,9 +307,9 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
     def validate(self, data):
         recipient_type = data.get('recipient_type')
         if data.get('recipient_identifier') and data.get('email') is None:
-            if recipient_type == BadgeInstance.RECIPIENT_TYPE_EMAIL:
+            if recipient_type == RECIPIENT_TYPE_EMAIL:
                 recipient_validator = EmailValidator()
-            elif recipient_type in (BadgeInstance.RECIPIENT_TYPE_URL, BadgeInstance.RECIPIENT_TYPE_ID):
+            elif recipient_type in (RECIPIENT_TYPE_URL, RECIPIENT_TYPE_ID):
                 recipient_validator = URLValidator()
             else:
                 recipient_validator = TelephoneValidator()
@@ -335,7 +335,7 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
 
         hashed = data.get('hashed', None)
         if hashed is None:
-            if recipient_type in (BadgeInstance.RECIPIENT_TYPE_URL, BadgeInstance.RECIPIENT_TYPE_ID):
+            if recipient_type in (RECIPIENT_TYPE_URL, RECIPIENT_TYPE_ID):
                 data['hashed'] = False
             else:
                 data['hashed'] = True
@@ -388,7 +388,7 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
             notify=validated_data.get('create_notification'),
             created_by=self.context.get('request').user,
             allow_uppercase=validated_data.get('allow_uppercase'),
-            recipient_type=validated_data.get('recipient_type', BadgeInstance.RECIPIENT_TYPE_EMAIL),
+            recipient_type=validated_data.get('recipient_type', RECIPIENT_TYPE_EMAIL),
             badgr_app=BadgrApp.objects.get_current(self.context.get('request')),
             expires_at=validated_data.get('expires_at', None),
             extensions=validated_data.get('extension_items', None)

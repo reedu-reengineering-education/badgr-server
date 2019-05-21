@@ -12,7 +12,7 @@ from rest_framework import serializers
 from badgeuser.models import BadgeUser
 from badgeuser.serializers_v2 import BadgeUserEmailSerializerV2
 from entity.serializers import DetailSerializerV2, EntityRelatedFieldV2, BaseSerializerV2
-from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance
+from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance, RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL, RECIPIENT_TYPE_TELEPHONE
 from issuer.utils import generate_sha256_hashstring
 from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
@@ -315,23 +315,23 @@ class BadgeRecipientSerializerV2(BaseSerializerV2):
     hashed = serializers.NullBooleanField(default=None, required=False)
     type = serializers.ChoiceField(
         choices=BadgeInstance.RECIPIENT_TYPE_CHOICES,
-        default=BadgeInstance.RECIPIENT_TYPE_EMAIL,
+        default=RECIPIENT_TYPE_EMAIL,
         required=False,
         source='recipient_type'
     )
     plaintextIdentity = serializers.CharField(source='recipient_identifier', read_only=True, required=False)
 
     VALIDATORS = {
-        BadgeInstance.RECIPIENT_TYPE_EMAIL: EmailValidator(),
-        BadgeInstance.RECIPIENT_TYPE_URL: URLValidator(),
-        BadgeInstance.RECIPIENT_TYPE_ID: URLValidator(),
-        BadgeInstance.RECIPIENT_TYPE_TELEPHONE: TelephoneValidator(),
+        RECIPIENT_TYPE_EMAIL: EmailValidator(),
+        RECIPIENT_TYPE_URL: URLValidator(),
+        RECIPIENT_TYPE_ID: URLValidator(),
+        RECIPIENT_TYPE_TELEPHONE: TelephoneValidator(),
     }
     HASHED_DEFAULTS = {
-        BadgeInstance.RECIPIENT_TYPE_EMAIL: True,
-        BadgeInstance.RECIPIENT_TYPE_URL: False,
-        BadgeInstance.RECIPIENT_TYPE_ID: False,
-        BadgeInstance.RECIPIENT_TYPE_TELEPHONE: True,
+        RECIPIENT_TYPE_EMAIL: True,
+        RECIPIENT_TYPE_URL: False,
+        RECIPIENT_TYPE_ID: False,
+        RECIPIENT_TYPE_TELEPHONE: True,
 
     }
 

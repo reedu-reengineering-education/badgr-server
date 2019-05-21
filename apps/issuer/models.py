@@ -39,6 +39,11 @@ from .utils import generate_sha256_hashstring, CURRENT_OBI_VERSION, get_obi_cont
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
+RECIPIENT_TYPE_EMAIL = 'email'
+RECIPIENT_TYPE_ID = 'openBadgeId'
+RECIPIENT_TYPE_TELEPHONE = 'telephone'
+RECIPIENT_TYPE_URL = 'url'
+
 logger = badgrlog.BadgrLogger()
 
 
@@ -565,8 +570,8 @@ class BadgeClass(ResizeUploadedImage,
     @cachemodel.cached_method(auto_publish=True)
     def cached_completion_elements(self):
         return [pce for pce in self.completion_elements.all()]
-
-    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, recipient_type=u'email', **kwargs):
+    
+    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, recipient_type=RECIPIENT_TYPE_EMAIL, **kwargs):
         return BadgeInstance.objects.create(
             badgeclass=self, recipient_identifier=recipient_id, recipient_type=recipient_type,
             narrative=narrative, evidence=evidence,
@@ -670,10 +675,6 @@ class BadgeInstance(BaseAuditedModel,
     badgeclass = models.ForeignKey(BadgeClass, blank=False, null=False, on_delete=models.CASCADE, related_name='badgeinstances')
     issuer = models.ForeignKey(Issuer, blank=False, null=False)
 
-    RECIPIENT_TYPE_EMAIL = 'email'
-    RECIPIENT_TYPE_ID = 'openBadgeId'
-    RECIPIENT_TYPE_TELEPHONE = 'telephone'
-    RECIPIENT_TYPE_URL = 'url'
     RECIPIENT_TYPE_CHOICES = (
         (RECIPIENT_TYPE_EMAIL, 'email'),
         (RECIPIENT_TYPE_ID, 'openBadgeId'),
@@ -779,20 +780,11 @@ class BadgeInstance(BaseAuditedModel,
             considered "pending"
         """
         from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
-        if self.recipient_type == BadgeInstance.RECIPIENT_TYPE_EMAIL:
-            try:
-                existing_email = CachedEmailAddress.cached.get(
-                    email=self.recipient_identifier)
-            except CachedEmailAddress.DoesNotExist:
-                existing_email = None
-            return not existing_email or not existing_email.verified
+        if self.recipient_type == RECIPIENT_TYPE_EMAIL:
+            existing_identifier = CachedEmailAddress.cached.filter(email=self.recipient_identifier).first()
         else:
-            try:
-                existing_identifier = UserRecipientIdentifier.cached.get(
-                    identifier=self.recipient_identifier)
-            except UserRecipientIdentifier.DoesNotExist:
-                existing_identifier = None
-            return not existing_identifier or not existing_identifier.verified
+            existing_identifier = UserRecipientIdentifier.cached.filter(identifier=self.recipient_identifier).first()
+        return not existing_identifier or not existing_identifier.verified
 
     def save(self, *args, **kwargs):
         if self.pk is None:
@@ -907,7 +899,7 @@ class BadgeInstance(BaseAuditedModel,
         TODO: consider making this an option on initial save and having a foreign key to
         the notification model instance (which would link through to the OpenBadge)
         """
-        if self.recipient_type != BadgeInstance.RECIPIENT_TYPE_EMAIL:
+        if self.recipient_type != RECIPIENT_TYPE_EMAIL:
             return
 
         try:
