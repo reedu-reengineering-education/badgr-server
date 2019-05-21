@@ -39,7 +39,7 @@ class BackpackAssertionList(BaseEntityListView):
         an unverified email). as long as the include_pending param is set
         """
         def filter(b):
-            ok = (not b.revoked) and b.acceptance is not BadgeInstance.ACCEPTANCE_REJECTED
+            ok = (not b.revoked) and b.acceptance != BadgeInstance.ACCEPTANCE_REJECTED
             if include_pending:
                 if b.source_url:
                     return ok
