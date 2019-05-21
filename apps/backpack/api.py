@@ -32,9 +32,23 @@ class BackpackAssertionList(BaseEntityListView):
         'post': ['rw:backpack'],
     }
 
+    def badge_filter(self, include_pending):
+        """
+        For assertions without a source url (locally issued assertions) 
+        only list assertions which are not in a pending state (awarded to 
+        an unverified email). as long as the include_pending param is set
+        """
+        def filter(b):
+            ok = (not b.revoked) and b.acceptance != BadgeInstance.ACCEPTANCE_REJECTED
+            if include_pending:
+                if b.source_url:
+                    return ok
+            return ok and not b.pending
+        return filter
+    
     def get_objects(self, request, **kwargs):
-        return filter(lambda a: (not a.revoked) and a.acceptance != BadgeInstance.ACCEPTANCE_REJECTED,
-                      self.request.user.cached_badgeinstances())
+        include_pending = True if request.query_params.get(u'include_pending', None) in ['1', 'true'] else False
+        return filter(self.badge_filter(include_pending), self.request.user.cached_badgeinstances())
 
     @apispec_list_operation('Assertion',
         summary="Get a list of Assertions in authenticated user's backpack ",
@@ -86,9 +100,9 @@ class BackpackAssertionDetail(BaseEntityDetailView):
         return context
 
     @apispec_get_operation('Assertion',
-        summary="Get detail on an Assertion in the user's Backpack",
-        tags=['Backpack']
-    )
+                           summary="Get detail on an Assertion in the user's Backpack",
+                           tags=['Backpack']
+                           )
     def get(self, request, **kwargs):
         mykwargs = kwargs.copy()
         mykwargs['expands'] = []
@@ -102,9 +116,9 @@ class BackpackAssertionDetail(BaseEntityDetailView):
         return super(BackpackAssertionDetail, self).get(request, **mykwargs)
 
     @apispec_delete_operation('Assertion',
-        summary='Remove an assertion from the backpack',
-        tags=['Backpack']
-    )
+                              summary='Remove an assertion from the backpack',
+                              tags=['Backpack']
+                              )
     def delete(self, request, **kwargs):
         obj = self.get_object(request, **kwargs)
         related_collections = list(BackpackCollection.objects.filter(backpackcollectionbadgeinstance__badgeinstance=obj))
@@ -120,9 +134,9 @@ class BackpackAssertionDetail(BaseEntityDetailView):
         return Response(status=HTTP_204_NO_CONTENT)
 
     @apispec_put_operation('Assertion',
-        summary="Update acceptance of an Assertion in the user's Backpack",
-        tags=['Backpack']
-    )
+                           summary="Update acceptance of an Assertion in the user's Backpack",
+                           tags=['Backpack']
+                           )
     def put(self, request, **kwargs):
         fields_whitelist = ('acceptance',)
         data = {k: v for k, v in request.data.items() if k in fields_whitelist}
@@ -149,16 +163,16 @@ class BackpackCollectionList(BaseEntityListView):
         return self.request.user.cached_backpackcollections()
 
     @apispec_get_operation('Collection',
-        summary='Get a list of Collections',
-        tags=['Backpack']
-    )
+                           summary='Get a list of Collections',
+                           tags=['Backpack']
+                           )
     def get(self, request, **kwargs):
         return super(BackpackCollectionList, self).get(request, **kwargs)
 
     @apispec_post_operation('Collection',
-        summary='Create a new Collection',
-        tags=['Backpack']
-    )
+                            summary='Create a new Collection',
+                            tags=['Backpack']
+                            )
     def post(self, request, **kwargs):
         return super(BackpackCollectionList, self).post(request, **kwargs)
 
@@ -176,23 +190,23 @@ class BackpackCollectionDetail(BaseEntityDetailView):
     }
 
     @apispec_get_operation('Collection',
-        summary='Get a single Collection',
-        tags=['Backpack']
-    )
+                           summary='Get a single Collection',
+                           tags=['Backpack']
+                           )
     def get(self, request, **kwargs):
         return super(BackpackCollectionDetail, self).get(request, **kwargs)
 
     @apispec_put_operation('Collection',
-        summary='Update a Collection',
-        tags=['Backpack']
-    )
+                           summary='Update a Collection',
+                           tags=['Backpack']
+                           )
     def put(self, request, **kwargs):
         return super(BackpackCollectionDetail, self).put(request, **kwargs)
 
     @apispec_delete_operation('Collection',
-        summary='Delete a collection',
-        tags=['Backpack']
-    )
+                              summary='Delete a collection',
+                              tags=['Backpack']
+                              )
     def delete(self, request, **kwargs):
         return super(BackpackCollectionDetail, self).delete(request, **kwargs)
 

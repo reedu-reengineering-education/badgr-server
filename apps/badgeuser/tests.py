@@ -731,20 +731,20 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
 
     def test_verified_recipient_receives_assertion(self):
         url = 'http://example.com'
-        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         self.assertEqual(len(self.first_user.cached_badgeinstances()), 1)
 
     def test_unverified_recipient_receives_no_assertion(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url)
-        self.badgeclass.issue(recipient_id=url)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         self.assertEqual(len(self.first_user.cached_badgeinstances()), 0)
 
     def test_verified_recipient_v1_badges_endpoint(self):
         url = 'http://example.com'
-        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
 
         response = self.client.get('/v1/earner/badges')
         self.assertEqual(len(response.data), 1)
@@ -752,15 +752,14 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
     def test_verified_recipient_v2_assertions_endpoint(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
-
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         response = self.client.get('/v2/backpack/assertions')
         self.assertEqual(len(response.data['result']), 1)
 
     def test_unverified_recipient_v1_badges_endpoint(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url)
-        self.badgeclass.issue(recipient_id=url)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
 
         response = self.client.get('/v1/earner/badges')
         self.assertEqual(len(response.data), 0)
@@ -768,7 +767,7 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
     def test_unverified_recipient_v2_assertions_endpoint(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url)
-        self.badgeclass.issue(recipient_id=url)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
 
         response = self.client.get('/v2/backpack/assertions')
         self.assertEqual(len(response.data['result']), 0)
@@ -804,8 +803,8 @@ class UserBadgeTests(BadgrTestCase):
         starting_count = len(response.data)
 
         badgeclass = self.create_badgeclass()
-        badgeclass.issue(recipient_id='New+email@newemail.com', allow_uppercase=True)
-        badgeclass.issue(recipient_id='New+Email@newemail.com', allow_uppercase=True)
+        badgeclass.issue(recipient_id='New+email@newemail.com', allow_uppercase=True, recipient_type='email')
+        badgeclass.issue(recipient_id='New+Email@newemail.com', allow_uppercase=True, recipient_type='email')
 
         outbox_count = len(mail.outbox)
 
