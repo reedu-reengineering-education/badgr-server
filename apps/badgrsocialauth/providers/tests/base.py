@@ -1,6 +1,6 @@
-from allauth.socialaccount.tests import OAuth2TestsMixin
 import warnings
 
+from allauth.socialaccount.tests import OAuth2TestsMixin, OAuthTestsMixin
 from django.core import mail
 from django.test import override_settings
 from django.urls import reverse
@@ -28,11 +28,36 @@ class BadgrSocialAuthTestsMixin(object):
         self.assertRegex(query_string, r'^authToken=[^\s]+$')
         self.assertEqual(redirect_url, self.badgr_app.ui_login_redirect)
 
+    @override_settings(SOCIALACCOUNT_AUTO_SIGNUP=True,
+                       SOCIALACCOUNT_EMAIL_REQUIRED=False,
+                       ACCOUNT_EMAIL_REQUIRED=False)
+    def test_auto_signup(self):
+        # override: we redirect to the frontend after sign-up, not to /accounts/profile
+        resp_mocks = self.get_mocked_response()
+        if not resp_mocks:
+            warnings.warn("Cannot test provider %s, no oauth mock"
+                          % self.provider.id)
+            return
+        response = self.login(resp_mocks)
+        self.assertEqual(response.status_code, 302)
+        redirect_url, query_string = response.url.split('?')
+        self.assertRegex(query_string, r'^authToken=[^\s]+$')
+        self.assertEqual(redirect_url, self.badgr_app.ui_login_redirect)
+
+        self.assertFalse(response.context['user'].has_usable_password())
+
 
 class BadgrOAuth2TestsMixin(BadgrSocialAuthTestsMixin, OAuth2TestsMixin):
     """
     Tests for OAuth2Provider subclasses in this application should use this
     mixin instead of OAuth2TestsMixin.
+    """
+
+
+class BadgrOAuthTestsMixin(BadgrSocialAuthTestsMixin, OAuthTestsMixin):
+    """
+    Tests for OAuthProvider subclasses in this application should use this
+    mixin instead of OAuthTestsMixin.
     """
 
 
