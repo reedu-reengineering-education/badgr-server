@@ -1,17 +1,18 @@
 from allauth.socialaccount.tests import OAuth2TestsMixin
+import warnings
+
+from django.core import mail
 from django.test import override_settings
 from django.urls import reverse
 from mainsite.tests import BadgrTestCase
 
 
-class BadgrOAuth2TestsMixin(OAuth2TestsMixin):
+class BadgrSocialAuthTestsMixin(object):
     """
-    Tests for OAuth2Provider subclasses in this application should use this
-    mixin instead of OAuth2TestsMixin.
-
     Default tests include expectations broken by BadgrAccountAdapter, and
     this overrides those to make more sense.
     """
+
     def test_authentication_error(self):
         # override: base implementation looks for a particular template to be rendered.
         resp = self.client.get(reverse(self.provider.id + '_callback'))
@@ -26,6 +27,22 @@ class BadgrOAuth2TestsMixin(OAuth2TestsMixin):
         redirect_url, query_string = response.url.split('?')
         self.assertRegex(query_string, r'^authToken=[^\s]+$')
         self.assertEqual(redirect_url, self.badgr_app.ui_login_redirect)
+
+
+class BadgrOAuth2TestsMixin(BadgrSocialAuthTestsMixin, OAuth2TestsMixin):
+    """
+    Tests for OAuth2Provider subclasses in this application should use this
+    mixin instead of OAuth2TestsMixin.
+    """
+
+
+class SendsVerificationEmailMixin(object):
+    def test_verification_email(self):
+        # Expect this provider to send a verification email on first login
+        before_count = len(mail.outbox)
+        response = self.login(self.get_mocked_response())
+        self.assertEqual(response.status_code, 302)  # sanity
+        self.assertEqual(len(mail.outbox), before_count + 1)
 
 
 @override_settings(UNSUBSCRIBE_SECRET_KEY='123a')

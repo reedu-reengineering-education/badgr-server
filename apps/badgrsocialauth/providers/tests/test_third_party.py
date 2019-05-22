@@ -1,18 +1,8 @@
 from allauth.socialaccount.providers.facebook.provider import FacebookProvider
 from allauth.socialaccount.providers.linkedin_oauth2.provider import LinkedInOAuth2Provider
 from allauth.tests import MockedResponse
-from django.core import mail
 
-from .base import BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase
-
-
-class SendsVerificationEmailMixin(object):
-    def test_verification_email(self):
-        # Expect this provider to send a verification email on first login
-        before_count = len(mail.outbox)
-        response = self.login(self.get_mocked_response())
-        self.assertEqual(response.status_code, 302)  # sanity
-        self.assertEqual(len(mail.outbox), before_count + 1)
+from .base import BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase, SendsVerificationEmailMixin
 
 
 class FacebookProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
