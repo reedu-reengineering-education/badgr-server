@@ -97,9 +97,11 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
 
         # Add source and signup query params to the confimation url
         if request:
-            if hasattr(request, 'session'):
+            source = None
+            if hasattr(request, 'data'):
+                source = request.data.get('source', None)
+            elif hasattr(request, 'session'):
                 source = request.session.get('source', None)
-            source = request.data.get('source', None)
 
             if source:
                 tokenized_activate_url = set_url_query_params(tokenized_activate_url, source=source)
