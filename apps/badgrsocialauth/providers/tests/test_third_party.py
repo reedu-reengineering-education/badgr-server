@@ -1,11 +1,21 @@
 from allauth.socialaccount.providers.facebook.provider import FacebookProvider
+from allauth.socialaccount.providers.linkedin_oauth2.provider import LinkedInOAuth2Provider
 from allauth.tests import MockedResponse
 from django.core import mail
 
 from .base import BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase
 
 
-class FacebookProviderTests(BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
+class SendsVerificationEmailMixin(object):
+    def test_verification_email(self):
+        # Expect this provider to send a verification email on first login
+        before_count = len(mail.outbox)
+        response = self.login(self.get_mocked_response())
+        self.assertEqual(response.status_code, 302)  # sanity
+        self.assertEqual(len(mail.outbox), before_count + 1)
+
+
+class FacebookProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
     provider_id = FacebookProvider.id
 
     def get_mocked_response(self):
@@ -33,9 +43,17 @@ class FacebookProviderTests(BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
            "updated_time": "2012-11-30T20:40:33+0000"
         }""")
 
-    def test_verification_email(self):
-        # Expect this provider to send a verification email on first login
-        before_count = len(mail.outbox)
-        response = self.login(self.get_mocked_response())
-        self.assertEqual(response.status_code, 302)  # sanity
-        self.assertEqual(len(mail.outbox), before_count + 1)
+
+class LinkedInOAuth2ProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
+    provider_id = LinkedInOAuth2Provider.id
+
+    def get_mocked_response(self):
+        return MockedResponse(200, """
+        {
+          "emailAddress": "raymond.penners@intenct.nl",
+          "firstName": "Raymond",
+          "id": "ZLARGMFT1M",
+          "lastName": "Penners",
+          "pictureUrl": "http://m.c.lnkd.licdn.com/mpr/mprx/0_e0hbvSLc",
+          "publicProfileUrl": "http://www.linkedin.com/in/intenct"
+        }""")
