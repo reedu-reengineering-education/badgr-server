@@ -3,6 +3,7 @@ from collections import OrderedDict
 import datetime
 
 import dateutil.parser
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.http import Http404
 from django.utils import timezone
@@ -495,7 +496,10 @@ class BadgeInstanceDetail(BaseEntityDetailView):
         if not revocation_reason:
             raise ValidationError({'revocation_reason': "This field is required"})
 
-        assertion.revoke(revocation_reason)
+        try:
+            assertion.revoke(revocation_reason)
+        except DjangoValidationError as e:
+            raise ValidationError(e.message)
 
         # logger.event(badgrlog.BadgeAssertionRevokedEvent(current_assertion, request.user))
         return Response(status=HTTP_200_OK)
