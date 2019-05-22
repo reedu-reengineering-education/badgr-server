@@ -967,6 +967,7 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
             assertion=test_assertion.entity_id,
         ), {'revocation_reason': revocation_reason})
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['result'][0]['revocationReason'], revocation_reason)
 
         response = self.client.get('/public/assertions/{assertion}.json'.format(assertion=test_assertion.entity_id))
         self.assertEqual(response.status_code, 200)

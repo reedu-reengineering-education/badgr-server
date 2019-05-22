@@ -501,8 +501,10 @@ class BadgeInstanceDetail(BaseEntityDetailView):
         except DjangoValidationError as e:
             raise ValidationError(e.message)
 
+        serializer = self.get_serializer_class()(assertion, context={'request': request})
+
         # logger.event(badgrlog.BadgeAssertionRevokedEvent(current_assertion, request.user))
-        return Response(status=HTTP_200_OK)
+        return Response(status=HTTP_200_OK, data=serializer.data)
 
     @apispec_put_operation('Assertion',
         summary="Update an Assertion",
