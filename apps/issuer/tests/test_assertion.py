@@ -22,6 +22,7 @@ from issuer.models import BadgeInstance, IssuerStaff
 from mainsite.models import ApplicationInfo
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationHelper
 from mainsite.utils import OriginSetting
+from rest_framework import serializers
 
 
 class AssertionTests(SetupIssuerHelper, BadgrTestCase):
@@ -297,6 +298,61 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
                 badge=test_badgeclass.entity_id,
                 assertion=assertion_slug))
             self.assertEqual(response.status_code, 200)
+
+    def test_can_issue_badge_by_class_name_success(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "test@example.com"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertEqual(response.status_code, 201)
+
+    def test_can_issue_badge_by_class_name_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "test@example.com"
+            },
+            "badgeclassName": "does not exist",
+        }
+
+        self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertRaises(serializers.ValidationError)
+    
+    def test_can_issue_badge_by_class_ambiguity_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "test@example.com"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertRaises(serializers.ValidationError)
 
     def test_cannot_issue_email_assertion_to_non_email(self):
         test_user = self.setup_user(authenticate=True)
