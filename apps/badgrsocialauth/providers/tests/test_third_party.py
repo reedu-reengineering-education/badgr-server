@@ -1,3 +1,4 @@
+from allauth.socialaccount.providers.azure.provider import AzureProvider
 from allauth.socialaccount.providers.facebook.provider import FacebookProvider
 from allauth.socialaccount.providers.linkedin_oauth2.provider import LinkedInOAuth2Provider
 from allauth.tests import MockedResponse
@@ -47,3 +48,19 @@ class LinkedInOAuth2ProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsM
           "pictureUrl": "http://m.c.lnkd.licdn.com/mpr/mprx/0_e0hbvSLc",
           "publicProfileUrl": "http://www.linkedin.com/in/intenct"
         }""")
+
+
+class AzureProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
+    provider_id = AzureProvider.id
+
+    def get_mocked_response(self):
+        return MockedResponse(200, """
+        {"displayName": "John Smith", "mobilePhone": null,
+        "preferredLanguage": "en-US", "jobTitle": "Director",
+        "userPrincipalName": "john@smith.com",
+        "@odata.context":
+        "https://graph.microsoft.com/v1.0/$metadata#users/$entity",
+        "officeLocation": "Paris", "businessPhones": [],
+        "mail": "john@smith.com", "surname": "Smith",
+        "givenName": "John", "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"}
+        """)
