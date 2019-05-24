@@ -5,7 +5,7 @@ from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_201_CREATED
 from entity.api import BaseEntityListView, VersionedObjectMixin, BaseEntityDetailView
 from issuer.models import Issuer
 from issuer.permissions import IsEditor, IsIssuerEditor
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 from recipient.models import RecipientGroup
 from recipient.serializers_v1 import RecipientGroupSerializerV1, IssuerRecipientGroupListSerializerV1
 from recipient.serializers_v2 import RecipientGroupSerializerV2
@@ -24,7 +24,7 @@ def _scrub_boolean(boolean_str, default=None):
 
 class IssuerRecipientGroupList(VersionedObjectMixin, BaseEntityListView):
     model = Issuer  # used by get_object()
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsEditor)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsEditor)
     v1_serializer_class = RecipientGroupSerializerV1
     v2_serializer_class = RecipientGroupSerializerV2
 
@@ -71,7 +71,7 @@ class IssuerRecipientGroupList(VersionedObjectMixin, BaseEntityListView):
 
 class RecipientGroupDetail(BaseEntityDetailView):
     model = RecipientGroup
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsIssuerEditor)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsIssuerEditor)
     v1_serializer_class = RecipientGroupSerializerV1
     v2_serializer_class = RecipientGroupSerializerV2
 

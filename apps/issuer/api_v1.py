@@ -22,7 +22,7 @@ from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
 from issuer.serializers_v2 import IssuerSerializerV2
 from issuer.utils import get_badgeclass_by_identifier
 from apispec_drf.decorators import apispec_list_operation, apispec_operation
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 
 
 logger = badgrlog.BadgrLogger()
@@ -34,7 +34,7 @@ class AbstractIssuerAPIEndpoint(APIView):
         authentication.SessionAuthentication,
         authentication.BasicAuthentication,
     )
-    permission_classes = (AuthenticatedWithVerifiedEmail,)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier,)
 
     def get_object(self, slug, queryset=None):
         """ Ensure user has permissions on Issuer """
@@ -78,7 +78,7 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
     role = 'staff'
     queryset = Issuer.objects.all()
     model = Issuer
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsOwnerOrStaff,)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsOwnerOrStaff,)
 
     @apispec_list_operation('IssuerStaff',
         tags=['Issuers'],
@@ -215,7 +215,7 @@ class FindBadgeClassDetail(APIView):
     """
     GET a specific BadgeClass by searching by identifier
     """
-    permission_classes = (AuthenticatedWithVerifiedEmail,)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier,)
 
     @apispec_operation(
         summary="Get a specific BadgeClass by searching by identifier",

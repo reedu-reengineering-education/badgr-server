@@ -28,7 +28,7 @@ from issuer.serializers_v2 import IssuerSerializerV2, BadgeClassSerializerV2, Ba
     IssuerAccessTokenSerializerV2
 from apispec_drf.decorators import apispec_get_operation, apispec_put_operation, \
     apispec_delete_operation, apispec_list_operation, apispec_post_operation
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 from mainsite.serializers import CursorPaginatedListSerializer
 
 logger = badgrlog.BadgrLogger()
@@ -41,7 +41,7 @@ class IssuerList(BaseEntityListView):
     model = Issuer
     v1_serializer_class = IssuerSerializerV1
     v2_serializer_class = IssuerSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsEditor, ApprovedIssuersOnly, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsEditor, ApprovedIssuersOnly, BadgrOAuthTokenHasScope)
     valid_scopes = ["rw:issuer"]
 
     create_event = badgrlog.IssuerCreatedEvent
@@ -68,7 +68,7 @@ class IssuerDetail(BaseEntityDetailView):
     model = Issuer
     v1_serializer_class = IssuerSerializerV1
     v2_serializer_class = IssuerSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsEditor, BadgrOAuthTokenHasEntityScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsEditor, BadgrOAuthTokenHasEntityScope)
     valid_scopes = ["rw:issuer", "rw:issuer:*"]
 
     @apispec_get_operation('Issuer',
@@ -99,7 +99,7 @@ class AllBadgeClassesList(BaseEntityListView):
     POST to create a new badgeclass within the issuer context
     """
     model = BadgeClass
-    permission_classes = (AuthenticatedWithVerifiedEmail, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope)
     v1_serializer_class = BadgeClassSerializerV1
     v2_serializer_class = BadgeClassSerializerV2
     valid_scopes = ["rw:issuer"]
@@ -128,7 +128,7 @@ class IssuerBadgeClassList(VersionedObjectMixin, BaseEntityListView):
     POST to create a new badgeclass within the issuer context
     """
     model = Issuer  # used by get_object()
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsEditor, BadgrOAuthTokenHasEntityScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsEditor, BadgrOAuthTokenHasEntityScope)
     v1_serializer_class = BadgeClassSerializerV1
     v2_serializer_class = BadgeClassSerializerV2
     create_event = badgrlog.BadgeClassCreatedEvent
@@ -167,7 +167,7 @@ class BadgeClassDetail(BaseEntityDetailView):
     PUT and DELETE should be restricted to BadgeClasses that haven't been issued yet.
     """
     model = BadgeClass
-    permission_classes = (AuthenticatedWithVerifiedEmail, MayEditBadgeClass, BadgrOAuthTokenHasEntityScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, MayEditBadgeClass, BadgrOAuthTokenHasEntityScope)
     v1_serializer_class = BadgeClassSerializerV1
     v2_serializer_class = BadgeClassSerializerV2
 
@@ -206,7 +206,7 @@ class BadgeClassDetail(BaseEntityDetailView):
 
 class BatchAssertionsIssue(VersionedObjectMixin, BaseEntityView):
     model = BadgeClass  # used by .get_object()
-    permission_classes = (AuthenticatedWithVerifiedEmail, MayIssueBadgeClass, BadgrOAuthTokenHasEntityScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, MayIssueBadgeClass, BadgrOAuthTokenHasEntityScope)
     v1_serializer_class = BadgeInstanceSerializerV1
     v2_serializer_class = BadgeInstanceSerializerV2
     valid_scopes = ["rw:issuer", "rw:issuer:*"]
@@ -268,7 +268,7 @@ class BatchAssertionsIssue(VersionedObjectMixin, BaseEntityView):
 
 class BatchAssertionsRevoke(VersionedObjectMixin, BaseEntityView):
     model = BadgeInstance
-    permission_classes = (AuthenticatedWithVerifiedEmail, BadgrOAuthTokenHasEntityScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasEntityScope)
     v2_serializer_class = BadgeInstanceSerializerV2
     valid_scopes = ["rw:issuer", "rw:issuer:*"]
 
@@ -343,7 +343,7 @@ class BadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, BaseEn
     POST to issue a new assertion
     """
     model = BadgeClass  # used by get_object()
-    permission_classes = (AuthenticatedWithVerifiedEmail, MayIssueBadgeClass, BadgrOAuthTokenHasEntityScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, MayIssueBadgeClass, BadgrOAuthTokenHasEntityScope)
     v1_serializer_class = BadgeInstanceSerializerV1
     v2_serializer_class = BadgeInstanceSerializerV2
     create_event = badgrlog.BadgeInstanceCreatedEvent
@@ -411,7 +411,7 @@ class IssuerBadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, 
     Retrieve all assertions within one issuer
     """
     model = Issuer  # used by get_object()
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsStaff, BadgrOAuthTokenHasEntityScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsStaff, BadgrOAuthTokenHasEntityScope)
     v1_serializer_class = BadgeInstanceSerializerV1
     v2_serializer_class = BadgeInstanceSerializerV2
     create_event = badgrlog.BadgeInstanceCreatedEvent
@@ -465,7 +465,7 @@ class BadgeInstanceDetail(BaseEntityDetailView):
     Endpoints for (GET)ting a single assertion or revoking a badge (DELETE)
     """
     model = BadgeInstance
-    permission_classes = (AuthenticatedWithVerifiedEmail, MayEditBadgeClass, BadgrOAuthTokenHasEntityScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, MayEditBadgeClass, BadgrOAuthTokenHasEntityScope)
     v1_serializer_class = BadgeInstanceSerializerV1
     v2_serializer_class = BadgeInstanceSerializerV2
     valid_scopes = ["rw:issuer", "rw:issuer:*"]
@@ -516,7 +516,7 @@ class BadgeInstanceDetail(BaseEntityDetailView):
 
 class IssuerTokensList(BaseEntityListView):
     model = AccessToken
-    permission_classes = (AuthenticatedWithVerifiedEmail, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope)
     v2_serializer_class = IssuerAccessTokenSerializerV2
     valid_scopes = ["rw:issuer"]
 

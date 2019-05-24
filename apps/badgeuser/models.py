@@ -350,7 +350,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         if self.is_superuser:
             return True
 
-        if len(self.verified_emails) > 0:
+        if len(self.all_verified_recipient_identifiers) > 0:
             return True
 
         return False

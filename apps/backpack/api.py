@@ -18,14 +18,14 @@ from issuer.permissions import AuditedModelOwner, VerifiedEmailMatchesRecipientI
 from issuer.public_api import ImagePropertyDetailView
 from apispec_drf.decorators import apispec_list_operation, apispec_post_operation, apispec_get_operation, \
     apispec_delete_operation, apispec_put_operation, apispec_operation
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 
 
 class BackpackAssertionList(BaseEntityListView):
     model = BadgeInstance
     v1_serializer_class = LocalBadgeInstanceUploadSerializerV1
     v2_serializer_class = BackpackAssertionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
     http_method_names = ('get', 'post')
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack'],
@@ -86,7 +86,7 @@ class BackpackAssertionDetail(BaseEntityDetailView):
     model = BadgeInstance
     v1_serializer_class = LocalBadgeInstanceUploadSerializerV1
     v2_serializer_class = BackpackAssertionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
     http_method_names = ('get', 'delete', 'put')
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack'],
@@ -153,7 +153,7 @@ class BackpackCollectionList(BaseEntityListView):
     model = BackpackCollection
     v1_serializer_class = CollectionSerializerV1
     v2_serializer_class = BackpackCollectionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, AuditedModelOwner, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, AuditedModelOwner, BadgrOAuthTokenHasScope)
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack'],
         'post': ['rw:backpack'],
@@ -181,7 +181,7 @@ class BackpackCollectionDetail(BaseEntityDetailView):
     model = BackpackCollection
     v1_serializer_class = CollectionSerializerV1
     v2_serializer_class = BackpackCollectionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, AuditedModelOwner, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, AuditedModelOwner, BadgrOAuthTokenHasScope)
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack'],
         'post': ['rw:backpack'],
@@ -213,7 +213,7 @@ class BackpackCollectionDetail(BaseEntityDetailView):
 
 class BackpackImportBadge(BaseEntityListView):
     v2_serializer_class = BackpackImportSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail,BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier,BadgrOAuthTokenHasScope)
     http_method_names = ('post',)
     valid_scopes = ['rw:backpack']
 
