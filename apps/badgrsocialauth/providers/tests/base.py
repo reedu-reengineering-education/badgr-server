@@ -25,9 +25,6 @@ class BadgrSocialAuthTestsMixin(object):
 
         Logging out clears the session, as expected. We need to re-set session BadgrApp before
         attempting each login.
-
-        TODO: Overriding BadgrAccountAdapter.logout to preserve session BadgrApp in the same
-        way as BadgrAccountAdapter.login would solve this in another (probably more correct) way.
         """
         session = self.client.session
         session.update({
