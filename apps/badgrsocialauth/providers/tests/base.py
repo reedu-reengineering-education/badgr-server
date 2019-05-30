@@ -51,7 +51,19 @@ class BadgrSocialAuthTestsMixin(object):
 
     def test_login(self):
         # override: base implementation uses assertRedirects, but we need to
-        # allow for query params.
+        # allow for query params. Also, base implementation tests initial sign-up,
+        # but we want to test login behavior for an existing account.
+
+        # Create a user account with a verified email.
+        with override_settings(SOCIALACCOUNT_PROVIDERS={self.provider.id: {'VERIFIED_EMAIL': True}}):
+            self.login(self.get_mocked_response())
+
+        # We call logout here because otherwise AllAuth will do it in
+        # the middle of the login machinery where we don't get a chance
+        # to reset the BadgrApp.
+        self.client.logout()
+
+        # Test login behavior for existing user account.
         response = self.login(self.get_mocked_response())
         self.assert_login_redirect(response)
 
