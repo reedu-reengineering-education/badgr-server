@@ -15,6 +15,28 @@ class BadgrSocialAuthTestsMixin(object):
     this overrides those to make more sense.
     """
 
+    def login(self, resp_mock, **kwargs):
+        """
+        Set session BadgrApp before attempting each login.
+
+        BadgrAccountAdapter.login assumes a BadgrApp pk is stored in the session. It looks like
+        this means the BadgrSocialLogin view (which sets the session BadgrApp) is the only
+        supported login flow.
+
+        Logging out clears the session, as expected. We need to re-set session BadgrApp before
+        attempting each login.
+
+        TODO: Overriding BadgrAccountAdapter.logout to preserve session BadgrApp in the same
+        way as BadgrAccountAdapter.login would solve this in another (probably more correct) way.
+        """
+        session = self.client.session
+        session.update({
+            'badgr_app_pk': self.badgr_app.pk
+        })
+        session.save()
+
+        return super(BadgrSocialAuthTestsMixin, self).login(resp_mock, **kwargs)
+
     def test_authentication_error(self):
         # override: base implementation looks for a particular template to be rendered.
         resp = self.client.get(reverse(self.provider.id + '_callback'))
@@ -85,8 +107,3 @@ class BadgrSocialAuthTestCase(BadgrTestCase):
         self.badgr_app.ui_login_redirect = 'http://test-badgr.io/'
         self.badgr_app.save()
 
-        session = self.client.session
-        session.update({
-            'badgr_app_pk': self.badgr_app.pk
-        })
-        session.save()
