@@ -1,4 +1,4 @@
-import warnings
+from unittest import skip
 
 from allauth.socialaccount.tests import OAuth2TestsMixin, OAuthTestsMixin
 from django.core import mail
@@ -37,6 +37,12 @@ class BadgrSocialAuthTestsMixin(object):
 
         return super(BadgrSocialAuthTestsMixin, self).login(resp_mock, **kwargs)
 
+    def assert_login_redirect(self, response):
+        self.assertEqual(response.status_code, 302)
+        redirect_url, query_string = response.url.split('?')
+        self.assertRegex(query_string, r'^authToken=[^\s]+$')
+        self.assertEqual(redirect_url, self.badgr_app.ui_login_redirect)
+
     def test_authentication_error(self):
         # override: base implementation looks for a particular template to be rendered.
         resp = self.client.get(reverse(self.provider.id + '_callback'))
@@ -47,28 +53,23 @@ class BadgrSocialAuthTestsMixin(object):
         # override: base implementation uses assertRedirects, but we need to
         # allow for query params.
         response = self.login(self.get_mocked_response())
-        self.assertEqual(response.status_code, 302)
-        redirect_url, query_string = response.url.split('?')
-        self.assertRegex(query_string, r'^authToken=[^\s]+$')
-        self.assertEqual(redirect_url, self.badgr_app.ui_login_redirect)
+        self.assert_login_redirect(response)
 
-    @override_settings(SOCIALACCOUNT_AUTO_SIGNUP=True,
-                       SOCIALACCOUNT_EMAIL_REQUIRED=False,
-                       ACCOUNT_EMAIL_REQUIRED=False)
+    @skip('unused feature')
     def test_auto_signup(self):
-        # override: we redirect to the frontend after sign-up, not to /accounts/profile
-        resp_mocks = self.get_mocked_response()
-        if not resp_mocks:
-            warnings.warn("Cannot test provider %s, no oauth mock"
-                          % self.provider.id)
-            return
-        response = self.login(resp_mocks)
-        self.assertEqual(response.status_code, 302)
-        redirect_url, query_string = response.url.split('?')
-        self.assertRegex(query_string, r'^authToken=[^\s]+$')
-        self.assertEqual(redirect_url, self.badgr_app.ui_login_redirect)
+        # override: don't test this.
+        pass
 
-        self.assertFalse(response.context['user'].has_usable_password())
+    def test_signup(self):
+        response = self.login(self.get_mocked_response())
+        users = BadgeUser.objects.all()
+        user = users.get()  # There can be only one.
+        if user.verified:
+            self.assert_login_redirect(response)
+        else:
+            self.assertRedirects(response,
+                                 reverse('account_email_verification_sent'),
+                                 fetch_redirect_response=False)
 
     def test_cached_email(self):
         self.login(self.get_mocked_response())
