@@ -2,15 +2,14 @@ import logging
 import urllib
 import urlparse
 
+from allauth.account.adapter import DefaultAccountAdapter, get_adapter
+from allauth.account.models import EmailConfirmation, EmailConfirmationHMAC
 from allauth.account.utils import user_pk_to_url_str
+from allauth.exceptions import ImmediateHttpResponse
 from django.conf import settings
-from django.contrib.auth import logout
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.urlresolvers import resolve, Resolver404, reverse
-
-from allauth.account.adapter import DefaultAccountAdapter, get_adapter
-from allauth.account.models import EmailConfirmation, EmailConfirmationHMAC
 
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import CachedEmailAddress, BadgrAccessToken
@@ -159,8 +158,16 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
 
     def login(self, request, user):
         """
-        Preserve badgr_app session data across Django login() boundary
+        Guard against unverified users and preserve badgr_app session data
+        across Django login() boundary.
         """
+        if not user.verified:
+            # The usual case if a user gets here without a verified recipient
+            # identifier is a new sign-up with an unverified email. If that's
+            # the case, we just sent them a confirmation.
+            raise ImmediateHttpResponse(
+                self.respond_email_verification_sent(request, user))
+
         badgr_app = get_session_badgr_app(request)
         ret = super(BadgrAccountAdapter, self).login(request, user)
         set_session_badgr_app(request, badgr_app)
