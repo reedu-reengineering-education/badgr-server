@@ -4,6 +4,8 @@ from allauth.socialaccount.tests import OAuth2TestsMixin, OAuthTestsMixin
 from django.core import mail
 from django.test import override_settings
 from django.urls import reverse
+
+from badgeuser.models import BadgeUser
 from mainsite.tests import BadgrTestCase
 
 
@@ -45,6 +47,12 @@ class BadgrSocialAuthTestsMixin(object):
         self.assertEqual(redirect_url, self.badgr_app.ui_login_redirect)
 
         self.assertFalse(response.context['user'].has_usable_password())
+
+    def test_cached_email(self):
+        self.login(self.get_mocked_response())
+        users = BadgeUser.objects.all()
+        user = users.get()  # There can be only one.
+        self.assertEqual(len(user.cached_emails()), len(user.emailaddress_set.all()))
 
 
 class BadgrOAuth2TestsMixin(BadgrSocialAuthTestsMixin, OAuth2TestsMixin):
