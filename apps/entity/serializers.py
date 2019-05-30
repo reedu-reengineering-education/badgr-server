@@ -170,7 +170,7 @@ class V2ErrorSerializer(BaseSerializerV2):
     def to_representation(self, instance):
         try:
             self.validation_errors = self.validation_errors + self.field_errors.pop('non_field_errors', [])
-        except TypeError:
+        except (TypeError, AttributeError):
             # In the case where field_errors is a list of dicts, we keep non_field_errors grouped with other field
             # errors for that object
             pass
