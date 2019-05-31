@@ -12,6 +12,7 @@ from openbadges_bakery import unbake
 
 from backpack.models import BackpackCollection, BackpackCollectionBadgeInstance
 from backpack.tests.utils import setup_resources, setup_basic_1_0
+from badgeuser.models import CachedEmailAddress
 from issuer.models import Issuer, BadgeInstance
 from issuer.utils import CURRENT_OBI_VERSION, OBI_VERSION_CONTEXT_IRIS, UNVERSIONED_BAKED_VERSION
 from mainsite.models import BadgrApp
@@ -66,7 +67,7 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
 
-        with self.assertNumQueries(0):
+        with self.assertNumQueries(1):
             response = self.client.get('/public/assertions/{}'.format(assertion.entity_id),
                                        **{'HTTP_ACCEPT': 'application/json'})
             self.assertEqual(response.status_code, 200)
@@ -83,7 +84,7 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
 
-        with self.assertNumQueries(0):
+        with self.assertNumQueries(1):
             response = self.client.get('/public/assertions/{}'.format(assertion.entity_id))
             self.assertEqual(response.status_code, 200)
 
@@ -99,6 +100,7 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         assertion = test_badgeclass.issue(recipient_id=test_user_email)
+        assertion.pending  # prepopulate cache
 
         # create a shared collection
         test_collection = BackpackCollection.objects.create(created_by=test_user, name='Test Collection', description="testing")
@@ -162,13 +164,13 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
             assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
 
             for headers in redirect_accepts:
-                with self.assertNumQueries(0):
+                with self.assertNumQueries(1):
                     response = self.client.get('/public/assertions/{}'.format(assertion.entity_id), **headers)
                     self.assertEqual(response.status_code, 302)
                     self.assertEqual(response.get('Location'), 'http://frontend.ui/public/assertions/{}'.format(assertion.entity_id))
 
             for headers in json_accepts:
-                with self.assertNumQueries(0):
+                with self.assertNumQueries(1):
                     response = self.client.get('/public/assertions/{}'.format(assertion.entity_id), **headers)
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.get('Content-Type'), "application/ld+json")
@@ -255,3 +257,24 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get('/public/assertions/{}?expand=badge'.format(assertion.entity_id), Accept='application/json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.get('badge', {}).get('name', None), new_badgeclass_name)
+
+
+class PendingAssertionsPublicAPITests(SetupIssuerHelper, BadgrTestCase):
+    @responses.activate
+    def test_pending_assertion_returns_404(self):
+        setup_resources([
+            {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png"},
+        ])
+        unverified_email = 'test@example.com'
+        test_user = self.setup_user(email='verified@example.com', authenticate=True)
+        CachedEmailAddress.objects.add_email(test_user, unverified_email)
+        post_input = {"url": "http://a.com/assertion-embedded1"}
+
+        post_resp = self.client.post('/v2/backpack/import', post_input, format='json')
+        assertion = BadgeInstance.objects.first()
+
+        self.client.logout()
+        get_resp = self.client.get('/public/assertions/{}'.format(assertion.entity_id))
+        self.assertEqual(get_resp.status_code, 404)

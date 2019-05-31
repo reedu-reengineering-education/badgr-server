@@ -349,6 +349,11 @@ class BadgeInstanceJson(JSONComponentView):
     permission_classes = (permissions.AllowAny,)
     model = BadgeInstance
 
+    def has_object_permissions(self, request, obj):
+        if obj.pending:
+            raise Http404
+        return super(BadgeInstanceJson, self).has_object_permissions(request, obj)
+
     def get_json(self, request):
         expands = request.GET.getlist('expand', [])
         json = super(BadgeInstanceJson, self).get_json(

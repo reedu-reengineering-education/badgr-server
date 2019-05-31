@@ -908,6 +908,8 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         post_input = {"url": "http://a.com/assertion-embedded1"}
 
         post_resp = self.client.post('/v2/backpack/import', post_input, format='json')
+        assertion = BadgeInstance.objects.first()
+
         test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
         test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
         test_badgeclass_one.issue(recipient_id='verified@example.com')
@@ -929,6 +931,10 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         get_resp3 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=0')
         self.assertEqual(len(get_resp3.data), 1)
 
+        # User should be able to delete it as well
+        del_resp = self.client.delete('/v2/backpack/assertions/{}'.format(assertion.entity_id))
+        self.assertEqual(del_resp.status_code, 204)
+
     @responses.activate
     def test_view_badge_i_imported_with_v1(self):
         setup_resources([
@@ -942,6 +948,7 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         post_input = {"url": "http://a.com/assertion-embedded1"}
         post_resp = self.client.post('/v1/earner/badges', post_input, format='json')
         self.assertEqual(post_resp.status_code, 201)
+        assertion = BadgeInstance.objects.first()
 
         get_resp2 = self.client.get('/v1/earner/badges?json_format=plain')
         self.assertEqual(len(get_resp2.data), 0)
@@ -951,6 +958,10 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
 
         get_resp4 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=false')
         self.assertEqual(len(get_resp4.data), 0)
+
+        # User should be able to delete it as well
+        del_resp = self.client.delete('/v1/earner/badges/{}'.format(assertion.entity_id))
+        self.assertEqual(del_resp.status_code, 204)
 
     # apps.badgeuser.tests.UserRecipientIdentifierTests.test_verified_recipient_v2_assertions_endpoint
     # apps.badgeuser.tests.UserRecipientIdentifierTests.test_verified_recipient_v1_badges_endpoint

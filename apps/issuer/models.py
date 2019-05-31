@@ -797,11 +797,14 @@ class BadgeInstance(BaseAuditedModel,
             considered "pending"
         """
         from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
-        if self.recipient_type == RECIPIENT_TYPE_EMAIL:
-            existing_identifier = CachedEmailAddress.cached.filter(email=self.recipient_identifier).first()
-        else:
-            existing_identifier = UserRecipientIdentifier.cached.filter(identifier=self.recipient_identifier).first()
-        return not existing_identifier or not existing_identifier.verified
+        try:
+            if self.recipient_type == RECIPIENT_TYPE_EMAIL:
+                existing_identifier = CachedEmailAddress.cached.get(email=self.recipient_identifier)
+            else:
+                existing_identifier = UserRecipientIdentifier.cached.get(identifier=self.recipient_identifier)
+        except (UserRecipientIdentifier.DoesNotExist, CachedEmailAddress.DoesNotExist,):
+            return False
+        return not existing_identifier.verified
 
     def save(self, *args, **kwargs):
         if self.pk is None:
