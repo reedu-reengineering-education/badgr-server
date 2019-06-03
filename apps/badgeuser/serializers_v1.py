@@ -38,7 +38,7 @@ class VerifiedEmailsField(serializers.Field):
 class BadgeUserProfileSerializerV1(serializers.Serializer):
     first_name = StripTagsCharField(max_length=30, allow_blank=True)
     last_name = StripTagsCharField(max_length=30, allow_blank=True)
-    email = serializers.EmailField(source='primary_email', required=False)
+    email = serializers.EmailField(source='primary_email', required=False, allow_blank=True, allow_null=True)
     url = serializers.ListField(read_only=True, source='cached_verified_urls')
     telephone = serializers.ListField(read_only=True, source='cached_verified_phone_numbers')
     current_password = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False)
@@ -65,7 +65,7 @@ class BadgeUserProfileSerializerV1(serializers.Serializer):
 
     def create(self, validated_data):
         user = BadgeUser.objects.create(
-            email=validated_data['primary_email'],
+            email=validated_data.get('primary_email'),
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
             plaintext_password=validated_data['password'],

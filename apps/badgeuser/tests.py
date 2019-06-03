@@ -18,7 +18,7 @@ from mainsite import TOP_DIR
 from rest_framework.authtoken.models import Token
 
 from badgeuser.models import (
-    BadgeUser, BadgrAccessToken, UserRecipientIdentifier, EmailAddressVariant, CachedEmailAddress)
+    BadgeUser, BadgrAccessToken, UserRecipientIdentifier, EmailAddressVariant, CachedEmailAddress, TermsVersion)
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1
 from badgeuser.serializers_v2 import BadgeUserSerializerV2
 from issuer.models import BadgeClass, Issuer
@@ -836,6 +836,10 @@ class UserBadgeTests(BadgrTestCase):
     SESSION_ENGINE='django.contrib.sessions.backends.cache',
 )
 class UserProfileTests(BadgrTestCase):
+    def assertUserLoggedIn(self, user_pk=None):
+        self.assertIn(SESSION_KEY, self.client.session)
+        if user_pk is not None:
+            self.assertEqual(self.client.session[SESSION_KEY], user_pk)
 
     def test_user_can_change_profile(self):
         first = 'firsty'
@@ -883,8 +887,55 @@ class UserProfileTests(BadgrTestCase):
         self.client.login(username=username, password=third_password)
         self.assertUserLoggedIn()
 
-    def assertUserLoggedIn(self, user_pk=None):
-        self.assertIn(SESSION_KEY, self.client.session)
-        if user_pk is not None:
-            self.assertEqual(self.client.session[SESSION_KEY], user_pk)
+    def test_user_can_agree_to_terms(self):
+        first = 'firsty'
+        last = 'lastington'
+        new_password = 'new-password'
+        username = 'testinguser'
+        original_password = 'password'
+        email = 'testinguser@testing.info'
 
+        user = BadgeUser(username=username, is_active=True, email=email)
+        user.set_password(original_password)
+        user.save()
+        self.client.login(username=username, password=original_password)
+        self.assertUserLoggedIn()
+
+        TermsVersion.objects.create(version=1, short_description='terms 1')
+
+        response = self.client.put('/v1/user/profile', {
+            'first_name': first,
+            'last_name': last,
+            'password': new_password,
+            'current_password': original_password,
+            'latest_terms_version': 1
+        })
+        self.assertEqual(response.status_code, 200)
+
+    def test_user_update_ignores_blank_email(self):
+        first = 'firsty'
+        last = 'lastington'
+        new_password = 'new-password'
+        username = 'testinguser'
+        original_password = 'password'
+
+        user = BadgeUser(username=username, is_active=True)
+        user.set_password(original_password)
+        user.save()
+        UserRecipientIdentifier.objects.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+            identifier='http://testurl.com/123',
+            verified=True,
+            user=user
+        )
+        self.client.login(username=username, password=original_password)
+        self.assertUserLoggedIn()
+
+        TermsVersion.objects.create(version=1, short_description='terms 1')
+
+        response = self.client.put('/v1/user/profile', {
+            'first_name': first + ' Q.',
+            'last_name': last,
+            'email': None
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
