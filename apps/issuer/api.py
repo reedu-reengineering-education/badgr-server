@@ -355,10 +355,9 @@ class BadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, BaseEn
             badgeclass=badgeclass,
             revoked=False
         )
-
-        if 'recipient' in request.query_params:
-            recipient_id = request.query_params.get('recipient').lower()
-            queryset = queryset.filter(recipient_identifier=recipient_id)
+        recipients = request.query_params.getlist('recipient', None)
+        if recipients:
+            queryset = queryset.filter(recipient_identifier__in=recipients)
 
         return queryset
 
@@ -423,10 +422,9 @@ class IssuerBadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, 
             issuer=issuer,
             revoked=False
         )
-
-        if 'recipient' in request.query_params:
-            recipient_id = request.query_params.get('recipient').lower()
-            queryset = queryset.filter(recipient_identifier=recipient_id)
+        recipients = request.query_params.getlist('recipient', None)
+        if recipients:
+            queryset = queryset.filter(recipient_identifier__in=recipients)
 
         return queryset
 
