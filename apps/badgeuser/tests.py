@@ -68,7 +68,6 @@ class AuthTokenTests(BadgrTestCase):
 
 
 class UserCreateTests(BadgrTestCase):
-
     def test_create_user(self):
         user_data = {
             'first_name': 'Test',
@@ -77,13 +76,24 @@ class UserCreateTests(BadgrTestCase):
             'password': 'secr3t4nds3cur3'
         }
 
+        self.badgr_app.email_confirmation_redirect = 'http://test-badgr-ui.example.com/profile/'
+        self.badgr_app.save()
+
         response = self.client.post('/v1/user/profile', user_data)
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("signup=true", mail.outbox[0].body)
         self.assertNotIn("source=mozilla", mail.outbox[0].body)
-    
+
+        launch_url = re.search("(?P<url>/v1/[^\s]+)", mail.outbox[0].body).group("url")
+        response = self.client.get(launch_url)
+        self.assertEqual(response.status_code, 302)
+        redirect_url = response._headers['location'][1]
+
+        self.assertIn('/welcome', redirect_url)
+
+
     def test_create_user_from_mozilla(self):
         user_data = {
             'first_name': 'Test',

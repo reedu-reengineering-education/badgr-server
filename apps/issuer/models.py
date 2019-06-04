@@ -448,7 +448,9 @@ class BadgeClass(ResizeUploadedImage,
         self.issuer.publish()
 
     def delete(self, *args, **kwargs):
-        if self.recipient_count() > 0:
+        # if there are some assertions and some have not expired
+        if self.recipient_count() > 0 and self.badgeinstances.filter(revoked=False).filter(
+                models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())).count() > 0:
             raise ProtectedError("BadgeClass may only be deleted if all BadgeInstances have been revoked.", self)
 
         if self.pathway_element_count() > 0:

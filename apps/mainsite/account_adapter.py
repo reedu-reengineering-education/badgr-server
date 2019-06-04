@@ -56,27 +56,29 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
                 return super(BadgrAccountAdapter, self).get_email_confirmation_redirect_url(request)
 
         try:
-            resolverMatch = resolve(request.path)
-            confirmation = EmailConfirmationHMAC.from_key(resolverMatch.kwargs.get('confirm_id'))
+            resolver_match = resolve(request.path)
+            confirmation = EmailConfirmationHMAC.from_key(resolver_match.kwargs.get('confirm_id'))
             # publish changes to cache
             email_address = CachedEmailAddress.objects.get(pk=confirmation.email_address.pk)
             email_address.save()
-            redirect_url = urlparse.urljoin(
-                badgr_app.email_confirmation_redirect.rstrip('/') + '/',
-                urllib.quote(email_address.user.first_name.encode('utf8'))
-            )
-            redirect_url = set_url_query_params(redirect_url, email=email_address.email.encode('utf8'))
 
+            query_params = {
+                'email': email_address.email.encode('utf8')
+            }
             # Pass source and signup along to UI
             source = request.query_params.get('source', None)
             if source:
-                redirect_url = set_url_query_params(redirect_url, source=source)
+                query_params['source'] = source
             
             signup = request.query_params.get('signup', None)
             if signup:
-                redirect_url = set_url_query_params(redirect_url, signup="true")
-
-            return redirect_url
+                query_params['signup'] = 'true'
+                return set_url_query_params(badgr_app.get_path('/welcome'), **query_params)
+            else:
+                return set_url_query_params(urlparse.urljoin(
+                    badgr_app.email_confirmation_redirect.rstrip('/') + '/',
+                    urllib.quote(email_address.user.first_name.encode('utf8'))
+                ), **query_params)
 
         except Resolver404, EmailConfirmation.DoesNotExist:
             return badgr_app.email_confirmation_redirect
