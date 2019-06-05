@@ -73,7 +73,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             signup = request.query_params.get('signup', None)
             if signup:
                 query_params['signup'] = 'true'
-                return set_url_query_params(badgr_app.get_path('/welcome'), **query_params)
+                return set_url_query_params(badgr_app.get_path('/auth/welcome'), **query_params)
             else:
                 return set_url_query_params(urlparse.urljoin(
                     badgr_app.email_confirmation_redirect.rstrip('/') + '/',
