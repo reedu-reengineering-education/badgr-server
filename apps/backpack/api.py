@@ -131,6 +131,8 @@ class BackpackAssertionDetail(BaseEntityDetailView):
 
         for collection in related_collections:
             collection.save()
+
+        request.user.save()
         return Response(status=HTTP_204_NO_CONTENT)
 
     @apispec_put_operation('Assertion',

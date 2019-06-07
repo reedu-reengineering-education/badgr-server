@@ -923,17 +923,20 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         self.assertTrue(get_resp.data.get('result')[0]['pending'])
         self.assertFalse(get_resp.data.get('result')[1]['pending'])
 
-        get_resp2 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=1')
-        self.assertEqual(len(get_resp2.data), 2)
-        self.assertTrue(get_resp2.data[0]['pending'])
-        self.assertFalse(get_resp2.data[1]['pending'])
+        get_resp = self.client.get('/v1/earner/badges?json_format=plain&include_pending=1')
+        self.assertEqual(len(get_resp.data), 2)
+        self.assertTrue(get_resp.data[0]['pending'])
+        self.assertFalse(get_resp.data[1]['pending'])
 
-        get_resp3 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=0')
-        self.assertEqual(len(get_resp3.data), 1)
+        get_resp = self.client.get('/v1/earner/badges?json_format=plain&include_pending=0')
+        self.assertEqual(len(get_resp.data), 1)
 
         # User should be able to delete it as well
         del_resp = self.client.delete('/v2/backpack/assertions/{}'.format(assertion.entity_id))
         self.assertEqual(del_resp.status_code, 204)
+
+        get_resp = self.client.get('/v1/earner/badges?json_format=plain&include_pending=1')
+        self.assertEqual(len(get_resp.data), 1)
 
     @responses.activate
     def test_view_badge_i_imported_with_v1(self):
