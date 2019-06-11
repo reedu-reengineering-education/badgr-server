@@ -3,6 +3,39 @@ from __future__ import unicode_literals
 
 from django.core.urlresolvers import reverse
 from mainsite.tests import SetupIssuerHelper, BadgrTestCase
+from mainsite.models import ApplicationInfo, AccessTokenProxy
+from oauth2_provider.models import Application, AccessToken
+from django.utils import timezone
+from datetime import timedelta
+
+
+class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
+    def test_application_can_fetch_changed_assertions(self):
+        staff = self.setup_user(email='staff@example.com')
+        recipient = self.setup_user(email='recipient@example.com')
+
+        issuer = self.setup_issuer(owner=staff)
+        badgeclass = self.setup_badgeclass(issuer=issuer)
+        badgeclass.issue(recipient_id=recipient.email)
+        badgeclass.issue(recipient_id=staff.email)
+        url = reverse('v2_api_assertions_changed_list')
+
+        clientApp = self.setup_user(email='clientApp@example.com', token_scope='r:assertions')
+        app = Application.objects.create(
+            client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
+            user=clientApp)
+        AccessToken.objects.create(
+            user=staff, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
+            token='123', application=app
+        )
+        AccessToken.objects.create(
+            user=recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
+            token='abc', application=app
+        )
+        
+        response = self.client.get(url)
+        self.assertEqual(len(response.data['result']), 2)
+        self.assertEqual(response.status_code, 200)
 
 
 class AssertionFetching(SetupIssuerHelper, BadgrTestCase):
