@@ -12,25 +12,35 @@ from datetime import timedelta
 class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_fetch_changed_assertions(self):
         staff = self.setup_user(email='staff@example.com')
-        recipient = self.setup_user(email='recipient@example.com')
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False)
+        unrelated_recipient = self.setup_user(email='otherrecipient1@example.com')
 
         issuer = self.setup_issuer(owner=staff)
         badgeclass = self.setup_badgeclass(issuer=issuer)
         badgeclass.issue(recipient_id=recipient.email)
         badgeclass.issue(recipient_id=staff.email)
+        badgeclass.issue(recipient_id=unrelated_recipient.email)
         url = reverse('v2_api_assertions_changed_list')
 
-        clientApp = self.setup_user(email='clientApp@example.com', token_scope='r:assertions')
+        clientAppUser = self.setup_user(email='clientApp@example.com', token_scope='r:assertions')
         app = Application.objects.create(
             client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
-            user=clientApp)
+            user=clientAppUser)
         AccessToken.objects.create(
             user=staff, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
             token='123', application=app
         )
         AccessToken.objects.create(
             user=recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
-            token='abc', application=app
+            token='abc2', application=app
+        )
+
+        unrelated_app = Application.objects.create(
+            client_id='clientApp-authcode-2', client_secret='testsecret', authorization_grant_type='authorization-code',
+            user=None)
+        AccessToken.objects.create(
+            user=unrelated_recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
+            token='abc3', application=unrelated_app
         )
 
         response = self.client.get(url)
