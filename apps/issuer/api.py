@@ -607,14 +607,12 @@ class AssertionsChangedSince(BaseEntityView):
     def get_queryset(self, request, since=None):
         user = self.get_user(request)
         issuer_ids = Issuer.objects.filter(staff__id=user.id).distinct().only('pk')
+        recipient_ids = set()
 
-        # authorized_badgeusers = request.auth.application.accesstoken_set.all()
-        # user_ids = [u.id for u in authorized_badgeusers]
-        tokens = AccessTokenProxy.objects.filter(application__user=user)
-        recipient_identifiers = set()
+        tokens = AccessTokenProxy.objects.filter(application__user=user, user__isnull=False)
         for t in tokens:
             for r in t.user.all_verified_recipient_identifiers:
-                recipient_identifiers.add(r)
+                recipient_ids.add(r)
         
         # select badgeinstance.* where
         #   (
@@ -625,7 +623,7 @@ class AssertionsChangedSince(BaseEntityView):
         #   AND
         #   badgeinstance.updated_at >= since
 
-        expr = Q(issuer_id__in=issuer_ids) | Q(recipient_identifier__in=list(recipient_identifiers))
+        expr = Q(issuer_id__in=issuer_ids) | Q(recipient_identifier__in=list(recipient_ids))
 
         if since is not None:
             expr &= Q(updated_at__gt=since)

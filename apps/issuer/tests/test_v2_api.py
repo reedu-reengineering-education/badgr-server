@@ -32,10 +32,23 @@ class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
             user=recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
             token='abc', application=app
         )
-        
+
         response = self.client.get(url)
-        self.assertEqual(len(response.data['result']), 2)
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+    def test_user_cant_fetch_changed_assertions(self):
+        staff = self.setup_user(email='staff@example.com')
+        recipient = self.setup_user(email='recipient@example.com', authenticate=True)
+
+        issuer = self.setup_issuer(owner=staff)
+        badgeclass = self.setup_badgeclass(issuer=issuer)
+        badgeclass.issue(recipient_id=recipient.email)
+        badgeclass.issue(recipient_id=staff.email)
+        url = reverse('v2_api_assertions_changed_list')
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
 
 
 class AssertionFetching(SetupIssuerHelper, BadgrTestCase):
