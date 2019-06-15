@@ -10,7 +10,7 @@ class FacebookProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, 
     provider_id = FacebookProvider.id
 
     def get_mocked_response(self):
-        return MockedResponse(200, """
+        response = MockedResponse(200, """
         {
            "id": "630595557",
            "name": "Raymond Penners",
@@ -33,28 +33,47 @@ class FacebookProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, 
            "verified": true,
            "updated_time": "2012-11-30T20:40:33+0000"
         }""")
+        response.ok = True
+        return response
 
 
-class LinkedInOAuth2ProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
-    provider_id = LinkedInOAuth2Provider.id
-
-    def get_mocked_response(self):
-        return MockedResponse(200, """
-        {
-          "emailAddress": "raymond.penners@intenct.nl",
-          "firstName": "Raymond",
-          "id": "ZLARGMFT1M",
-          "lastName": "Penners",
-          "pictureUrl": "http://m.c.lnkd.licdn.com/mpr/mprx/0_e0hbvSLc",
-          "publicProfileUrl": "http://www.linkedin.com/in/intenct"
-        }""")
+# class LinkedInOAuth2ProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
+#     provider_id = LinkedInOAuth2Provider.id
+#
+#     def get_mocked_response(self):
+#         response = MockedResponse(200, """{
+#             "profilePicture": {
+#                 "displayImage": "urn:li:digitalmediaAsset:12345abcdefgh-12abcd"
+#             },
+#             "id": "1234567",
+#             "lastName": {
+#                 "preferredLocale": {
+#                     "language": "en",
+#                     "country": "US"
+#                 },
+#                 "localized": {
+#                     "en_US": "Penners"
+#                 }
+#             },
+#             "firstName": {
+#                 "preferredLocale": {
+#                     "language": "en",
+#                     "country": "US"
+#                 },
+#                 "localized": {
+#                     "en_US": "Raymond"
+#                 }
+#             }
+#         }""")
+#         response.ok = True
+#         return response
 
 
 class AzureProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
     provider_id = AzureProvider.id
 
     def get_mocked_response(self):
-        return MockedResponse(200, """
+        response = MockedResponse(200, """
         {"displayName": "John Smith", "mobilePhone": null,
         "preferredLanguage": "en-US", "jobTitle": "Director",
         "userPrincipalName": "john@smith.com",
@@ -64,3 +83,5 @@ class AzureProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, Bad
         "mail": "john@smith.com", "surname": "Smith",
         "givenName": "John", "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"}
         """)
+        response.ok = True
+        return response
