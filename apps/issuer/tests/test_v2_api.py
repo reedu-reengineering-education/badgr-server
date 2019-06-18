@@ -7,7 +7,7 @@ from mainsite.models import ApplicationInfo, AccessTokenProxy
 from oauth2_provider.models import Application, AccessToken
 from django.utils import timezone
 from datetime import timedelta
-
+from badgeuser.models import UserRecipientIdentifier
 
 class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_fetch_changed_assertions(self):
@@ -157,3 +157,23 @@ class AssertionFetching(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 2)
+
+    def test_can_fetch_assertions_by_url_based_recipient_ids(self):
+        url_recipient = "http://example.com"
+        u1 = self.setup_user(authenticate=True, email="hey@example.com")
+        UserRecipientIdentifier.objects.create(identifier=url_recipient, user=u1)
+        UserRecipientIdentifier.objects.create(identifier="http://example.com/notme", user=u1)
+        i = self.setup_issuer(owner=u1)
+        b = self.setup_badgeclass(issuer=i)
+        b.issue(recipient_id=url_recipient)
+        b.issue(recipient_id=u1.email)
+        b.issue(recipient_id="http://example.com/notme")
+        url = "{url}?recipient={url_recipient}".format(
+            url=reverse('v2_api_badgeclass_assertion_list', kwargs={'entity_id': b.entity_id}),
+            url_recipient=url_recipient
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+
+
