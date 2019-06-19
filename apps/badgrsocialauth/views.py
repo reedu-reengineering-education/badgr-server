@@ -39,7 +39,10 @@ class BadgrSocialLogin(RedirectView):
         self.request.session['source'] = self.request.GET.get('source', None)
 
         try:
-            redirect_url = reverse('{}_login'.format(self.request.GET.get('provider')))
+            if 'saml2' in provider_name:
+                redirect_url = reverse('saml2login', args=[provider_name])
+            else:
+                redirect_url = reverse('{}_login'.format(provider_name))
         except NoReverseMatch:
             raise ValidationError('No {} provider found'.format(provider_name))
 

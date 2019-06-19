@@ -11,7 +11,7 @@ badgr_admin.autodiscover()
 from django.views.generic.base import RedirectView, TemplateView
 
 from mainsite.views import SitewideActionFormView, LoginAndObtainAuthToken, RedirectToUiLogin, DocsAuthorizeRedirect
-from mainsite.views import info_view, email_unsubscribe, AppleAppSiteAssociation, error404, error500
+from mainsite.views import info_view, email_unsubscribe, AppleAppSiteAssociation, error404, error500, saml2_redirect, assertion_consumer_service
 from pathway.api import PathwayList
 
 urlpatterns = [
@@ -42,6 +42,10 @@ urlpatterns = [
 
     # Service health endpoint
     url(r'^health', include('health.urls')),
+
+    # SAML2 Identidy Provider
+    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/$', saml2_redirect, name='saml2login'),
+    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/acs/', assertion_consumer_service, name='assertion_consumer_service'),
 
     # Swagger Docs
     #
