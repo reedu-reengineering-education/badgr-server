@@ -13,6 +13,7 @@ from requests_cache.backends import BaseCache
 
 from issuer.models import Issuer, BadgeClass, BadgeInstance
 from mainsite.utils import first_node_match
+import json
 
 
 class DjangoCacheDict(MutableMapping):
@@ -138,7 +139,7 @@ class BadgeCheckHelper(object):
         })
 
     @classmethod
-    def get_or_create_assertion(cls, url=None, imagefile=None, assertion=None, created_by=None, allow_unvalidated_recipient=False):
+    def get_or_create_assertion(cls, url=None, imagefile=None, assertion=None, created_by=None):
 
         # distill 3 optional arguments into one query argument
         query = (url, imagefile, assertion)
@@ -146,20 +147,23 @@ class BadgeCheckHelper(object):
         if len(query) != 1:
             raise ValueError("Must provide only 1 of: url, imagefile or assertion_obo")
         query = query[0]
-
+        
         if created_by:
-            validated_emails = created_by.all_verified_recipient_identifiers
-
-            if not validated_emails and allow_unvalidated_recipient:
-                validated_emails = [created_by.email]
-
+            emails = [d.email for d in created_by.email_items.all()]
             badgecheck_recipient_profile = {
-                'email': validated_emails
+                'email': emails + [v.email for v in created_by.cached_email_variants()],
+                'telephone': created_by.cached_verified_phone_numbers(),
+                'url': created_by.cached_verified_urls()
             }
         else:
             badgecheck_recipient_profile = None
 
         try:
+            if type(query) is dict:
+                try:
+                    query = json.dumps(query)
+                except (TypeError, ValueError):
+                    raise ValidationError("Could not parse dict to json")
             response = openbadges.verify(query, recipient_profile=badgecheck_recipient_profile, **cls.badgecheck_options())
         except ValueError as e:
             raise ValidationError([{'name': "INVALID_BADGE", 'description': str(e)}])

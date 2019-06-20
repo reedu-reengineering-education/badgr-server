@@ -165,12 +165,15 @@ class AuditedModelOwner(permissions.BasePermission):
 
 class VerifiedEmailMatchesRecipientIdentifier(permissions.BasePermission):
     """
-    one of request user's verified emails matches obj.recipient_identifier
+    One of request user's verified emails matches obj.recipient_identifier.
+    For badges imported by this user, they can delete the badge.
     ---
     model: BadgeInstance
     """
     def has_object_permission(self, request, view, obj):
         recipient_identifier = getattr(obj, 'recipient_identifier', None)
+        if getattr(obj, 'pending', False):
+            return recipient_identifier and recipient_identifier in request.user.all_recipient_identifiers
         return recipient_identifier and recipient_identifier in request.user.all_verified_recipient_identifiers
 
 

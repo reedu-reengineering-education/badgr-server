@@ -39,6 +39,11 @@ from .utils import generate_sha256_hashstring, CURRENT_OBI_VERSION, get_obi_cont
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
+RECIPIENT_TYPE_EMAIL = 'email'
+RECIPIENT_TYPE_ID = 'openBadgeId'
+RECIPIENT_TYPE_TELEPHONE = 'telephone'
+RECIPIENT_TYPE_URL = 'url'
+
 logger = badgrlog.BadgrLogger()
 
 
@@ -85,6 +90,18 @@ class BaseOpenBadgeObjectModel(OriginalJsonMixin, cachemodel.CacheModel):
 
     def get_extensions_manager(self):
         raise NotImplementedError()
+
+    def __eq__(self, other):
+        UNUSABLE_DEFAULT = uuid.uuid4()
+
+        comparable_properties = getattr(self, 'COMPARABLE_PROPERTIES', None)
+        if comparable_properties is None:
+            return super(BaseOpenBadgeObjectModel, self).__eq__(other)
+
+        for prop in self.COMPARABLE_PROPERTIES:
+            if getattr(self, prop) != getattr(other, prop, UNUSABLE_DEFAULT):
+                return False
+        return True
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_extensions(self):
@@ -138,7 +155,8 @@ class Issuer(ResizeUploadedImage,
              BaseVersionedEntity,
              BaseOpenBadgeObjectModel):
     entity_class_name = 'Issuer'
-
+    COMPARABLE_PROPERTIES = ('badgrapp_id', 'description', 'email', 'entity_id', 'entity_version', 'name', 'pk',
+                            'updated_at', 'url',)
 
     staff = models.ManyToManyField(AUTH_USER_MODEL, through='IssuerStaff')
 
@@ -387,6 +405,8 @@ class BadgeClass(ResizeUploadedImage,
                  BaseVersionedEntity,
                  BaseOpenBadgeObjectModel):
     entity_class_name = 'BadgeClass'
+    COMPARABLE_PROPERTIES = ('criteria_text', 'criteria_url', 'description', 'entity_id', 'entity_version',
+                             'expires_amount', 'expires_duration', 'name', 'pk', 'slug', 'updated_at',)
 
     EXPIRES_DURATION_DAYS = 'days'
     EXPIRES_DURATION_WEEKS = 'weeks'
@@ -428,7 +448,9 @@ class BadgeClass(ResizeUploadedImage,
         self.issuer.publish()
 
     def delete(self, *args, **kwargs):
-        if self.recipient_count() > 0:
+        # if there are some assertions and some have not expired
+        if self.recipient_count() > 0 and self.badgeinstances.filter(revoked=False).filter(
+                models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())).count() > 0:
             raise ProtectedError("BadgeClass may only be deleted if all BadgeInstances have been revoked.", self)
 
         if self.pathway_element_count() > 0:
@@ -565,10 +587,11 @@ class BadgeClass(ResizeUploadedImage,
     @cachemodel.cached_method(auto_publish=True)
     def cached_completion_elements(self):
         return [pce for pce in self.completion_elements.all()]
-
-    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, **kwargs):
+    
+    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, recipient_type=RECIPIENT_TYPE_EMAIL, **kwargs):
         return BadgeInstance.objects.create(
-            badgeclass=self, recipient_identifier=recipient_id, narrative=narrative, evidence=evidence,
+            badgeclass=self, recipient_identifier=recipient_id, recipient_type=recipient_type,
+            narrative=narrative, evidence=evidence,
             notify=notify, created_by=created_by, allow_uppercase=allow_uppercase,
             badgr_app=badgr_app,
             **kwargs
@@ -663,16 +686,14 @@ class BadgeInstance(BaseAuditedModel,
                     BaseVersionedEntity,
                     BaseOpenBadgeObjectModel):
     entity_class_name = 'Assertion'
+    COMPARABLE_PROPERTIES = ('badgeclass_id', 'entity_id', 'entity_version', 'issued_on', 'pk', 'narrative',
+                             'recipient_identifier', 'recipient_type', 'revoked', 'revocation_reason', 'updated_at',)
 
     issued_on = models.DateTimeField(blank=False, null=False, default=timezone.now)
 
     badgeclass = models.ForeignKey(BadgeClass, blank=False, null=False, on_delete=models.CASCADE, related_name='badgeinstances')
     issuer = models.ForeignKey(Issuer, blank=False, null=False)
 
-    RECIPIENT_TYPE_EMAIL = 'email'
-    RECIPIENT_TYPE_ID = 'openBadgeId'
-    RECIPIENT_TYPE_TELEPHONE = 'telephone'
-    RECIPIENT_TYPE_URL = 'url'
     RECIPIENT_TYPE_CHOICES = (
         (RECIPIENT_TYPE_EMAIL, 'email'),
         (RECIPIENT_TYPE_ID, 'openBadgeId'),
@@ -771,18 +792,21 @@ class BadgeInstance(BaseAuditedModel,
         return self.issuer.owners
 
     @property
-    def is_recipient_email_unverified(self):
-        from badgeuser.models import CachedEmailAddress
+    def pending(self):
+        """
+            If the associated identifier for this BadgeInstance 
+            does not exist or is unverified the BadgeInstance is 
+            considered "pending"
+        """
+        from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
         try:
-            existing_email = CachedEmailAddress.cached.get(
-                email=self.recipient_identifier)
-        except CachedEmailAddress.DoesNotExist:
-            existing_email = None
-
-        if not existing_email or existing_email.verified != True:
-            return True
-        else:
+            if self.recipient_type == RECIPIENT_TYPE_EMAIL:
+                existing_identifier = CachedEmailAddress.cached.get(email=self.recipient_identifier)
+            else:
+                existing_identifier = UserRecipientIdentifier.cached.get(identifier=self.recipient_identifier)
+        except (UserRecipientIdentifier.DoesNotExist, CachedEmailAddress.DoesNotExist,):
             return False
+        return not existing_identifier.verified
 
     def save(self, *args, **kwargs):
         if self.pk is None:
@@ -897,7 +921,7 @@ class BadgeInstance(BaseAuditedModel,
         TODO: consider making this an option on initial save and having a foreign key to
         the notification model instance (which would link through to the OpenBadge)
         """
-        if self.recipient_type != BadgeInstance.RECIPIENT_TYPE_EMAIL:
+        if self.recipient_type != RECIPIENT_TYPE_EMAIL:
             return
 
         try:

@@ -112,6 +112,12 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
     def __unicode__(self):
         return self.cors
 
+    def get_path(self, path='/', use_https=None):
+        if use_https is None:
+            use_https = self.signup_redirect.startswith('https')
+        scheme = 'https://' if use_https else 'http://'
+        return '{}{}{}'.format(scheme, self.cors, path)
+
 
 @deconstructible
 class DefinedScopesValidator(object):

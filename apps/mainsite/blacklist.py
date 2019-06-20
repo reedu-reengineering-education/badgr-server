@@ -66,5 +66,5 @@ def api_query_is_in_blacklist(id_type, recipient_id):
 
 
 def generate_hash(id_type, id_value):
-    return "${id_type}$sha256${hash}".format(id_type=id_type,
+    return "{id_type}$sha256${hash}".format(id_type=id_type,
                                              hash=sha256(id_value).hexdigest())

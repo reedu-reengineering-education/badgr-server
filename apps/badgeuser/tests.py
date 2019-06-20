@@ -18,7 +18,7 @@ from mainsite import TOP_DIR
 from rest_framework.authtoken.models import Token
 
 from badgeuser.models import (
-    BadgeUser, BadgrAccessToken, UserRecipientIdentifier, EmailAddressVariant, CachedEmailAddress)
+    BadgeUser, BadgrAccessToken, UserRecipientIdentifier, EmailAddressVariant, CachedEmailAddress, TermsVersion)
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1
 from badgeuser.serializers_v2 import BadgeUserSerializerV2
 from issuer.models import BadgeClass, Issuer
@@ -68,7 +68,6 @@ class AuthTokenTests(BadgrTestCase):
 
 
 class UserCreateTests(BadgrTestCase):
-
     def test_create_user(self):
         user_data = {
             'first_name': 'Test',
@@ -77,13 +76,24 @@ class UserCreateTests(BadgrTestCase):
             'password': 'secr3t4nds3cur3'
         }
 
+        self.badgr_app.email_confirmation_redirect = 'http://test-badgr-ui.example.com/profile/'
+        self.badgr_app.save()
+
         response = self.client.post('/v1/user/profile', user_data)
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("signup=true", mail.outbox[0].body)
         self.assertNotIn("source=mozilla", mail.outbox[0].body)
-    
+
+        launch_url = re.search("(?P<url>/v1/[^\s]+)", mail.outbox[0].body).group("url")
+        response = self.client.get(launch_url)
+        self.assertEqual(response.status_code, 302)
+        redirect_url = response._headers['location'][1]
+
+        self.assertIn('/welcome', redirect_url)
+
+
     def test_create_user_from_mozilla(self):
         user_data = {
             'first_name': 'Test',
@@ -731,20 +741,20 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
 
     def test_verified_recipient_receives_assertion(self):
         url = 'http://example.com'
-        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         self.assertEqual(len(self.first_user.cached_badgeinstances()), 1)
 
     def test_unverified_recipient_receives_no_assertion(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url)
-        self.badgeclass.issue(recipient_id=url)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         self.assertEqual(len(self.first_user.cached_badgeinstances()), 0)
 
     def test_verified_recipient_v1_badges_endpoint(self):
         url = 'http://example.com'
-        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
+        self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
 
         response = self.client.get('/v1/earner/badges')
         self.assertEqual(len(response.data), 1)
@@ -752,15 +762,14 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
     def test_verified_recipient_v2_assertions_endpoint(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True)
-        self.badgeclass.issue(recipient_id=url)
-
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         response = self.client.get('/v2/backpack/assertions')
         self.assertEqual(len(response.data['result']), 1)
 
     def test_unverified_recipient_v1_badges_endpoint(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url)
-        self.badgeclass.issue(recipient_id=url)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
 
         response = self.client.get('/v1/earner/badges')
         self.assertEqual(len(response.data), 0)
@@ -768,7 +777,7 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
     def test_unverified_recipient_v2_assertions_endpoint(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url)
-        self.badgeclass.issue(recipient_id=url)
+        self.badgeclass.issue(recipient_id=url, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
 
         response = self.client.get('/v2/backpack/assertions')
         self.assertEqual(len(response.data['result']), 0)
@@ -804,8 +813,8 @@ class UserBadgeTests(BadgrTestCase):
         starting_count = len(response.data)
 
         badgeclass = self.create_badgeclass()
-        badgeclass.issue(recipient_id='New+email@newemail.com', allow_uppercase=True)
-        badgeclass.issue(recipient_id='New+Email@newemail.com', allow_uppercase=True)
+        badgeclass.issue(recipient_id='New+email@newemail.com', allow_uppercase=True, recipient_type='email')
+        badgeclass.issue(recipient_id='New+Email@newemail.com', allow_uppercase=True, recipient_type='email')
 
         outbox_count = len(mail.outbox)
 
@@ -837,6 +846,10 @@ class UserBadgeTests(BadgrTestCase):
     SESSION_ENGINE='django.contrib.sessions.backends.cache',
 )
 class UserProfileTests(BadgrTestCase):
+    def assertUserLoggedIn(self, user_pk=None):
+        self.assertIn(SESSION_KEY, self.client.session)
+        if user_pk is not None:
+            self.assertEqual(self.client.session[SESSION_KEY], user_pk)
 
     def test_user_can_change_profile(self):
         first = 'firsty'
@@ -884,8 +897,55 @@ class UserProfileTests(BadgrTestCase):
         self.client.login(username=username, password=third_password)
         self.assertUserLoggedIn()
 
-    def assertUserLoggedIn(self, user_pk=None):
-        self.assertIn(SESSION_KEY, self.client.session)
-        if user_pk is not None:
-            self.assertEqual(self.client.session[SESSION_KEY], user_pk)
+    def test_user_can_agree_to_terms(self):
+        first = 'firsty'
+        last = 'lastington'
+        new_password = 'new-password'
+        username = 'testinguser'
+        original_password = 'password'
+        email = 'testinguser@testing.info'
 
+        user = BadgeUser(username=username, is_active=True, email=email)
+        user.set_password(original_password)
+        user.save()
+        self.client.login(username=username, password=original_password)
+        self.assertUserLoggedIn()
+
+        TermsVersion.objects.create(version=1, short_description='terms 1')
+
+        response = self.client.put('/v1/user/profile', {
+            'first_name': first,
+            'last_name': last,
+            'password': new_password,
+            'current_password': original_password,
+            'latest_terms_version': 1
+        })
+        self.assertEqual(response.status_code, 200)
+
+    def test_user_update_ignores_blank_email(self):
+        first = 'firsty'
+        last = 'lastington'
+        new_password = 'new-password'
+        username = 'testinguser'
+        original_password = 'password'
+
+        user = BadgeUser(username=username, is_active=True)
+        user.set_password(original_password)
+        user.save()
+        UserRecipientIdentifier.objects.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+            identifier='http://testurl.com/123',
+            verified=True,
+            user=user
+        )
+        self.client.login(username=username, password=original_password)
+        self.assertUserLoggedIn()
+
+        TermsVersion.objects.create(version=1, short_description='terms 1')
+
+        response = self.client.put('/v1/user/profile', {
+            'first_name': first + ' Q.',
+            'last_name': last,
+            'email': None
+        }, format='json')
+        self.assertEqual(response.status_code, 200)

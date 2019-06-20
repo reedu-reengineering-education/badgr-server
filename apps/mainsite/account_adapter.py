@@ -2,15 +2,14 @@ import logging
 import urllib
 import urlparse
 
+from allauth.account.adapter import DefaultAccountAdapter, get_adapter
+from allauth.account.models import EmailConfirmation, EmailConfirmationHMAC
 from allauth.account.utils import user_pk_to_url_str
+from allauth.exceptions import ImmediateHttpResponse
 from django.conf import settings
-from django.contrib.auth import logout
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.urlresolvers import resolve, Resolver404, reverse
-
-from allauth.account.adapter import DefaultAccountAdapter, get_adapter
-from allauth.account.models import EmailConfirmation, EmailConfirmationHMAC
 
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import CachedEmailAddress, BadgrAccessToken
@@ -57,27 +56,29 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
                 return super(BadgrAccountAdapter, self).get_email_confirmation_redirect_url(request)
 
         try:
-            resolverMatch = resolve(request.path)
-            confirmation = EmailConfirmationHMAC.from_key(resolverMatch.kwargs.get('confirm_id'))
+            resolver_match = resolve(request.path)
+            confirmation = EmailConfirmationHMAC.from_key(resolver_match.kwargs.get('confirm_id'))
             # publish changes to cache
             email_address = CachedEmailAddress.objects.get(pk=confirmation.email_address.pk)
             email_address.save()
-            redirect_url = urlparse.urljoin(
-                badgr_app.email_confirmation_redirect.rstrip('/') + '/',
-                urllib.quote(email_address.user.first_name.encode('utf8'))
-            )
-            redirect_url = set_url_query_params(redirect_url, email=email_address.email.encode('utf8'))
 
+            query_params = {
+                'email': email_address.email.encode('utf8')
+            }
             # Pass source and signup along to UI
             source = request.query_params.get('source', None)
             if source:
-                redirect_url = set_url_query_params(redirect_url, source=source)
+                query_params['source'] = source
             
             signup = request.query_params.get('signup', None)
             if signup:
-                redirect_url = set_url_query_params(redirect_url, signup="true")
-
-            return redirect_url
+                query_params['signup'] = 'true'
+                return set_url_query_params(badgr_app.get_path('/auth/welcome'), **query_params)
+            else:
+                return set_url_query_params(urlparse.urljoin(
+                    badgr_app.email_confirmation_redirect.rstrip('/') + '/',
+                    urllib.quote(email_address.user.first_name.encode('utf8'))
+                ), **query_params)
 
         except Resolver404, EmailConfirmation.DoesNotExist:
             return badgr_app.email_confirmation_redirect
@@ -97,9 +98,11 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
 
         # Add source and signup query params to the confimation url
         if request:
-            if hasattr(request, 'session'):
+            source = None
+            if hasattr(request, 'data'):
+                source = request.data.get('source', None)
+            elif hasattr(request, 'session'):
                 source = request.session.get('source', None)
-            source = request.data.get('source', None)
 
             if source:
                 tokenized_activate_url = set_url_query_params(tokenized_activate_url, source=source)
@@ -157,8 +160,16 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
 
     def login(self, request, user):
         """
-        Preserve badgr_app session data across Django login() boundary
+        Guard against unverified users and preserve badgr_app session data
+        across Django login() boundary.
         """
+        if not user.verified:
+            # The usual case if a user gets here without a verified recipient
+            # identifier is a new sign-up with an unverified email. If that's
+            # the case, we just sent them a confirmation.
+            raise ImmediateHttpResponse(
+                self.respond_email_verification_sent(request, user))
+
         badgr_app = get_session_badgr_app(request)
         ret = super(BadgrAccountAdapter, self).login(request, user)
         set_session_badgr_app(request, badgr_app)

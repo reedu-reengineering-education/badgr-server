@@ -13,7 +13,7 @@ from badgrsocialauth.permissions import IsSocialAccountOwner
 from badgrsocialauth.serializers import BadgrSocialAccountSerializerV1
 from entity.api import BaseEntityListView, BaseEntityDetailView
 from issuer.permissions import BadgrOAuthTokenHasScope
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 from mainsite.utils import OriginSetting
 
 
@@ -21,7 +21,7 @@ class BadgrSocialAccountList(BaseEntityListView):
     model = SocialAccount
     v1_serializer_class = BadgrSocialAccountSerializerV1
     v2_serializer_class = None
-    permission_classes = (AuthenticatedWithVerifiedEmail,)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier,)
 
     def get_objects(self, request, **kwargs):
         obj =  self.request.user.socialaccount_set.all()
@@ -32,7 +32,7 @@ class BadgrSocialAccountList(BaseEntityListView):
 
 
 class BadgrSocialAccountConnect(APIView):
-    permission_classes = (AuthenticatedWithVerifiedEmail, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope)
     valid_scopes = ['rw:profile']
 
     def get(self, request, **kwargs):
@@ -57,7 +57,7 @@ class BadgrSocialAccountDetail(BaseEntityDetailView):
     model = SocialAccount
     v1_serializer_class = BadgrSocialAccountSerializerV1
     v2_serializer_class = None
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsSocialAccountOwner)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsSocialAccountOwner)
 
     def get_object(self, request, **kwargs):
         try:

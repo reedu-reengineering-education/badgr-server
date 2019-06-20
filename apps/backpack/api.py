@@ -18,23 +18,37 @@ from issuer.permissions import AuditedModelOwner, VerifiedEmailMatchesRecipientI
 from issuer.public_api import ImagePropertyDetailView
 from apispec_drf.decorators import apispec_list_operation, apispec_post_operation, apispec_get_operation, \
     apispec_delete_operation, apispec_put_operation, apispec_operation
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 
 
 class BackpackAssertionList(BaseEntityListView):
     model = BadgeInstance
     v1_serializer_class = LocalBadgeInstanceUploadSerializerV1
     v2_serializer_class = BackpackAssertionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
     http_method_names = ('get', 'post')
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack'],
         'post': ['rw:backpack'],
     }
 
+    def badge_filter(self, include_pending):
+        """
+        For assertions without a source url (locally issued assertions) 
+        only list assertions which are not in a pending state (awarded to 
+        an unverified email). as long as the include_pending param is set
+        """
+        def filter(b):
+            ok = (not b.revoked) and b.acceptance != BadgeInstance.ACCEPTANCE_REJECTED
+            if include_pending:
+                if b.source_url:
+                    return ok
+            return ok and not b.pending
+        return filter
+    
     def get_objects(self, request, **kwargs):
-        return filter(lambda a: (not a.revoked) and a.acceptance != BadgeInstance.ACCEPTANCE_REJECTED,
-                      self.request.user.cached_badgeinstances())
+        include_pending = True if request.query_params.get(u'include_pending', None) in ['1', 'true'] else False
+        return filter(self.badge_filter(include_pending), self.request.user.cached_badgeinstances())
 
     @apispec_list_operation('Assertion',
         summary="Get a list of Assertions in authenticated user's backpack ",
@@ -72,7 +86,7 @@ class BackpackAssertionDetail(BaseEntityDetailView):
     model = BadgeInstance
     v1_serializer_class = LocalBadgeInstanceUploadSerializerV1
     v2_serializer_class = BackpackAssertionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
     http_method_names = ('get', 'delete', 'put')
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack'],
@@ -86,9 +100,9 @@ class BackpackAssertionDetail(BaseEntityDetailView):
         return context
 
     @apispec_get_operation('Assertion',
-        summary="Get detail on an Assertion in the user's Backpack",
-        tags=['Backpack']
-    )
+                           summary="Get detail on an Assertion in the user's Backpack",
+                           tags=['Backpack']
+                           )
     def get(self, request, **kwargs):
         mykwargs = kwargs.copy()
         mykwargs['expands'] = []
@@ -102,9 +116,9 @@ class BackpackAssertionDetail(BaseEntityDetailView):
         return super(BackpackAssertionDetail, self).get(request, **mykwargs)
 
     @apispec_delete_operation('Assertion',
-        summary='Remove an assertion from the backpack',
-        tags=['Backpack']
-    )
+                              summary='Remove an assertion from the backpack',
+                              tags=['Backpack']
+                              )
     def delete(self, request, **kwargs):
         obj = self.get_object(request, **kwargs)
         related_collections = list(BackpackCollection.objects.filter(backpackcollectionbadgeinstance__badgeinstance=obj))
@@ -117,12 +131,14 @@ class BackpackAssertionDetail(BaseEntityDetailView):
 
         for collection in related_collections:
             collection.save()
+
+        request.user.save()
         return Response(status=HTTP_204_NO_CONTENT)
 
     @apispec_put_operation('Assertion',
-        summary="Update acceptance of an Assertion in the user's Backpack",
-        tags=['Backpack']
-    )
+                           summary="Update acceptance of an Assertion in the user's Backpack",
+                           tags=['Backpack']
+                           )
     def put(self, request, **kwargs):
         fields_whitelist = ('acceptance',)
         data = {k: v for k, v in request.data.items() if k in fields_whitelist}
@@ -139,7 +155,7 @@ class BackpackCollectionList(BaseEntityListView):
     model = BackpackCollection
     v1_serializer_class = CollectionSerializerV1
     v2_serializer_class = BackpackCollectionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, AuditedModelOwner, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, AuditedModelOwner, BadgrOAuthTokenHasScope)
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack'],
         'post': ['rw:backpack'],
@@ -149,16 +165,16 @@ class BackpackCollectionList(BaseEntityListView):
         return self.request.user.cached_backpackcollections()
 
     @apispec_get_operation('Collection',
-        summary='Get a list of Collections',
-        tags=['Backpack']
-    )
+                           summary='Get a list of Collections',
+                           tags=['Backpack']
+                           )
     def get(self, request, **kwargs):
         return super(BackpackCollectionList, self).get(request, **kwargs)
 
     @apispec_post_operation('Collection',
-        summary='Create a new Collection',
-        tags=['Backpack']
-    )
+                            summary='Create a new Collection',
+                            tags=['Backpack']
+                            )
     def post(self, request, **kwargs):
         return super(BackpackCollectionList, self).post(request, **kwargs)
 
@@ -167,7 +183,7 @@ class BackpackCollectionDetail(BaseEntityDetailView):
     model = BackpackCollection
     v1_serializer_class = CollectionSerializerV1
     v2_serializer_class = BackpackCollectionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail, AuditedModelOwner, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, AuditedModelOwner, BadgrOAuthTokenHasScope)
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack'],
         'post': ['rw:backpack'],
@@ -176,30 +192,30 @@ class BackpackCollectionDetail(BaseEntityDetailView):
     }
 
     @apispec_get_operation('Collection',
-        summary='Get a single Collection',
-        tags=['Backpack']
-    )
+                           summary='Get a single Collection',
+                           tags=['Backpack']
+                           )
     def get(self, request, **kwargs):
         return super(BackpackCollectionDetail, self).get(request, **kwargs)
 
     @apispec_put_operation('Collection',
-        summary='Update a Collection',
-        tags=['Backpack']
-    )
+                           summary='Update a Collection',
+                           tags=['Backpack']
+                           )
     def put(self, request, **kwargs):
         return super(BackpackCollectionDetail, self).put(request, **kwargs)
 
     @apispec_delete_operation('Collection',
-        summary='Delete a collection',
-        tags=['Backpack']
-    )
+                              summary='Delete a collection',
+                              tags=['Backpack']
+                              )
     def delete(self, request, **kwargs):
         return super(BackpackCollectionDetail, self).delete(request, **kwargs)
 
 
 class BackpackImportBadge(BaseEntityListView):
     v2_serializer_class = BackpackImportSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail,BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier,BadgrOAuthTokenHasScope)
     http_method_names = ('post',)
     valid_scopes = ['rw:backpack']
 

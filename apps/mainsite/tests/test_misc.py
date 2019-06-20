@@ -249,5 +249,5 @@ class TestBlacklist(BadgrTestCase):
         # The generate_hash function implementation should not change; We risk contacting people on the blacklist
         for (id_type, id_value) in self.Inputs:
             got = blacklist.generate_hash(id_type, id_value)
-            expected = "${id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value).hexdigest())
+            expected = "{id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value).hexdigest())
             self.assertEqual(got, expected)

@@ -356,6 +356,29 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
         self.assertTrue(BadgeClass.objects.filter(entity_id=test_badgeclass.entity_id).exists())
 
+    def test_can_delete_already_issued_badgeclass_if_all_expired(self):
+        """
+        A user should not be able to delete a badge class if it has been issued,
+        unless all of the assertions are expired. This is a sufficient safety check.
+        """
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        yesterday = timezone.now() - timezone.timedelta(days=1)
+        recently = timezone.now() - timezone.timedelta(hours=12)
+
+        # issue badge to a recipient
+        test_badgeclass.issue(recipient_id='new.recipient@email.test', issued_on=yesterday, expires_at=recently)
+
+        response = self.client.delete('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ))
+        self.assertEqual(response.status_code, 204)
+
+        self.assertFalse(BadgeClass.objects.filter(entity_id=test_badgeclass.entity_id).exists())
+
     def test_cannot_create_badgeclass_with_invalid_markdown(self):
         with open(self.get_test_image_path(), 'r') as badge_image:
             badgeclass_props = {

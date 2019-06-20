@@ -20,7 +20,7 @@ class IsRequestUser(permissions.BasePermission):
         return obj == request.user
 
 
-class AuthenticatedWithVerifiedEmail(permissions.BasePermission):
+class AuthenticatedWithVerifiedIdentifier(permissions.BasePermission):
     """
     Allows access only to authenticated users who have verified email addresses.
     """

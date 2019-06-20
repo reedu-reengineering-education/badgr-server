@@ -147,6 +147,8 @@ class SetupIssuerHelper(object):
             image=image,
             name=name,
             description=description,
+            criteria_text=criteria_text,
+            criteria_url=criteria_url
         )
         return badgeclass
 

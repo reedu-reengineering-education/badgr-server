@@ -955,6 +955,33 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
             badgeclass=other_badgeclass.entity_id), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 404)
 
+    def test_can_revoke_assertion(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        revocation_reason = "I take it all back. I don't mean what I said when I was hungry."
+
+        response = self.client.delete('/v2/assertions/{assertion}'.format(
+            assertion=test_assertion.entity_id,
+        ), {'revocation_reason': revocation_reason})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['result'][0]['revocationReason'], revocation_reason)
+
+        response = self.client.get('/public/assertions/{assertion}.json'.format(assertion=test_assertion.entity_id))
+        self.assertEqual(response.status_code, 200)
+        assertion_obo = json.loads(response.content)
+        self.assertDictContainsSubset(dict(
+            revocationReason=revocation_reason,
+            revoked=True
+        ), assertion_obo)
+
+        response = self.client.delete('/v2/assertions/{assertion}'.format(
+            assertion=test_assertion.entity_id,
+        ), {'revocation_reason': revocation_reason})
+        self.assertEqual(response.status_code, 400)
+
 
 class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_assertions(self):
