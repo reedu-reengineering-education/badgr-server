@@ -19,8 +19,3 @@ def handle_email_created(sender, instance=None, created=False, **kwargs):
     """
     if created:
         instance.user.publish_method('cached_emails')
-
-def delete_refresh_tokens(refresh):
-    def delete(sender, instance, **kwargs):
-        refresh.objects.filter(access_token=instance.pk).delete()
-    return delete
