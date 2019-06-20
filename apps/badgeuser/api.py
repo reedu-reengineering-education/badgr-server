@@ -8,7 +8,7 @@ from allauth.account.adapter import get_adapter
 from allauth.account.models import EmailConfirmationHMAC
 from allauth.account.utils import user_pk_to_url_str, url_str_to_user_pk
 from apispec_drf.decorators import (apispec_get_operation, apispec_put_operation, apispec_post_operation, apispec_operation,
-    apispec_delete_operation, apispec_list_operation,)
+                                    apispec_delete_operation, apispec_list_operation,)
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -25,10 +25,10 @@ from rest_framework.exceptions import ValidationError as RestframeworkValidation
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.status import (HTTP_302_FOUND, HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,)
+                                   HTTP_400_BAD_REQUEST,)
 
 from badgeuser.authcode import authcode_for_accesstoken, decrypt_authcode
-from badgeuser.models import BadgeUser, CachedEmailAddress, BadgrAccessToken, TermsVersion
+from badgeuser.models import BadgeUser, CachedEmailAddress, TermsVersion
 from badgeuser.permissions import BadgeUserIsAuthenticatedUser
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserTokenSerializerV1
 from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerializerV2, AccessTokenSerializerV2
@@ -38,7 +38,7 @@ import badgrlog
 from entity.api import BaseEntityDetailView, BaseEntityListView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
-from mainsite.models import BadgrApp
+from mainsite.models import BadgrApp, AccessTokenProxy
 from mainsite.utils import OriginSetting, backoff_cache_key
 
 RATE_LIMIT_DELTA = datetime.timedelta(minutes=5)
@@ -58,10 +58,10 @@ class BadgeUserDetail(BaseEntityDetailView):
     }
 
     @apispec_post_operation('BadgeUser',
-        summary="Post a single BadgeUser profile",
-        description="Make an account",
-        tags=['BadgeUsers']
-    )
+                            summary="Post a single BadgeUser profile",
+                            description="Make an account",
+                            tags=['BadgeUsers']
+                            )
     def post(self, request, **kwargs):
         """
         Signup for a new account
@@ -81,18 +81,18 @@ class BadgeUserDetail(BaseEntityDetailView):
         return Response(status=HTTP_404_NOT_FOUND)
 
     @apispec_get_operation('BadgeUser',
-        summary="Get a single BadgeUser profile",
-        description="Use the entityId 'self' to retrieve the authenticated user's profile",
-        tags=['BadgeUsers']
-    )
+                           summary="Get a single BadgeUser profile",
+                           description="Use the entityId 'self' to retrieve the authenticated user's profile",
+                           tags=['BadgeUsers']
+                           )
     def get(self, request, **kwargs):
         return super(BadgeUserDetail, self).get(request, **kwargs)
 
     @apispec_put_operation('BadgeUser',
-        summary="Update a BadgeUser",
-        description="Use the entityId 'self' to update the authenticated user's profile",
-        tags=['BadgeUsers']
-    )
+                           summary="Update a BadgeUser",
+                           description="Use the entityId 'self' to update the authenticated user's profile",
+                           tags=['BadgeUsers']
+                           )
     def put(self, request, **kwargs):
         return super(BadgeUserDetail, self).put(request, allow_partial=True, **kwargs)
 
@@ -252,8 +252,8 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
 
         if not send_email:
             return Response("Forgot password request limit exceeded. Please check your"
-                + " inbox for an existing message or wait to retry.",
-                status=status.HTTP_429_TOO_MANY_REQUESTS)
+                            + " inbox for an existing message or wait to retry.",
+                            status=status.HTTP_429_TOO_MANY_REQUESTS)
 
         email_address.set_last_forgot_password_sent_time(datetime.datetime.now())
 
@@ -384,8 +384,8 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         if emailconfirmation is None:
             logger.event(badgrlog.NoEmailConfirmation())
             return redirect_to_frontend_error_toast(request,
-                "Your email confirmation link is invalid. Please attempt to "
-                "create an account with this email address, again.")
+                                                    "Your email confirmation link is invalid. Please attempt to "
+                                                    "create an account with this email address, again.")
         # Get EmailAddress instance
         else:
             try:
@@ -395,8 +395,8 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
                 logger.event(badgrlog.NoEmailConfirmationEmailAddress(
                     request, email_address=emailconfirmation.email_address))
                 return redirect_to_frontend_error_toast(request,
-                    "Your email confirmation link is invalid. Please attempt "
-                    "to create an account with this email address, again.")
+                                                        "Your email confirmation link is invalid. Please attempt "
+                                                        "to create an account with this email address, again.")
 
         # Validate 'token' syntax from query param
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
@@ -405,8 +405,8 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
                 request, token=token, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
-                "Your email confirmation token is invalid. You have been sent "
-                "a new link. Please check your email and try again.")
+                                                    "Your email confirmation token is invalid. You have been sent "
+                                                    "a new link. Please check your email and try again.")
         uidb36 = matches.group(1)
         key = matches.group(2)
         if not (uidb36 and key):
@@ -414,8 +414,8 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
                 request, token=token, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
-                "Your email confirmation token is invalid. You have been sent "
-                "a new link. Please check your email and try again.")
+                                                    "Your email confirmation token is invalid. You have been sent "
+                                                    "a new link. Please check your email and try again.")
 
         redirect_url = get_adapter().get_email_confirmation_redirect_url(
             request, badgr_app=badgrapp)
@@ -427,17 +427,17 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
                 request, email_address=email_address))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
-                "Your authorization link has expired. You have been sent a new "
-                "link. Please check your email and try again.")
+                                                    "Your authorization link has expired. You have been sent a new "
+                                                    "link. Please check your email and try again.")
 
         if email_address.user != user:
             logger.event(badgrlog.OtherUsersEmailConfirmationToken(
                 request, email_address=email_address, token=token, other_user=user))
             email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
-                "Your email confirmation token is associated with another "
-                "user. You have been sent a new link. Please check your email "
-                "and try again.")
+                                                    "Your email confirmation token is associated with another "
+                                                    "user. You have been sent a new link. Please check your email "
+                                                    "and try again.")
 
         # Perform main operation, set EmaiAddress .verified and .primary True
         old_primary = CachedEmailAddress.objects.get_primary(user)
@@ -448,8 +448,8 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
 
         process_email_verification.delay(email_address.pk)
 
-        # Create an OAuth BadgrAccessToken instance for this user
-        accesstoken = BadgrAccessToken.objects.generate_new_token_for_user(
+        # Create an OAuth AccessTokenProxy instance for this user
+        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
             user,
             application=badgrapp.oauth_application if badgrapp.oauth_application_id else None,
             scope='rw:backpack rw:profile rw:issuer')
@@ -524,45 +524,45 @@ class BadgeUserAccountConfirm(RedirectView):
 
 
 class AccessTokenList(BaseEntityListView):
-    model = BadgrAccessToken
+    model = AccessTokenProxy
     v2_serializer_class = AccessTokenSerializerV2
     permission_classes = (permissions.IsAuthenticated, BadgrOAuthTokenHasScope)
     valid_scopes = ['rw:profile']
 
     def get_objects(self, request, **kwargs):
-        return BadgrAccessToken.objects.filter(user=request.user, expires__gt=timezone.now())
+        return AccessTokenProxy.objects.filter(user=request.user, expires__gt=timezone.now())
 
     @apispec_list_operation('AccessToken',
-        summary='Get a list of access tokens for authenticated user',
-        tags=['Authentication']
-    )
+                            summary='Get a list of access tokens for authenticated user',
+                            tags=['Authentication']
+                            )
     def get(self, request, **kwargs):
         return super(AccessTokenList, self).get(request, **kwargs)
 
 
 class AccessTokenDetail(BaseEntityDetailView):
-    model = BadgrAccessToken
+    model = AccessTokenProxy
     v2_serializer_class = AccessTokenSerializerV2
     permission_classes = (permissions.IsAuthenticated, BadgrOAuthTokenHasScope)
     valid_scopes = ['rw:profile']
 
     def get_object(self, request, **kwargs):
-        self.object = BadgrAccessToken.objects.get_from_entity_id(kwargs.get('entity_id'))
+        self.object = AccessTokenProxy.objects.get_from_entity_id(kwargs.get('entity_id'))
         if not self.has_object_permissions(request, self.object):
             raise Http404
         return self.object
 
     @apispec_get_operation('AccessToken',
-        summary='Get a single AccessToken',
-        tags=['Authentication']
-    )
+                           summary='Get a single AccessToken',
+                           tags=['Authentication']
+                           )
     def get(self, request, **kwargs):
         return super(AccessTokenDetail, self).get(request, **kwargs)
 
     @apispec_delete_operation('AccessToken',
-        summary='Revoke an AccessToken',
-        tags=['Authentication']
-    )
+                              summary='Revoke an AccessToken',
+                              tags=['Authentication']
+                              )
     def delete(self, request, **kwargs):
         obj = self.get_object(request, **kwargs)
         if not self.has_object_permissions(request, obj):
@@ -572,5 +572,3 @@ class AccessTokenDetail(BaseEntityDetailView):
         from oauth2_provider.models import RefreshToken
         RefreshToken.objects.filter(access_token=obj.pk).delete()
         return Response(status=204)
-
-

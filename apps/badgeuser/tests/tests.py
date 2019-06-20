@@ -18,11 +18,11 @@ from mainsite import TOP_DIR
 from rest_framework.authtoken.models import Token
 
 from badgeuser.models import (
-    BadgeUser, BadgrAccessToken, UserRecipientIdentifier, EmailAddressVariant, CachedEmailAddress, TermsVersion)
+    BadgeUser, UserRecipientIdentifier, EmailAddressVariant, CachedEmailAddress, TermsVersion)
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1
 from badgeuser.serializers_v2 import BadgeUserSerializerV2
 from issuer.models import BadgeClass, Issuer
-from mainsite.models import BadgrApp, ApplicationInfo
+from mainsite.models import BadgrApp, ApplicationInfo, AccessTokenProxy
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import backoff_cache_key
 

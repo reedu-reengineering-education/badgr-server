@@ -6,7 +6,7 @@ from django.utils import timezone
 from oauth2_provider.models import AccessToken, Application
 
 from badgeuser.authcode import encrypt_authcode, decrypt_authcode, authcode_for_accesstoken
-from badgeuser.models import BadgrAccessToken
+from mainsite.models import AccessTokenProxy
 from issuer.models import Issuer
 from mainsite.models import ApplicationInfo
 from mainsite.tests import BadgrTestCase
@@ -98,7 +98,7 @@ class OAuth2TokenTests(BadgrTestCase):
             authorization_grant_type=Application.GRANT_PASSWORD
         )
         ApplicationInfo.objects.create(application=application)
-        accesstoken = BadgrAccessToken.objects.generate_new_token_for_user(user, application=application, scope='r:profile')
+        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(user, application=application, scope='r:profile')
 
         # can exchange valid authcode for accesstoken
         authcode = authcode_for_accesstoken(accesstoken)

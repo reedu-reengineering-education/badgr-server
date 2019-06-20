@@ -12,9 +12,9 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.core.urlresolvers import resolve, Resolver404, reverse
 
 from badgeuser.authcode import authcode_for_accesstoken
-from badgeuser.models import CachedEmailAddress, BadgrAccessToken
+from badgeuser.models import CachedEmailAddress
 from badgrsocialauth.utils import set_url_query_params, get_session_badgr_app, set_session_badgr_app
-from mainsite.models import BadgrApp, EmailBlacklist
+from mainsite.models import BadgrApp, EmailBlacklist, AccessTokenProxy
 from mainsite.utils import OriginSetting
 
 
@@ -143,7 +143,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             badgr_app = BadgrApp.objects.get_current(self.request)
 
             if badgr_app is not None:
-                accesstoken = BadgrAccessToken.objects.generate_new_token_for_user(
+                accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
                     request.user,
                     application=badgr_app.oauth_application if badgr_app.oauth_application_id else None,
                     scope='rw:backpack rw:profile rw:issuer')
