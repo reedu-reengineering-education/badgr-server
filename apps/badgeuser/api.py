@@ -567,8 +567,5 @@ class AccessTokenDetail(BaseEntityDetailView):
         obj = self.get_object(request, **kwargs)
         if not self.has_object_permissions(request, obj):
             return Response(status=HTTP_404_NOT_FOUND)
-        obj.delete()
-        # Remove related refresh tokens
-        from oauth2_provider.models import RefreshToken
-        RefreshToken.objects.filter(access_token=obj.pk).delete()
+        obj.revoke()
         return Response(status=204)

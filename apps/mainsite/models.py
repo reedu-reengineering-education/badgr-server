@@ -216,6 +216,11 @@ class AccessTokenProxy(AccessToken):
         verbose_name = 'access token'
         verbose_name_plural = 'access tokens'
 
+    def revoke(self):
+        from oauth2_provider.models import RefreshToken
+        RefreshToken.objects.filter(access_token=self.pk).delete()
+        self.delete()
+
     @property
     def entity_id(self):
         # fake an entityId for this non-entity
