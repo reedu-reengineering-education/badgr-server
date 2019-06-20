@@ -564,6 +564,13 @@ class AccessTokenDetail(BaseEntityDetailView):
         tags=['Authentication']
     )
     def delete(self, request, **kwargs):
-        return super(AccessTokenDetail, self).delete(request, **kwargs)
+        obj = self.get_object(request, **kwargs)
+        if not self.has_object_permissions(request, obj):
+            return Response(status=HTTP_404_NOT_FOUND)
+        obj.delete()
+        # Remove related refresh tokens
+        from oauth2_provider.models import RefreshToken
+        RefreshToken.objects.filter(access_token=obj.pk).delete()
+        return Response(status=204)
 
 
