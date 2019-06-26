@@ -18,7 +18,7 @@ from django.utils import timezone
 from oauth2_provider.models import Application
 
 from badgeuser.models import CachedEmailAddress
-from issuer.models import BadgeInstance, IssuerStaff
+from issuer.models import BadgeInstance, IssuerStaff, Issuer
 from mainsite.models import ApplicationInfo
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationHelper
 from mainsite.utils import OriginSetting
@@ -334,7 +334,37 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             issuer=test_issuer.entity_id
         ), assertion, format="json")
         self.assertRaises(serializers.ValidationError)
-    
+
+    def test_can_issue_badge_by_class_name_cached_issuer_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "test@example.com"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        # Cause issuer to be published to cache.
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertEqual(response.status_code, 201)
+
+        # Update issuer without re-publishing to cache.
+        Issuer.objects.filter(pk=test_issuer.pk).update(
+            description='Using update method will not cause cache to be updated')
+
+        # Error condition would instead produce a
+        # 400 "Could not find matching badgeclass for this issuer."
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertEqual(response.status_code, 201)
+
     def test_can_issue_badge_by_class_ambiguity_error(self):
         badgeclass_name = "A Badge"
         test_user = self.setup_user(authenticate=True)
