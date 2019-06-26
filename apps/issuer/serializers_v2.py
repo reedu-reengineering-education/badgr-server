@@ -584,7 +584,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                     raise serializers.ValidationError(
                         "A previous award of this badge already exists for this recipient.")
 
-        if expected_issuer and data['badgeclass'].issuer != expected_issuer:
+        if expected_issuer and data['badgeclass'].issuer_id != expected_issuer.id:
             raise serializers.ValidationError({"badgeclass": ["Could not find matching badgeclass for this issuer."]})
 
         if 'badgeclass' in data:
