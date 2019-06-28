@@ -18,9 +18,9 @@ def authcode_for_accesstoken(accesstoken, expires_seconds=None, secret_key=None)
 
 def accesstoken_for_authcode(authcode, secret_key=None):
     accesstoken_pk = decrypt_authcode(authcode, secret_key=secret_key)
-    from badgeuser.models import BadgrAccessToken
+    from mainsite.models import AccessTokenProxy
     try:
-        return BadgrAccessToken.objects.get(pk=accesstoken_pk)
+        return AccessTokenProxy.objects.get(pk=accesstoken_pk)
     except AccessToken.DoesNotExist:
         return None
 

@@ -1,6 +1,5 @@
 import badgrlog
 
-
 badgrlogger = badgrlog.BadgrLogger()
 
 

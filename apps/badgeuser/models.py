@@ -18,10 +18,8 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.core.validators import URLValidator, RegexValidator
 from django.db import models, transaction
-from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from oauth2_provider.models import AccessToken, Application
-from oauthlib.common import generate_token
 from oauthlib.oauth2 import BearerToken
 from rest_framework.authtoken.models import Token
 
@@ -459,84 +457,6 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
                     # nothing to do, abort so we dont call .publish()
                     return
         return super(BadgeUser, self).save(*args, **kwargs)
-
-
-class BadgrAccessTokenManager(models.Manager):
-
-    def generate_new_token_for_user(self, user, scope='r:profile', application=None, expires=None, refresh_token=False):
-        with transaction.atomic():
-            if application is None:
-                application, created = Application.objects.get_or_create(
-                    client_id='public',
-                    client_type=Application.CLIENT_PUBLIC,
-                    authorization_grant_type=Application.GRANT_PASSWORD,
-                )
-                if created:
-                    ApplicationInfo.objects.create(application=application)
-
-            if expires is None:
-                access_token_expires_seconds = getattr(settings, 'OAUTH2_PROVIDER', {}).get('ACCESS_TOKEN_EXPIRE_SECONDS', 86400)
-                expires = timezone.now() + datetime.timedelta(seconds=access_token_expires_seconds)
-
-            accesstoken = self.create(
-                application=application,
-                user=user,
-                expires=expires,
-                token=generate_token(),
-                scope=scope
-            )
-
-        return accesstoken
-
-    def get_from_entity_id(self, entity_id):
-        # lookup by a faked
-        padding = len(entity_id) % 4
-        if padding > 0:
-            entity_id = '{}{}'.format(entity_id, (4-padding)*'=')
-        decoded = base64.urlsafe_b64decode(entity_id.encode('utf-8'))
-        id = re.sub(r'^{}'.format(self.model.fake_entity_id_prefix), '', decoded)
-        try:
-            pk = int(id)
-        except ValueError as e:
-            pass
-        else:
-            try:
-                obj = self.get(pk=pk)
-            except self.model.DoesNotExist:
-                pass
-            else:
-                return obj
-        raise self.model.DoesNotExist
-
-
-class BadgrAccessToken(AccessToken, cachemodel.CacheModel):
-    objects = BadgrAccessTokenManager()
-    fake_entity_id_prefix = "BadgrAccessToken.id="
-
-    class Meta:
-        proxy = True
-
-    @property
-    def entity_id(self):
-        # fake an entityId for this non-entity
-        digest = "{}{}".format(self.fake_entity_id_prefix, self.pk)
-        b64_string = base64.urlsafe_b64encode(digest)
-        b64_trimmed = re.sub(r'=+$', '', b64_string)
-        return b64_trimmed
-
-    def get_entity_class_name(self):
-        return 'AccessToken'
-
-    @property
-    def application_name(self):
-        return self.application.name
-
-    @property
-    def applicationinfo(self):
-        try:
-            return self.application.applicationinfo
-        except ApplicationInfo.DoesNotExist:
-            return ApplicationInfo()
 
 
 class TermsVersionManager(cachemodel.CacheModelManager):
