@@ -176,10 +176,11 @@ class Issuer(ResizeUploadedImage,
     objects = IssuerManager()
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
 
-    def publish(self, *args, **kwargs):
+    def publish(self, publish_staff=False, *args, **kwargs):
         super(Issuer, self).publish(*args, **kwargs)
-        for member in self.cached_issuerstaff():
-            member.cached_user.publish()
+        if publish_staff:
+            for member in self.cached_issuerstaff():
+                member.cached_user.publish()
 
     def delete(self, *args, **kwargs):
         if self.recipient_count > 0:
@@ -446,6 +447,8 @@ class BadgeClass(ResizeUploadedImage,
     def publish(self):
         super(BadgeClass, self).publish()
         self.issuer.publish()
+        if self.created_by:
+            self.created_by.publish()
 
     def delete(self, *args, **kwargs):
         # if there are some assertions and some have not expired
