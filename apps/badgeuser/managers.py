@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from badgeuser.authcode import encrypt_authcode
 from mainsite.models import BadgrApp, OriginSetting
-from badgrsocialauth.utils import set_url_query_params
+from mainsite.utils import set_url_query_params
 
 
 class BadgeUserManager(UserManager):

@@ -16,6 +16,7 @@
 	<meta property="og:image:height" content="200" />
 
 	<meta property="og:site_name" content="Badgr" />
+    {% if oembed_link_url %}<link rel="alternate" type="application/json+oembed" href="{{oembed_link_url | safe }}" />{% endif %}
 </head>
 
 <body>

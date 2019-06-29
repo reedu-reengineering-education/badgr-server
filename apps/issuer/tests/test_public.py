@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import io
 import json
+import urllib
 
 import responses
 from django.urls import reverse
@@ -278,3 +279,44 @@ class PendingAssertionsPublicAPITests(SetupIssuerHelper, BadgrTestCase):
         self.client.logout()
         get_resp = self.client.get('/public/assertions/{}'.format(assertion.entity_id))
         self.assertEqual(get_resp.status_code, 404)
+
+
+class OEmbedTests(SetupIssuerHelper, BadgrTestCase):
+    """
+    oEmbed url schemes:
+      - {HTTP_ORIGIN}/public/assertions/{entity_id}/embed
+
+    oEmbed API endpoint:
+      - {HTTP_ORIGIN}/public/oembed?format=json&url={HTTP_ORIGIN}/public/assertions/{entity_id}
+
+
+    """
+
+    def test_get_oembed_json(self):
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        # with self.assertNumQueries(0):
+        response = self.client.get('/public/oembed?format=json&url={}'.format(urllib.quote(assertion.jsonld_id)))
+        self.assertEqual(response.status_code, 200)
+
+    def test_endpoint_handles_malformed_urls(self):
+        response = self.client.get('/public/oembed?format=json&url={}'.format(urllib.quote('ralph the dog')))
+        self.assertEqual(response.status_code, 404)
+
+    def test_auto_discovery_of_api_endpoint(self):
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        response = self.client.get(
+            '/public/assertions/{}'.format(assertion.entity_id),
+            HTTP_USER_AGENT='Mozilla/5.0 (compatible; Embedly/0.2; +http://support.embed.ly/)',
+            HTTP_ACCEPT='text/html,application/xml,application/xhtml+xml;q=0.9,text//plain;q0.8,image/png,*/*;q=0.5'
+
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'oembed')

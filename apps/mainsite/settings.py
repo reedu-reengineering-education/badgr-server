@@ -443,6 +443,7 @@ BADGR_PUBLIC_BOT_USERAGENTS = [
     'facebook',      # https://developers.facebook.com/docs/sharing/webmasters/crawler
     'Facebot',
     'Slackbot',
+    'Embedly',
 ]
 BADGR_PUBLIC_BOT_USERAGENTS_WIDE = [
     'LinkedInBot',
