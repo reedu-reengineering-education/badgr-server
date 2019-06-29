@@ -33,13 +33,13 @@ from badgeuser.permissions import BadgeUserIsAuthenticatedUser
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserTokenSerializerV1
 from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerializerV2, AccessTokenSerializerV2
 from badgeuser.tasks import process_email_verification
-from badgrsocialauth.utils import set_url_query_params, redirect_to_frontend_error_toast
+from badgrsocialauth.utils import redirect_to_frontend_error_toast
 import badgrlog
 from entity.api import BaseEntityDetailView, BaseEntityListView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
 from mainsite.models import BadgrApp
-from mainsite.utils import OriginSetting, backoff_cache_key
+from mainsite.utils import backoff_cache_key, OriginSetting, set_url_query_params
 
 RATE_LIMIT_DELTA = datetime.timedelta(minutes=5)
 

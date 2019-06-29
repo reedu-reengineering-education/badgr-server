@@ -15,16 +15,14 @@ from django.views.generic import RedirectView
 from rest_framework import status, permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.status import HTTP_400_BAD_REQUEST
 from rest_framework.views import APIView
 
 import badgrlog
 import utils
 from backpack.models import BackpackCollection
-from badgrsocialauth.utils import set_url_query_params
 from entity.api import VersionedObjectMixin
 from mainsite.models import BadgrApp
-from mainsite.utils import OriginSetting
+from mainsite.utils import OriginSetting, set_url_query_params
 from .models import Issuer, BadgeClass, BadgeInstance
 
 logger = badgrlog.BadgrLogger()
@@ -473,11 +471,11 @@ class OEmbedAPIEndpoint(APIView):
         try:
             resolved = resolve(request_url.path)
         except Http404:
-            return None
+            raise Http404("Cannot find resource.")
 
         if resolved.url_name == 'badgeinstance_json':
             return BadgeInstance.cached.get(entity_id=resolved.kwargs.get('entity_id'))
-        raise Http404('Only Assertions are supported for OEmbed at this time.')
+        raise Http404('Cannot find resource.')
 
     def get_badgrapp_redirect(self, entity):
         badgrapp = entity.cached_badgrapp
@@ -496,6 +494,7 @@ class OEmbedAPIEndpoint(APIView):
         ret = '{redirect}{path}'.format(
             redirect=redirect_url,
             path=stripped_path)
+        ret = set_url_query_params(ret, embedVersion=1)
         return ret
 
     def get(self, request, **kwargs):

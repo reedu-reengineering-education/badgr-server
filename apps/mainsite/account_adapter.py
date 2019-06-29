@@ -13,9 +13,9 @@ from django.core.urlresolvers import resolve, Resolver404, reverse
 
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import CachedEmailAddress, BadgrAccessToken
-from badgrsocialauth.utils import set_url_query_params, get_session_badgr_app, set_session_badgr_app
+from badgrsocialauth.utils import get_session_badgr_app, set_session_badgr_app
 from mainsite.models import BadgrApp, EmailBlacklist
-from mainsite.utils import OriginSetting
+from mainsite.utils import OriginSetting, set_url_query_params
 
 
 class BadgrAccountAdapter(DefaultAccountAdapter):
