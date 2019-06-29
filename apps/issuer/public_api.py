@@ -1,6 +1,8 @@
-import StringIO
 import os
 import re
+import StringIO
+import urllib
+import urlparse
 
 import cairosvg
 from PIL import Image
@@ -19,6 +21,7 @@ from rest_framework.views import APIView
 import badgrlog
 import utils
 from backpack.models import BackpackCollection
+from badgrsocialauth.utils import set_url_query_params
 from entity.api import VersionedObjectMixin
 from mainsite.models import BadgrApp
 from mainsite.utils import OriginSetting
@@ -371,11 +374,19 @@ class BadgeInstanceJson(JSONComponentView):
         )
         if self.is_wide_bot():
             image_url = "{}&fmt=wide".format(image_url)
+
+        oembed_link_url = '{}{}?format=json&url={}'.format(
+            getattr(settings, 'HTTP_ORIGIN'),
+            reverse('oembed_api_endpoint'),
+            urllib.quote(self.current_object.public_url)
+        )
+
         return dict(
             title=self.current_object.cached_badgeclass.name,
             description=self.current_object.cached_badgeclass.description,
             public_url=self.current_object.public_url,
-            image_url=image_url
+            image_url=image_url,
+            oembed_link_url=oembed_link_url
         )
 
 
@@ -449,3 +460,83 @@ class BakedBadgeInstanceImage(VersionedObjectMixin, APIView, SlugToEntityIdRedir
         redirect_url = assertion.get_baked_image_url(obi_version=requested_version)
 
         return redirect(redirect_url, permanent=True)
+
+
+
+class OEmbedAPIEndpoint(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    @staticmethod
+    def get_object(url):
+        request_url = urlparse.urlparse(url)
+
+        try:
+            resolved = resolve(request_url.path)
+        except Http404:
+            return None
+
+        if resolved.url_name == 'badgeinstance_json':
+            return BadgeInstance.cached.get(entity_id=resolved.kwargs.get('entity_id'))
+        raise Http404('Only Assertions are supported for OEmbed at this time.')
+
+    def get_badgrapp_redirect(self, entity):
+        badgrapp = entity.cached_badgrapp
+        if not badgrapp or not badgrapp.public_pages_redirect:
+            badgrapp = BadgrApp.objects.get_current(request=None)  # use the default badgrapp
+
+        redirect_url = badgrapp.public_pages_redirect
+        if not redirect_url:
+            redirect_url = 'https://{}/public/'.format(badgrapp.cors)
+        else:
+            if not redirect_url.endswith('/'):
+                redirect_url += '/'
+
+        path = entity.get_absolute_url()
+        stripped_path = re.sub(r'^/public/', '', path)
+        ret = '{redirect}{path}'.format(
+            redirect=redirect_url,
+            path=stripped_path)
+        return ret
+
+    def get(self, request, **kwargs):
+        try:
+            url = request.query_params.get('url')
+            maxwidth = int(request.query_params.get('maxwidth', 800))
+            maxheight = int(request.query_params.get('maxheight', 800))
+            response_format = request.query_params.get('format', 'json')
+        except (TypeError, ValueError):
+            raise ValidationError("Cannot parse OEmbed request parameters.")
+
+        if response_format != 'json':
+            return Response("Only json format is supported at this time.", status=status.HTTP_501_NOT_IMPLEMENTED)
+
+        try:
+            badgeinstance = self.get_object(url)
+        except BadgeInstance.DoesNotExist:
+            raise Http404("Object to embed not found.")
+
+        badgeclass = badgeinstance.cached_badgeclass
+        issuer = badgeinstance.cached_issuer
+
+        data = {
+            'type': 'rich',
+            'version': '1.0',
+            'title': badgeclass.name,
+            'author_name': issuer.name,
+            'author_url': issuer.url,
+            # 'provider_name': TODO: BadgrApp name for issuer's associated BadgrApp,
+            'thumbnail_url': badgeinstance.image_url(),
+            'thumnail_width': 400,  # TODO: get real data; respect maxwidth
+            'thumbnail_height': 400,  # TODO: get real data; respect maxheight
+            'width': min(800, maxwidth),
+            'height': min(800, maxheight)
+        }
+
+        data['html'] = """<iframe src="{src}" frameborder="0" width="{width}" height="{height}"></iframe>""".format(
+            src=self.get_badgrapp_redirect(badgeinstance), width=data['width'], height=data['height']
+        )
+
+        return Response(data, status=status.HTTP_200_OK)
+
+
+
