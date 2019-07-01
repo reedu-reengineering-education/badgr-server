@@ -995,12 +995,18 @@ class BadgeInstance(BaseAuditedModel,
 
     @property
     def recipient_user(self):
-        from badgeuser.models import CachedEmailAddress
+        from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
         try:
             email_address = CachedEmailAddress.cached.get(email=self.recipient_identifier)
             if email_address.verified:
                 return email_address.user
         except CachedEmailAddress.DoesNotExist:
+            try:
+                identifier = UserRecipientIdentifier.cached.get(identifier=self.recipient_identifier)
+                if identifier.verified:
+                    return identifier.user
+            except UserRecipientIdentifier.DoesNotExist:
+                pass
             pass
         return None
 
