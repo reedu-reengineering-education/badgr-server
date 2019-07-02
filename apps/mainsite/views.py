@@ -217,9 +217,6 @@ def assertion_consumer_service(request, idp_name):
         badgr_app = BadgrApp.objects.get(pk=request.session.get('badgr_app_pk'))
     except:
         raise Exception("Could not find badgr_app_pk in session")
-    error_redirect_url = "{url}?authError={message}".format(
-        url=badgr_app.ui_login_redirect,
-        message=urllib.quote("Authentication error"))
 
     def login(user):
         accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
@@ -253,7 +250,9 @@ def assertion_consumer_service(request, idp_name):
             # Email exists but is not verified, auto-provision account and log in
             return login(new_account(email))
         # Email exists and is already verified
-        return redirect(error_redirect_url)
+        return redirect("{url}?authError={message}".format(
+            url=badgr_app.ui_login_redirect,
+            message=urllib.quote("Authentication Error")))
     except CachedEmailAddress.DoesNotExist:
         # Email does not exist, auto-provision account and log in
         return login(new_account(email))
@@ -296,12 +295,15 @@ def saml_client_for(idp_name=None):
     # Consider caching this XML instead of requesting from the network everytime
     try:
         config = Saml2Configuration.objects.get(slug=idp_name)
-    except:
+    except Saml2Configuration.DoesNotExist:
         raise Exception("Saml2Configuration for IDP '{}' not found".format(idp_name))
     try:
-        rv = requests.get(config.metadata_conf_url)
+        if not config.cached_metadata:
+            rv = requests.get(config.metadata_conf_url)
+        else:
+            rv = config.cached_metadata
     except:
-        raise Exception("Could not GET metadata for SAML2 Authn flow")
+        raise Exception("Could not fetch Saml2Configuration.metadata_conf_url: {}".format(config.metadata_conf_url))
 
     setting = {
         'metadata': {
