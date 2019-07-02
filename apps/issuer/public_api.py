@@ -516,6 +516,7 @@ class OEmbedAPIEndpoint(APIView):
 
         badgeclass = badgeinstance.cached_badgeclass
         issuer = badgeinstance.cached_issuer
+        badgrapp = BadgrApp.objects.get_current(request)
 
         data = {
             'type': 'rich',
@@ -523,7 +524,8 @@ class OEmbedAPIEndpoint(APIView):
             'title': badgeclass.name,
             'author_name': issuer.name,
             'author_url': issuer.url,
-            # 'provider_name': TODO: BadgrApp name for issuer's associated BadgrApp,
+            'provider_name': badgrapp.name,
+            'provider_url': badgrapp.ui_login_redirect,
             'thumbnail_url': badgeinstance.image_url(),
             'thumnail_width': 400,  # TODO: get real data; respect maxwidth
             'thumbnail_height': 400,  # TODO: get real data; respect maxheight
