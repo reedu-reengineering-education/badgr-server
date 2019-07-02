@@ -1,10 +1,7 @@
 from __future__ import unicode_literals
 
 import base64
-import random
 import re
-import string
-from hashlib import md5
 from itertools import chain
 
 import cachemodel
@@ -27,6 +24,7 @@ from backpack.models import BackpackCollection
 from entity.models import BaseVersionedEntity
 from issuer.models import Issuer, BadgeInstance, BaseAuditedModel
 from badgeuser.managers import CachedEmailAddressManager, BadgeUserManager
+from badgeuser.utils import generate_badgr_username
 from mainsite.models import ApplicationInfo
 
 
@@ -445,9 +443,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
 
     def save(self, *args, **kwargs):
         if not self.username:
-            # md5 hash the email and then encode as base64 to take up only 25 characters
-            hashed = md5(self.email + ''.join(random.choice(string.lowercase) for i in range(64))).digest().encode('base64')[:-1]  # strip last character because its a newline
-            self.username = "badgr{}".format(hashed[:25])
+            self.username = generate_badgr_username(self.email)
 
         if getattr(settings, 'BADGEUSER_SKIP_LAST_LOGIN_TIME', True):
             # skip saving last_login to the database
