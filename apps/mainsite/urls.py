@@ -2,6 +2,7 @@ from django.apps import apps
 from django.conf import settings
 from django.conf.urls import include, url
 
+from badgrsocialauth.views import saml2_redirect, assertion_consumer_service
 from mainsite.admin import badgr_admin
 from mainsite.oauth2_api import AuthorizationApiView, TokenView, AuthCodeExchange
 
@@ -11,7 +12,7 @@ badgr_admin.autodiscover()
 from django.views.generic.base import RedirectView, TemplateView
 
 from mainsite.views import SitewideActionFormView, LoginAndObtainAuthToken, RedirectToUiLogin, DocsAuthorizeRedirect
-from mainsite.views import info_view, email_unsubscribe, AppleAppSiteAssociation, error404, error500, saml2_redirect, assertion_consumer_service
+from mainsite.views import info_view, email_unsubscribe, AppleAppSiteAssociation, error404, error500
 from pathway.api import PathwayList
 
 urlpatterns = [
