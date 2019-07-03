@@ -696,6 +696,7 @@ class BadgeInstance(BaseAuditedModel,
 
     badgeclass = models.ForeignKey(BadgeClass, blank=False, null=False, on_delete=models.CASCADE, related_name='badgeinstances')
     issuer = models.ForeignKey(Issuer, blank=False, null=False)
+    user = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True)
 
     RECIPIENT_TYPE_CHOICES = (
         (RECIPIENT_TYPE_EMAIL, 'email'),
