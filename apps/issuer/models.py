@@ -597,8 +597,27 @@ class BadgeClass(ResizeUploadedImage,
             narrative=narrative, evidence=evidence,
             notify=notify, created_by=created_by, allow_uppercase=allow_uppercase,
             badgr_app=badgr_app,
+            user=self.get_user_or_none(recipient_id),
             **kwargs
         )
+
+    def get_user_or_none(self, recipient_id):
+        from django.apps import apps
+        CachedEmailAddress = apps.get_model('badgeuser', 'CachedEmailAddress')
+        UserRecipientIdentifier = apps.get_model('badgeuser', 'UserRecipientIdentifier')
+        BadgeUser = apps.get_model('badgeuser', 'BadgeUser')
+        user = None
+        verified_email = CachedEmailAddress.objects.filter(verified=True, email=recipient_id).first()
+        if verified_email:
+            user = verified_email.user
+        else:
+            verified_recipient_id = UserRecipientIdentifier.objects.filter(verified=True,
+                                                                           identifier=recipient_id).first()
+            if verified_recipient_id:
+                user = verified_recipient_id.user
+        if user:
+            return BadgeUser.objects.filter(pk=user.pk).first()
+        return None
 
     def get_json(self, obi_version=CURRENT_OBI_VERSION, include_extra=True, use_canonical_id=False):
         obi_version, context_iri = get_obi_context(obi_version)
