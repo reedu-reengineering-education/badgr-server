@@ -31,12 +31,12 @@ class Pathway(cachemodel.CacheModel, IsActive):
     def publish(self):
         super(Pathway, self).publish()
         self.publish_by('slug')
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
 
     def delete(self, *args, **kwargs):
         issuer = self.issuer
         ret = super(Pathway, self).delete(*args, **kwargs)
-        issuer.publish()
+        issuer.publish(publish_staff=False)
         return ret
 
     @property

@@ -83,11 +83,11 @@ class RecipientGroup(BaseAuditedModel, BaseVersionedEntity, IsActive):
 
     def publish(self):
         super(RecipientGroup, self).publish()
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
 
     def delete(self, *args, **kwargs):
         ret = super(RecipientGroup, self).delete(*args, **kwargs)
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
         return ret
 
     @property
