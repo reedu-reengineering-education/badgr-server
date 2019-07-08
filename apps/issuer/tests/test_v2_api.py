@@ -2,13 +2,20 @@
 from __future__ import unicode_literals
 
 from django.core.urlresolvers import reverse
+from django.test import override_settings
+
+from issuer.models import BadgeInstance
 from mainsite.tests import SetupIssuerHelper, BadgrTestCase
 from mainsite.models import ApplicationInfo, AccessTokenProxy
 from oauth2_provider.models import Application, AccessToken
 from django.utils import timezone
 from datetime import timedelta
-from badgeuser.models import UserRecipientIdentifier
+from badgeuser.models import UserRecipientIdentifier, CachedEmailAddress
 
+
+@override_settings(
+    CELERY_ALWAYS_EAGER=True
+)
 class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_fetch_changed_assertions(self):
         staff = self.setup_user(email='staff@example.com')
@@ -46,6 +53,50 @@ class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 2)
+
+    def test_assertion_has_user_post_issue(self):
+        # email and url identifiers
+        staff = self.setup_user(email='staff@example.com')
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False)
+        issuer = self.setup_issuer(owner=staff)
+        badgeclass = self.setup_badgeclass(issuer=issuer)
+        award = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award.user.pk, recipient.pk)
+
+    def test_assertion_user_with_verification(self):
+        staff = self.setup_user(email='staff@example.com')
+        issuer = self.setup_issuer(owner=staff)
+        badgeclass = self.setup_badgeclass(issuer=issuer)
+
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False, verified=False)
+        award = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award.user, None)
+
+        recipient2 = self.setup_user(email='recipient2example.com', authenticate=False)
+        award2 = badgeclass.issue(recipient_id=recipient2.email)
+        self.assertEqual(award2.user.pk, recipient2.pk)
+
+    def test_assertion_user_none_post_email_or_identifier_delete(self):
+        staff = self.setup_user(email='staff@example.com')
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False)
+        issuer = self.setup_issuer(owner=staff)
+        badgeclass = self.setup_badgeclass(issuer=issuer)
+        badgeclass.issue(recipient_id=recipient.email)
+        award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
+        self.assertEqual(award.user, recipient)
+
+        CachedEmailAddress.objects.get(email='recipient@example.com').delete()
+        award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
+        self.assertEqual(award.user, None)
+
+        my_id = self.add_identifier(recipient, 'http://google.com')
+        badgeclass.issue(recipient_id='http://google.com', recipient_type='url')
+        award = BadgeInstance.objects.get(recipient_identifier='http://google.com')
+        self.assertEqual(award.user, recipient)
+
+        my_id.delete()
+        award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
+        self.assertEqual(award.user, None)
 
     def test_user_cant_fetch_changed_assertions(self):
         staff = self.setup_user(email='staff@example.com')

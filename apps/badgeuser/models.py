@@ -21,6 +21,7 @@ from oauthlib.oauth2 import BearerToken
 from rest_framework.authtoken.models import Token
 
 from backpack.models import BackpackCollection
+from badgeuser.tasks import process_post_recipient_id_verification, process_post_recipient_id_deletion
 from entity.models import BaseVersionedEntity
 from issuer.models import Issuer, BadgeInstance, BaseAuditedModel
 from badgeuser.managers import CachedEmailAddressManager, BadgeUserManager
@@ -68,6 +69,7 @@ class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
         user = self.user
         self.publish_delete('email')
         self.publish_delete('pk')
+        process_post_recipient_id_deletion.delay(self.email)
         super(CachedEmailAddress, self).delete(*args, **kwargs)
         user.publish()
 
@@ -193,12 +195,17 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
 
     def save(self, *args, **kwargs):
         self.validate_identifier()
+        if self.verified:
+            process_post_recipient_id_verification.delay(self.identifier, self.type)
         return super(UserRecipientIdentifier, self).save(*args, **kwargs)
 
     def publish(self):
         super(UserRecipientIdentifier, self).publish()
         self.user.publish()
 
+    def delete(self):
+        super(UserRecipientIdentifier, self).delete()
+        process_post_recipient_id_deletion.delay(self.identifier)
 
 class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     """

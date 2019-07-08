@@ -13,7 +13,7 @@ from django.utils import timezone
 from oauth2_provider.models import AccessToken, Application
 from rest_framework.test import APITransactionTestCase
 
-from badgeuser.models import BadgeUser, TermsVersion
+from badgeuser.models import BadgeUser, TermsVersion, UserRecipientIdentifier
 from issuer.models import Issuer, BadgeClass
 from mainsite import TOP_DIR
 from mainsite.models import BadgrApp, ApplicationInfo
@@ -54,6 +54,8 @@ class SetupOAuth2ApplicationHelper(object):
 
 
 class SetupUserHelper(object):
+    def add_identifier(self, user, url):
+        return UserRecipientIdentifier.objects.create(type='url',identifier = url,user = user,verified = True)
     def setup_user(self,
                    email=None,
                    first_name='firsty',
