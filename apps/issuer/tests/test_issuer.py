@@ -122,6 +122,15 @@ class IssuerTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.data['description'], updated_issuer_props['description'])
         self.assertEqual(response.data['email'], updated_issuer_props['email'])
 
+        # test that subsequent GETs include the updated data
+        response = self.client.get('/v2/issuers')
+        response_issuers = response.data['result']
+        self.assertEqual(len(response_issuers), 1)
+        self.assertEqual(response_issuers[0]['url'], updated_issuer_props['url'])
+        self.assertEqual(response_issuers[0]['name'], updated_issuer_props['name'])
+        self.assertEqual(response_issuers[0]['description'], updated_issuer_props['description'])
+        self.assertEqual(response_issuers[0]['email'], updated_issuer_props['email'])
+
     def test_get_empty_issuer_editors_set(self):
         test_user = self.setup_user(authenticate=True)
         issuer = self.setup_issuer(owner=test_user)
