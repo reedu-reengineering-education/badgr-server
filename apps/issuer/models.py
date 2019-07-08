@@ -176,7 +176,7 @@ class Issuer(ResizeUploadedImage,
     objects = IssuerManager()
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
 
-    def publish(self, publish_staff=False, *args, **kwargs):
+    def publish(self, publish_staff=True, *args, **kwargs):
         super(Issuer, self).publish(*args, **kwargs)
         if publish_staff:
             for member in self.cached_issuerstaff():
@@ -380,14 +380,14 @@ class IssuerStaff(cachemodel.CacheModel):
 
     def publish(self):
         super(IssuerStaff, self).publish()
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
         self.user.publish()
 
     def delete(self, *args, **kwargs):
         publish_issuer = kwargs.pop('publish_issuer', True)
         super(IssuerStaff, self).delete()
         if publish_issuer:
-            self.issuer.publish()
+            self.issuer.publish(publish_staff=False)
         self.user.publish()
 
     @property
@@ -446,7 +446,7 @@ class BadgeClass(ResizeUploadedImage,
 
     def publish(self):
         super(BadgeClass, self).publish()
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
         if self.created_by:
             self.created_by.publish()
 
@@ -464,7 +464,7 @@ class BadgeClass(ResizeUploadedImage,
 
         issuer = self.issuer
         super(BadgeClass, self).delete(*args, **kwargs)
-        issuer.publish()
+        issuer.publish(publish_staff=False)
 
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
@@ -590,7 +590,7 @@ class BadgeClass(ResizeUploadedImage,
     @cachemodel.cached_method(auto_publish=True)
     def cached_completion_elements(self):
         return [pce for pce in self.completion_elements.all()]
-    
+
     def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, recipient_type=RECIPIENT_TYPE_EMAIL, **kwargs):
         return BadgeInstance.objects.create(
             badgeclass=self, recipient_identifier=recipient_id, recipient_type=recipient_type,
@@ -797,8 +797,8 @@ class BadgeInstance(BaseAuditedModel,
     @property
     def pending(self):
         """
-            If the associated identifier for this BadgeInstance 
-            does not exist or is unverified the BadgeInstance is 
+            If the associated identifier for this BadgeInstance
+            does not exist or is unverified the BadgeInstance is
             considered "pending"
         """
         from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
@@ -1310,11 +1310,11 @@ class IssuerExtension(BaseOpenBadgeExtension):
 
     def publish(self):
         super(IssuerExtension, self).publish()
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
 
     def delete(self, *args, **kwargs):
         super(IssuerExtension, self).delete(*args, **kwargs)
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
 
 
 class BadgeClassExtension(BaseOpenBadgeExtension):

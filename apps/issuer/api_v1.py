@@ -199,7 +199,7 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
 
         elif action == 'remove':
             IssuerStaff.objects.filter(user=user_to_modify, issuer=current_issuer).delete()
-            current_issuer.publish()
+            current_issuer.publish(publish_staff=False)
             user_to_modify.publish()
             return Response(
                 "User %s has been removed from %s staff." % (user_to_modify.username, current_issuer.name),
