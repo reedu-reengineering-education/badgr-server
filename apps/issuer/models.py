@@ -400,9 +400,7 @@ class IssuerStaff(cachemodel.CacheModel):
         return Issuer.cached.get(pk=self.issuer_id)
 
 def get_user_or_none(recipient_id, recipient_type):
-    from django.apps import apps
-    CachedEmailAddress = apps.get_model('badgeuser', 'CachedEmailAddress')
-    UserRecipientIdentifier = apps.get_model('badgeuser', 'UserRecipientIdentifier')
+    from badgeuser.models import UserRecipientIdentifier, CachedEmailAddress
     user = None
     if recipient_type=='email':
         verified_email = CachedEmailAddress.objects.filter(verified=True, email=recipient_id).first()
