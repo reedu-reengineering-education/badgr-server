@@ -216,16 +216,6 @@ class AccessTokenProxy(AccessToken):
         verbose_name = 'access token'
         verbose_name_plural = 'access tokens'
 
-    def save(self, *args, **kwargs):
-        # AccessTokenProxy < AccessToken < AbstractAccessToken has the save()
-        super(AccessToken).save(*args, **kwargs)
-        for s in self.scope.split():
-            try:
-                AccessTokenScope.objects.create(token=self, scope=s)
-            except ValidationError:
-                # TODO: Log?
-                pass
-
     def revoke(self):
         from oauth2_provider.models import RefreshToken
         RefreshToken.objects.filter(access_token=self.pk).delete()
