@@ -20,7 +20,7 @@ from entity.serializers import BaseSerializerV2, V2ErrorSerializer
 from issuer.models import Issuer, BadgeClass, BadgeInstance, IssuerStaff
 from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass,
                                 IsEditor, IsStaff, ApprovedIssuersOnly, BadgrOAuthTokenHasScope,
-                                BadgrOAuthTokenHasEntityScope)
+                                BadgrOAuthTokenHasEntityScope, AuthorizationIsBadgrOAuthToken)
 from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
                                    BadgeInstanceSerializerV1)
 from issuer.serializers_v2 import IssuerSerializerV2, BadgeClassSerializerV2, BadgeInstanceSerializerV2, \
@@ -514,7 +514,7 @@ class BadgeInstanceDetail(BaseEntityDetailView):
 
 class IssuerTokensList(BaseEntityListView):
     model = AccessTokenProxy
-    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope, AuthorizationIsBadgrOAuthToken)
     v2_serializer_class = IssuerAccessTokenSerializerV2
     valid_scopes = ["rw:issuer"]
 
@@ -523,11 +523,6 @@ class IssuerTokensList(BaseEntityListView):
         tags=["Issuers"],
     )
     def post(self, request, **kwargs):
-        if not isinstance(request.auth, AccessTokenProxy):
-            # need to use a oauth2 bearer token to authorize
-            error_response = BaseSerializerV2.response_envelope(result=[], success=False, description="Invalid token")
-            return Response(error_response, status=HTTP_403_FORBIDDEN)
-
         issuer_entityids = request.data.get('issuers', None)
         if not issuer_entityids:
             raise serializers.ValidationError({"issuers": "field is required"})
