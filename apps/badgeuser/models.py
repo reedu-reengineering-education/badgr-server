@@ -16,8 +16,7 @@ from django.core.mail import send_mail
 from django.core.validators import URLValidator, RegexValidator
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
-from oauth2_provider.models import AccessToken, Application
-from oauthlib.oauth2 import BearerToken
+from oauth2_provider.models import Application
 from rest_framework.authtoken.models import Token
 
 from backpack.models import BackpackCollection

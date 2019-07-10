@@ -6,8 +6,8 @@ from django.test import override_settings
 
 from issuer.models import BadgeInstance
 from mainsite.tests import SetupIssuerHelper, BadgrTestCase
-from mainsite.models import ApplicationInfo, AccessTokenProxy
-from oauth2_provider.models import Application, AccessToken
+from mainsite.models import AccessTokenProxy
+from oauth2_provider.models import Application
 from django.utils import timezone
 from datetime import timedelta
 from badgeuser.models import UserRecipientIdentifier, CachedEmailAddress
@@ -33,11 +33,11 @@ class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
         app = Application.objects.create(
             client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
             user=clientAppUser)
-        AccessToken.objects.create(
+        AccessTokenProxy.objects.create(
             user=staff, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
             token='123', application=app
         )
-        AccessToken.objects.create(
+        AccessTokenProxy.objects.create(
             user=recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
             token='abc2', application=app
         )
@@ -45,7 +45,7 @@ class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
         unrelated_app = Application.objects.create(
             client_id='clientApp-authcode-2', client_secret='testsecret', authorization_grant_type='authorization-code',
             user=None)
-        AccessToken.objects.create(
+        AccessTokenProxy.objects.create(
             user=unrelated_recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
             token='abc3', application=unrelated_app
         )

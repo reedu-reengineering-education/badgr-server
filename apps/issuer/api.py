@@ -7,7 +7,6 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.http import Http404
 from django.utils import timezone
-from oauth2_provider.models import AccessToken
 from oauthlib.oauth2.rfc6749.tokens import random_token_generator
 from rest_framework import status, serializers
 from rest_framework.exceptions import ValidationError
@@ -514,7 +513,7 @@ class BadgeInstanceDetail(BaseEntityDetailView):
 
 
 class IssuerTokensList(BaseEntityListView):
-    model = AccessToken
+    model = AccessTokenProxy
     permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope)
     v2_serializer_class = IssuerAccessTokenSerializerV2
     valid_scopes = ["rw:issuer"]
@@ -524,7 +523,7 @@ class IssuerTokensList(BaseEntityListView):
         tags=["Issuers"],
     )
     def post(self, request, **kwargs):
-        if not isinstance(request.auth, AccessToken):
+        if not isinstance(request.auth, AccessTokenProxy):
             # need to use a oauth2 bearer token to authorize
             error_response = BaseSerializerV2.response_envelope(result=[], success=False, description="Invalid token")
             return Response(error_response, status=HTTP_403_FORBIDDEN)
@@ -557,7 +556,7 @@ class IssuerTokensList(BaseEntityListView):
                 )
             )
 
-            accesstoken, created = AccessToken.objects.get_or_create(
+            accesstoken, created = AccessTokenProxy.objects.get_or_create(
                 user=request.auth.application.user,
                 application=request.auth.application,
                 scope=scope,

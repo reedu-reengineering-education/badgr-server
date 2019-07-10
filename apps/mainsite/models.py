@@ -17,10 +17,8 @@ from oauthlib.common import generate_token
 import cachemodel
 from django.db.models import Manager
 from django.utils.deconstruct import deconstructible
-from oauth2_provider.models import AccessToken, Application
+from oauth2_provider.models import AccessToken, Application, AbstractAccessToken
 from rest_framework.authtoken.models import Token
-
-from mainsite.utils import OriginSetting
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 DEFAULT_BADGRAPP_PK = getattr(settings, 'BADGR_APP_ID', None)
@@ -207,6 +205,10 @@ class AccessTokenProxyManager(models.Manager):
         raise self.model.DoesNotExist
 
 
+class BadgrAccessToken(AbstractAccessToken):
+    pass
+
+
 class AccessTokenProxy(AccessToken):
     objects = AccessTokenProxyManager()
     fake_entity_id_prefix = "AccessTokenProxy.id="
@@ -215,6 +217,11 @@ class AccessTokenProxy(AccessToken):
         proxy = True
         verbose_name = 'access token'
         verbose_name_plural = 'access tokens'
+
+    def save(self, *args, **kwargs):
+        super(AccessToken, self).save(*args, **kwargs)
+        for s in self.scope.split():
+            AccessTokenScope.objects.get_or_create(token=self, scope=s)
 
     def revoke(self):
         from oauth2_provider.models import RefreshToken

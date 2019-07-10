@@ -3,7 +3,7 @@ import urllib
 from django.core.cache import cache
 from django.urls import reverse
 from django.utils import timezone
-from oauth2_provider.models import AccessToken, Application
+from oauth2_provider.models import Application
 
 from badgeuser.authcode import encrypt_authcode, decrypt_authcode, authcode_for_accesstoken
 from mainsite.models import AccessTokenProxy
@@ -67,14 +67,14 @@ class OAuth2TokenTests(BadgrTestCase):
         response = self.client.post(reverse('oauth2_provider_token'), data=request_data)
         self.assertEqual(response.status_code, 200)
         first_token = response.json()['access_token']
-        first_token_instance = AccessToken.objects.get(token=first_token)
+        first_token_instance = AccessTokenProxy.objects.get(token=first_token)
 
         # Do it again... The token should update its "token" value.
         response = self.client.post(reverse('oauth2_provider_token'), data=request_data)
         self.assertEqual(response.status_code, 200)
 
         token = response.json()['access_token']
-        new_token_instance = AccessToken.objects.get(token=token)
+        new_token_instance = AccessTokenProxy.objects.get(token=token)
         # self.assertEqual(first_token_instance.pk, new_token_instance.pk)
 
         self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(token))

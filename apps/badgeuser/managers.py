@@ -10,7 +10,8 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 
 from badgeuser.authcode import encrypt_authcode
-from mainsite.models import BadgrApp, OriginSetting
+from mainsite.models import BadgrApp
+from mainsite.utils import OriginSetting
 from mainsite.utils import set_url_query_params
 
 
