@@ -216,6 +216,14 @@ class AccessTokenProxy(AccessToken):
         verbose_name = 'access token'
         verbose_name_plural = 'access tokens'
 
+    def save(self, *args, **kwargs):
+        super(AccessTokenProxy).save(*args, **kwargs)  # Call the "real" save() method.
+        for s in self.scope.split():
+            try:
+                AccessTokenScope.objects.create(token=self, scope=s)
+            except ValidationError:
+                pass
+
     def revoke(self):
         from oauth2_provider.models import RefreshToken
         RefreshToken.objects.filter(access_token=self.pk).delete()
@@ -258,6 +266,9 @@ class AccessTokenProxy(AccessToken):
 class AccessTokenScope(models.Model):
     token = models.ForeignKey(AccessToken)
     scope = models.CharField(max_length=256)
+
+    class Meta:
+        unique_together = ['token', 'scope']
 
     def __str__(self):
         return self.scope
