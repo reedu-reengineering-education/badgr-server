@@ -2,17 +2,12 @@
 from __future__ import unicode_literals
 
 from django.core.management import BaseCommand
-from django.db import connection
 
 from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import BadgeInstance
 
 
 class Command(BaseCommand):
-    def __init__(self):
-        super(Command, self).__init__()
-        self.cursor = connection.cursor()
-
     def handle(self, *args, **options):
 
         self.stdout.write("Updating BadgeInstaces...")
