@@ -90,7 +90,7 @@ class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(award.user, None)
 
         my_id = self.add_identifier(recipient, 'http://google.com')
-        badgeclass.issue(recipient_id='http://google.com', recipient_type='url')
+        badgeclass.issue(recipient_id='http://google.com', recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
         award = BadgeInstance.objects.get(recipient_identifier='http://google.com')
         self.assertEqual(award.user, recipient)
 
