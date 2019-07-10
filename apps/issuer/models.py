@@ -411,9 +411,8 @@ def get_user_or_none(recipient_id, recipient_type):
                                                                        identifier=recipient_id).first()
         if verified_recipient_id:
             user = verified_recipient_id.user
-    if user:
-        return user
-    return None
+
+    return user
 
 class BadgeClass(ResizeUploadedImage,
                  ScrubUploadedSvgImage,
