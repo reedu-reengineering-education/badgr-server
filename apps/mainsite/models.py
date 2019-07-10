@@ -254,6 +254,12 @@ class AccessTokenProxy(AccessToken):
         if self.token:
             return "{}***".format(self.token[:4])
 
+class AccessTokenScope(models.Model):
+    token = models.ForeignKey(AccessToken)
+    scope = models.CharField(max_length=256)
+
+    def __str__(self):
+        return self.scope
 
 class LegacyTokenProxy(Token):
     class Meta:
