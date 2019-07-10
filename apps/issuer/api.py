@@ -597,15 +597,8 @@ class AssertionsChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
     valid_scopes = ["r:assertions"]
 
-    @staticmethod
-    def get_user(request):
-        if request.user:
-            return request.user
-        if request.auth:
-            return request.auth.application.user
-
     def get_queryset(self, request, since=None):
-        user = self.get_user(request)
+        user = request.user
 
         expr = Q(user__oauth2_provider_accesstoken__application__user=user) | Q(issuer__issuerstaff__user=user)
 
