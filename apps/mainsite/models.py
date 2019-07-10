@@ -267,7 +267,7 @@ class AccessTokenProxy(AccessToken):
 
 class AccessTokenScope(models.Model):
     token = models.ForeignKey(AccessToken)
-    scope = models.CharField(max_length=256, db_index=True)
+    scope = models.CharField(max_length=256)
 
     class Meta:
         unique_together = ['token', 'scope']
