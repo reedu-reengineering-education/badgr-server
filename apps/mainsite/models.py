@@ -217,11 +217,13 @@ class AccessTokenProxy(AccessToken):
         verbose_name_plural = 'access tokens'
 
     def save(self, *args, **kwargs):
-        super(AccessTokenProxy).save(*args, **kwargs)  # Call the "real" save() method.
+        # AccessTokenProxy < AccessToken < AbstractAccessToken has the save()
+        super(AccessToken).save(*args, **kwargs)
         for s in self.scope.split():
             try:
                 AccessTokenScope.objects.create(token=self, scope=s)
             except ValidationError:
+                # TODO: Log?
                 pass
 
     def revoke(self):
@@ -265,7 +267,7 @@ class AccessTokenProxy(AccessToken):
 
 class AccessTokenScope(models.Model):
     token = models.ForeignKey(AccessToken)
-    scope = models.CharField(max_length=256)
+    scope = models.CharField(max_length=256, db_index=True)
 
     class Meta:
         unique_together = ['token', 'scope']
