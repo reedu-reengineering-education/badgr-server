@@ -35,14 +35,7 @@ def process_email_verification(self, email_address_id):
 def process_post_recipient_id_verification(self, identifier, type):
     from issuer.models import BadgeInstance, get_user_or_none
     user = get_user_or_none(identifier, type)
-
-    kwargs = {"user_id": user.pk, "recipient_identifier": identifier}
-    cursor = connection.cursor()
-    cursor.execute("""
-        UPDATE issuer_badgeinstance 
-        SET    user_id = {user_id} 
-        WHERE  recipient_identifier = '{recipient_identifier}'; 
-    """.format(**kwargs))
+    BadgeInstance.objects.filter(recipient_identifier=identifier).update(user=user)
     for b in BadgeInstance.objects.filter(recipient_identifier=identifier):
         b.publish()
 
@@ -50,11 +43,6 @@ def process_post_recipient_id_verification(self, identifier, type):
 @app.task(bind=True, queue=email_task_queue_name)
 def process_post_recipient_id_deletion(self, identifier):
     from issuer.models import BadgeInstance
-    cursor = connection.cursor()
-    cursor.execute("""
-        UPDATE issuer_badgeinstance 
-        SET    user_id = NULL 
-        WHERE  recipient_identifier = "{}"; 
-    """.format(identifier))
+    BadgeInstance.objects.filter(recipient_identifier=identifier).update(user=None)
     for b in BadgeInstance.objects.filter(recipient_identifier=identifier):
         b.publish()
