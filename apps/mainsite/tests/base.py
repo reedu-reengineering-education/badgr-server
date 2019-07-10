@@ -55,7 +55,9 @@ class SetupOAuth2ApplicationHelper(object):
 
 class SetupUserHelper(object):
     def add_identifier(self, user, url):
-        return UserRecipientIdentifier.objects.create(type='url',identifier = url,user = user,verified = True)
+        return UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL, identifier=url,
+                                                      user=user, verified=True)
+
     def setup_user(self,
                    email=None,
                    first_name='firsty',
