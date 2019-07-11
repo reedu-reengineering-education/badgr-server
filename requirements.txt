@@ -96,4 +96,4 @@ boto3==1.5.6
 django-boto==0.3.12
 django-ses==0.8.4
 
-pysaml2==4.0.3
+pysaml2==4.7.0
