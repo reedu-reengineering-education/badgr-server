@@ -5,7 +5,7 @@ from django.core.urlresolvers import reverse
 from django.test import override_settings
 
 from mainsite.tests import SetupIssuerHelper, BadgrTestCase, BadgeUser
-from mainsite.models import AccessTokenProxy
+from mainsite.models import AccessTokenProxy, AccessTokenScope
 from oauth2_provider.models import Application
 from django.utils import timezone
 from datetime import timedelta
@@ -21,6 +21,7 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         email.verified = True
         email.primary = True
         email.save()
+
     def test_with_two_apps(self):
         # Application A
         client_a = BadgeUser.objects.create(email="danger@example.com",
@@ -120,10 +121,12 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
             user=staff, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
             token='123', application=app
         )
-        AccessTokenProxy.objects.create(
+        token = AccessTokenProxy.objects.create(
             user=recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
             token='abc2', application=app
         )
+        # Sanity check that signal was called post AbstractAccessToken save()
+        self.assertEqual(AccessTokenScope.objects.filter(token = token).count(), 3)
 
         unrelated_app = Application.objects.create(
             client_id='clientApp-authcode-2', client_secret='testsecret', authorization_grant_type='authorization-code',
