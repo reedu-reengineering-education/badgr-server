@@ -20,7 +20,7 @@ from oauth2_provider.models import Application
 from rest_framework.authtoken.models import Token
 
 from backpack.models import BackpackCollection
-from badgeuser.tasks import process_post_recipient_id_verification, process_post_recipient_id_deletion
+from badgeuser.tasks import process_post_recipient_id_deletion, process_post_recipient_id_verification_change
 from entity.models import BaseVersionedEntity
 from issuer.models import Issuer, BadgeInstance, BaseAuditedModel
 from badgeuser.managers import CachedEmailAddressManager, BadgeUserManager
@@ -84,7 +84,7 @@ class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
 
     def save(self, *args, **kwargs):
         super(CachedEmailAddress, self).save(*args, **kwargs)
-
+        process_post_recipient_id_verification_change.delay(self.email, 'email', self.verified)
         if not self.emailaddressvariant_set.exists() and self.email != self.email.lower():
             self.add_variant(self.email.lower())
 
@@ -194,9 +194,9 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
 
     def save(self, *args, **kwargs):
         self.validate_identifier()
-        if self.verified:
-            process_post_recipient_id_verification.delay(self.identifier, self.type)
-        return super(UserRecipientIdentifier, self).save(*args, **kwargs)
+        super(UserRecipientIdentifier, self).save(*args, **kwargs)
+        process_post_recipient_id_verification_change.delay(self.identifier, self.type, self.verified)
+
 
     def publish(self):
         super(UserRecipientIdentifier, self).publish()

@@ -16,6 +16,19 @@ from badgeuser.models import UserRecipientIdentifier
     CELERY_ALWAYS_EAGER=True
 )
 class AssertionsChangedSince(SetupIssuerHelper, BadgrTestCase):
+    def test_user_cant_fetch_changed_assertions(self):
+        staff = self.setup_user(email='staff@example.com')
+        recipient = self.setup_user(email='recipient@example.com', authenticate=True)
+
+        issuer = self.setup_issuer(owner=staff)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        badgeclass.issue(recipient_id=recipient.email)
+        badgeclass.issue(recipient_id=staff.email)
+        url = reverse('v2_api_assertions_changed_list')
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
     def test_application_can_fetch_changed_assertions(self):
         staff = self.setup_user(email='staff@example.com')
         recipient = self.setup_user(email='recipient@example.com', authenticate=False)

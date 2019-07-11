@@ -14,6 +14,7 @@ from urllib import quote_plus
 from django.core import mail
 from django.core.urlresolvers import reverse
 from django.utils import timezone
+from django.test import override_settings
 from oauth2_provider.models import Application
 
 from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
@@ -878,10 +879,10 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
                 "narrative": "foo@bar's test narrative",
                 "evidence": [
                     {
-                        "url": "http://google.com?evidence=foo.bar",
+                        "url": "http://example.com?evidence=foo.bar",
                     },
                     {
-                        "url": "http://google.com?evidence=bar.baz",
+                        "url": "http://example.com?evidence=bar.baz",
                         "narrative": "barbaz"
                     }
                 ]
@@ -1064,64 +1065,113 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 0)
 
-
+@override_settings(
+    CELERY_ALWAYS_EAGER=True
+)
 class AssertionWithUserTests(SetupIssuerHelper, BadgrTestCase):
-    def test_assertion_has_user_post_issue(self):
-        # email and url identifiers
-        staff = self.setup_user(email='staff@example.com')
+    def setUp(self):
+        super(AssertionWithUserTests, self).setUp()
+        self.issuer = self.setup_issuer(owner=self.setup_user(email='staff@example.com'))
+
+    def test_award_to_missing_email(self):
+        email = 'idonotexistyet@example.com'
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        award = badgeclass.issue(recipient_id=email)
+        self.assertEqual(award.user, None)
+        recipient = self.setup_user(email=email, authenticate=False)
+        award2 = BadgeInstance.objects.get(recipient_identifier=email)
+        self.assertEqual(award2.user, recipient)
+
+    def test_verification_change_owns_badge(self):
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False, verified=False)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        award = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award.user, None)
+
+        email = recipient.cached_emails()[0]
+        email.verified = True
+        email.save()
+        award2 = BadgeInstance.objects.get(recipient_identifier=recipient.email)
+        self.assertEqual(award2.user, recipient)
+
+        my_id = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+                                                       identifier='http://example123.com',
+                                                       user=recipient, verified=False)
+        badgeclass.issue(recipient_id=my_id.identifier, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        award2 = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
+        self.assertEqual(award2.user, None)
+        my_id.verified = True
+        my_id.save()
+        award3 = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
+        self.assertEqual(award3.user, recipient)
+
+        badgeclass.issue(recipient_id='+15555555555', recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE)
+        award = BadgeInstance.objects.get(recipient_identifier='+15555555555')
+        self.assertEqual(award.user, None)
+        my_id = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
+                                                       identifier='+15555555555',
+                                                       user=recipient, verified=True)
+        award = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
+        self.assertEqual(award.user, recipient)
+
+
+    def test_verification_change_disowns_badge(self):
         recipient = self.setup_user(email='recipient@example.com', authenticate=False)
-        issuer = self.setup_issuer(owner=staff)
-        badgeclass = self.setup_badgeclass(issuer=issuer)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        award = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award.user.pk, recipient.pk)
+
+        my_id = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+                                                       identifier='http://example.com',
+                                                       user=recipient, verified=True)
+        badgeclass.issue(recipient_id='http://example.com', recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        award = BadgeInstance.objects.get(recipient_identifier='http://example.com')
+        self.assertEqual(award.user, recipient)
+        my_id.verified = False
+        my_id.save()
+        award = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
+        self.assertEqual(award.user, None)
+
+        email = recipient.cached_emails()[0]
+        email.verified = False
+        email.save()
+        award2 = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award2.user, None)
+
+
+    def test_assertion_has_user_post_issue(self):
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
         award = badgeclass.issue(recipient_id=recipient.email)
         self.assertEqual(award.user.pk, recipient.pk)
 
     def test_assertion_user_with_verification(self):
-        staff = self.setup_user(email='staff@example.com')
-        issuer = self.setup_issuer(owner=staff)
-        badgeclass = self.setup_badgeclass(issuer=issuer)
-
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
         recipient = self.setup_user(email='recipient@example.com', authenticate=False, verified=False)
         award = badgeclass.issue(recipient_id=recipient.email)
         self.assertEqual(award.user, None)
-
         recipient2 = self.setup_user(email='recipient2example.com', authenticate=False)
         award2 = badgeclass.issue(recipient_id=recipient2.email)
         self.assertEqual(award2.user.pk, recipient2.pk)
 
     def test_assertion_user_none_post_email_or_identifier_delete(self):
-        staff = self.setup_user(email='staff@example.com')
         recipient = self.setup_user(email='recipient@example.com', authenticate=False)
-        issuer = self.setup_issuer(owner=staff)
-        badgeclass = self.setup_badgeclass(issuer=issuer)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
         badgeclass.issue(recipient_id=recipient.email)
         award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
         self.assertEqual(award.user, recipient)
-
         CachedEmailAddress.objects.get(email='recipient@example.com').delete()
         award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
         self.assertEqual(award.user, None)
-
-        my_id = self.add_identifier(recipient, 'http://google.com')
-        badgeclass.issue(recipient_id='http://google.com', recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
-        award = BadgeInstance.objects.get(recipient_identifier='http://google.com')
+        my_id = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+                                                       identifier='http://example.com',
+                                                       user=recipient, verified=True)
+        badgeclass.issue(recipient_id='http://example.com', recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        award = BadgeInstance.objects.get(recipient_identifier='http://example.com')
         self.assertEqual(award.user, recipient)
-
         my_id.delete()
         award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
         self.assertEqual(award.user, None)
-
-    def test_user_cant_fetch_changed_assertions(self):
-        staff = self.setup_user(email='staff@example.com')
-        recipient = self.setup_user(email='recipient@example.com', authenticate=True)
-
-        issuer = self.setup_issuer(owner=staff)
-        badgeclass = self.setup_badgeclass(issuer=issuer)
-        badgeclass.issue(recipient_id=recipient.email)
-        badgeclass.issue(recipient_id=staff.email)
-        url = reverse('v2_api_assertions_changed_list')
-
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
 
 
 class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
