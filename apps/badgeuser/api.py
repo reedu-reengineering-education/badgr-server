@@ -447,7 +447,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         email_address.save()
 
         process_email_verification.delay(email_address.pk)
-        process_post_recipient_id_verification_change().delay(email_address, 'email', True)
+        process_post_recipient_id_verification_change.delay(email_address, 'email', True)
 
         # Create an OAuth AccessTokenProxy instance for this user
         accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
