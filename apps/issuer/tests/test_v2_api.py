@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from django.core.urlresolvers import reverse
 from django.test import override_settings
 
-from mainsite.tests import SetupIssuerHelper, BadgrTestCase
+from mainsite.tests import SetupIssuerHelper, BadgrTestCase, BadgeUser
 from mainsite.models import AccessTokenProxy
 from oauth2_provider.models import Application
 from django.utils import timezone
@@ -16,6 +16,77 @@ from badgeuser.models import UserRecipientIdentifier
     CELERY_ALWAYS_EAGER=True
 )
 class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
+    def verify_email(self, user):
+        email = user.cached_emails()[0]
+        email.verified = True
+        email.primary = True
+        email.save()
+    def test_with_two_apps(self):
+        # Application A
+        client_a = BadgeUser.objects.create(email="danger@example.com",
+                                        first_name="Danger No No",
+                                        last_name="No",
+                                        create_email_address=True,
+                                        send_confirmation=False)
+        self.verify_email(client_a)
+        app_a = Application.objects.create(
+            client_id='client_a', client_secret='secret', authorization_grant_type='client-credentials',
+            user=client_a)
+        token_a = AccessTokenProxy.objects.create(
+            user=client_a, scope="r:assertions", expires=timezone.now() + timedelta(hours=1),
+            token='prettyplease1', application=app_a
+        )
+        
+        # Application B
+        client_b = BadgeUser.objects.create(email="yes@example.com",
+                                        first_name="Gimme Yes",
+                                        last_name="Yes Yes Yes",
+                                        create_email_address=True,
+                                        send_confirmation=False)
+        self.verify_email(client_b)
+        app_b = Application.objects.create(
+            client_id='client_b', client_secret='secret', authorization_grant_type='client-credentials',
+            user=client_b)
+        token_b = AccessTokenProxy.objects.create(
+            user=client_b, scope="r:assertions", expires=timezone.now() + timedelta(hours=1),
+            token='prettyplease2', application=app_b
+        )
+
+        user = BadgeUser.objects.create(email="recipient@example.com",
+                                        first_name="Firsty",
+                                        last_name="Lastington",
+                                        create_email_address=True,
+                                        send_confirmation=False)
+        self.verify_email(user)
+        # token for app b with r:backpack
+        AccessTokenProxy.objects.create(
+            user=user, scope="r:backpack", expires=timezone.now() + timedelta(hours=1),
+            token='prettyplease3', application=app_b
+        )
+        # token for app a with r:profile
+        AccessTokenProxy.objects.create(
+            user=user, scope="r:profile", expires=timezone.now() + timedelta(hours=1),
+            token='prettyplease4', application=app_a
+        )
+        staff = self.setup_user(email="staff@example.com", authenticate=False)
+        issuer = self.setup_issuer(name="Giver", owner=staff)
+        badge = self.setup_badgeclass(issuer=issuer)
+        badge.issue(recipient_id="recipient@example.com")
+
+        # Application A should not have access to the badge instance
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(token_a.token))
+        url = reverse('v2_api_assertions_changed_list')
+        response = self.client.get(url)
+        self.assertEqual(len(response.data['result']), 0)
+
+        # Application B should have access to the badge instance
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(token_b.token))
+        url = reverse('v2_api_assertions_changed_list')
+        response = self.client.get(url)
+        self.assertEqual(len(response.data['result']), 1)
+
+        
+
     def test_user_cant_fetch_changed_assertions(self):
         staff = self.setup_user(email='staff@example.com')
         recipient = self.setup_user(email='recipient@example.com', authenticate=True)
