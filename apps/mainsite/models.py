@@ -205,10 +205,6 @@ class AccessTokenProxyManager(models.Manager):
         raise self.model.DoesNotExist
 
 
-class BadgrAccessToken(AbstractAccessToken):
-    pass
-
-
 class AccessTokenProxy(AccessToken):
     objects = AccessTokenProxyManager()
     fake_entity_id_prefix = "AccessTokenProxy.id="
