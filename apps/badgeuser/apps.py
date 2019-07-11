@@ -19,3 +19,9 @@ class BadgeUserConfig(AppConfig):
         post_save.connect(handle_email_created,
                           sender=EmailAddress,
                           dispatch_uid="email_created")
+
+        from oauth2_provider.models import AbstractAccessToken
+        from mainsite.signals import handle_token_save
+        post_save.connect(handle_token_save,
+                          sender=AbstractAccessToken,
+                          dispatch_uid="token_saved")

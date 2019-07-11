@@ -214,11 +214,6 @@ class AccessTokenProxy(AccessToken):
         verbose_name = 'access token'
         verbose_name_plural = 'access tokens'
 
-    def save(self, *args, **kwargs):
-        super(AccessToken, self).save(*args, **kwargs)
-        for s in self.scope.split():
-            AccessTokenScope.objects.get_or_create(token=self, scope=s)
-
     def revoke(self):
         from oauth2_provider.models import RefreshToken
         RefreshToken.objects.filter(access_token=self.pk).delete()
