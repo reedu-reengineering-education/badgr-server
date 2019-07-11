@@ -594,7 +594,9 @@ class AssertionsChangedSince(BaseEntityView):
     def get_queryset(self, request, since=None):
         user = request.user
 
-        expr = Q(user__oauth2_provider_accesstoken__application__user=user) | Q(issuer__issuerstaff__user=user)
+        expr = Q(user__oauth2_provider_accesstoken__application__user=user)
+        expr &= Q(user__oauth2_provider_accesstoken__accesstokenscope__scope__in=["r:backpack", "rw:backpack"])
+        expr |= Q(issuer__issuerstaff__user=user)
 
         if since is not None:
             expr &= Q(updated_at__gt=since)
