@@ -177,6 +177,13 @@ class VerifiedEmailMatchesRecipientIdentifier(permissions.BasePermission):
         return recipient_identifier and recipient_identifier in request.user.all_verified_recipient_identifiers
 
 
+class AuthorizationIsBadgrOAuthToken(permissions.BasePermission):
+    message = 'Invalid token'
+
+    def has_permission(self, request, view):
+        return isinstance(request.auth, oauth2_provider.models.AccessToken)
+
+
 class BadgrOAuthTokenHasScope(permissions.BasePermission):
     def has_permission(self, request, view):
         valid_scopes = self.valid_scopes_for_view(view, method=request.method)
