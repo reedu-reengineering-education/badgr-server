@@ -16,7 +16,7 @@ from badgeuser.models import CachedEmailAddress, BadgeUser
 from badgrsocialauth.models import Saml2Account, Saml2Configuration
 from badgrsocialauth.utils import (set_session_badgr_app, get_session_badgr_app,
                                    get_session_verification_email, set_session_authcode,)
-from mainsite import settings
+from django.conf import settings
 from mainsite.models import BadgrApp
 from mainsite.utils import set_url_query_params
 
@@ -134,7 +134,13 @@ def saml2_client_for(idp_name=None):
     setting = {
         'metadata': {
             'inline': [rv.text],
+            # "remote": [
+            # {
+            #     "url":config.metadata_conf_url,
+            #     # "cert":"kalmar2.cert"
+            # }],
         },
+        'entityid': "iamaserviceprovider",
         'service': {
             'sp': {
                 'endpoints': {
@@ -201,9 +207,9 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config):
             request=request,
         )
         # Auto verify emails
-        email = CachedEmailAddress.objects.get(email=email)
-        email.verified = True
-        email.save()
+        cached_email = CachedEmailAddress.objects.get(email=email)
+        cached_email.verified = True
+        cached_email.save()
         Saml2Account.objects.create(config=config, user=new_user, uuid=email)
         return new_user
 
