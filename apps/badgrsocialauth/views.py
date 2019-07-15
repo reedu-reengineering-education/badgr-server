@@ -134,13 +134,8 @@ def saml2_client_for(idp_name=None):
     setting = {
         'metadata': {
             'inline': [rv.text],
-            # "remote": [
-            # {
-            #     "url":config.metadata_conf_url,
-            #     # "cert":"kalmar2.cert"
-            # }],
         },
-        'entityid': "iamaserviceprovider",
+        'entityid': "badgrserver",
         'service': {
             'sp': {
                 'endpoints': {
