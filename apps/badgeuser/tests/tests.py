@@ -487,6 +487,28 @@ class UserEmailTests(BadgrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(mail.outbox), 2)
 
+    def test_no_login_on_confirmation_of_verified_email(self):
+        # register a new un-verified email
+        response = self.client.post('/v1/user/emails', {
+            'email': 'new+email@newemail.com',
+        })
+        self.assertEqual(response.status_code, 201)
+
+        # receive verification email
+        self.assertEqual(len(mail.outbox), 1)
+        verify_url = re.search("(?P<url>/v1/[^\s]+)", mail.outbox[0].body).group("url")
+
+        # verify the email address
+        email_address = CachedEmailAddress.objects.filter(verified=False).get()
+        email_address.verified = True
+        email_address.save()
+
+        # verification attempt fails
+        response = self.client.get(verify_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('authError', response['location'])
+        self.assertNotIn('authToken', response['location'])
+
     def test_verification_cannot_be_reused(self):
         # register a new un-verified email
         response = self.client.post('/v1/user/emails', {
