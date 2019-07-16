@@ -2,6 +2,8 @@ import random
 import re
 
 import os
+
+from allauth.account.models import EmailConfirmation
 from django.contrib.auth import SESSION_KEY
 from django.core import mail
 from django.core.cache import cache
@@ -484,6 +486,28 @@ class UserEmailTests(BadgrTestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(mail.outbox), 2)
+
+    def test_verification_cannot_be_reused(self):
+        # register a new un-verified email
+        response = self.client.post('/v1/user/emails', {
+            'email': 'new+email@newemail.com',
+        })
+        self.assertEqual(response.status_code, 201)
+
+        # receive verification email
+        self.assertEqual(len(mail.outbox), 1)
+        verify_url = re.search("(?P<url>/v1/[^\s]+)", mail.outbox[0].body).group("url")
+
+        # verify the email address successfully
+        response = self.client.get(verify_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('authToken', response['location'])
+
+        # second verification attempt fails
+        response = self.client.get(verify_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('authError', response['location'])
+        self.assertNotIn('authToken', response['location'])
 
     def test_user_can_request_forgot_password(self):
         self.client.logout()
