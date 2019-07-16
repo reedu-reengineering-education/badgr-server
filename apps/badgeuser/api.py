@@ -439,6 +439,12 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
                                                     "user. You have been sent a new link. Please check your email "
                                                     "and try again.")
 
+        if email_address.verified:
+            logger.event(badgrlog.EmailConfirmationAlreadyVerified(
+                request, email_address=email_address, token=token))
+            return redirect_to_frontend_error_toast(request,
+                                                    "Your email address is already verified. You may now log in.")
+
         # Perform main operation, set EmaiAddress .verified and .primary True
         old_primary = CachedEmailAddress.objects.get_primary(user)
         if old_primary is None:
