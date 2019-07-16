@@ -7,7 +7,6 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.http import Http404
 from django.utils import timezone
-from oauth2_provider.models import AccessToken
 from oauthlib.oauth2.rfc6749.tokens import random_token_generator
 from rest_framework import status, serializers
 from rest_framework.exceptions import ValidationError
@@ -21,7 +20,7 @@ from entity.serializers import BaseSerializerV2, V2ErrorSerializer
 from issuer.models import Issuer, BadgeClass, BadgeInstance, IssuerStaff
 from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass,
                                 IsEditor, IsStaff, ApprovedIssuersOnly, BadgrOAuthTokenHasScope,
-                                BadgrOAuthTokenHasEntityScope)
+                                BadgrOAuthTokenHasEntityScope, AuthorizationIsBadgrOAuthToken)
 from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
                                    BadgeInstanceSerializerV1)
 from issuer.serializers_v2 import IssuerSerializerV2, BadgeClassSerializerV2, BadgeInstanceSerializerV2, \
@@ -514,8 +513,8 @@ class BadgeInstanceDetail(BaseEntityDetailView):
 
 
 class IssuerTokensList(BaseEntityListView):
-    model = AccessToken
-    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope)
+    model = AccessTokenProxy
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope, AuthorizationIsBadgrOAuthToken)
     v2_serializer_class = IssuerAccessTokenSerializerV2
     valid_scopes = ["rw:issuer"]
 
@@ -524,11 +523,6 @@ class IssuerTokensList(BaseEntityListView):
         tags=["Issuers"],
     )
     def post(self, request, **kwargs):
-        if not isinstance(request.auth, AccessToken):
-            # need to use a oauth2 bearer token to authorize
-            error_response = BaseSerializerV2.response_envelope(result=[], success=False, description="Invalid token")
-            return Response(error_response, status=HTTP_403_FORBIDDEN)
-
         issuer_entityids = request.data.get('issuers', None)
         if not issuer_entityids:
             raise serializers.ValidationError({"issuers": "field is required"})
@@ -557,7 +551,7 @@ class IssuerTokensList(BaseEntityListView):
                 )
             )
 
-            accesstoken, created = AccessToken.objects.get_or_create(
+            accesstoken, created = AccessTokenProxy.objects.get_or_create(
                 user=request.auth.application.user,
                 application=request.auth.application,
                 scope=scope,
@@ -597,38 +591,17 @@ class AssertionsChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
     valid_scopes = ["r:assertions"]
 
-    @staticmethod
-    def get_user(request):
-        if request.user:
-            return request.user
-        if request.auth:
-            return request.auth.application.user
-
     def get_queryset(self, request, since=None):
-        user = self.get_user(request)
-        issuer_ids = Issuer.objects.filter(staff__id=user.id).distinct().only('pk')
-        recipient_ids = set()
+        user = request.user
 
-        tokens = AccessTokenProxy.objects.filter(application__user=user, user__isnull=False)
-        for t in tokens:
-            for r in t.user.all_verified_recipient_identifiers:
-                recipient_ids.add(r)
-        
-        # select badgeinstance.* where
-        #   (
-        #     badgeinstance.issuer_id in (:issuer_ids)
-        #     OR
-        #     badgeinstance.recipient_identifier in (:user_ids)
-        #   )
-        #   AND
-        #   badgeinstance.updated_at >= since
-
-        expr = Q(issuer_id__in=issuer_ids) | Q(recipient_identifier__in=list(recipient_ids))
+        expr = Q(user__oauth2_provider_accesstoken__application__user=user)
+        expr &= Q(user__oauth2_provider_accesstoken__accesstokenscope__scope__in=["r:backpack", "rw:backpack"])
+        expr |= Q(issuer__issuerstaff__user=user)
 
         if since is not None:
             expr &= Q(updated_at__gt=since)
 
-        qs = BadgeInstance.objects.filter(expr)
+        qs = BadgeInstance.objects.filter(expr).distinct()
         return qs
 
     def get(self, request, **kwargs):

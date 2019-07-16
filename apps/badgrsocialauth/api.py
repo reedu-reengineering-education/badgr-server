@@ -3,7 +3,6 @@ from allauth.socialaccount.models import SocialAccount
 from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.urls import reverse
-from oauth2_provider.models import AccessToken
 from rest_framework.response import Response
 from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_204_NO_CONTENT, HTTP_403_FORBIDDEN
 from rest_framework.views import APIView
@@ -13,6 +12,7 @@ from badgrsocialauth.permissions import IsSocialAccountOwner
 from badgrsocialauth.serializers import BadgrSocialAccountSerializerV1
 from entity.api import BaseEntityListView, BaseEntityDetailView
 from issuer.permissions import BadgrOAuthTokenHasScope
+from mainsite.models import AccessTokenProxy
 from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 from mainsite.utils import OriginSetting
 
@@ -36,7 +36,7 @@ class BadgrSocialAccountConnect(APIView):
     valid_scopes = ['rw:profile']
 
     def get(self, request, **kwargs):
-        if not isinstance(request.auth, AccessToken):
+        if not isinstance(request.auth, AccessTokenProxy):
             raise ValidationError("Invalid credentials")
         provider_name = self.request.GET.get('provider', None)
         if provider_name is None:

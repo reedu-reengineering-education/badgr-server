@@ -61,7 +61,8 @@ class PublicAPITests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestC
         self.assertEqual(response.status_code, 200)
         result = response.json()
         # result should contain token_type and access_token
-        self.assertFalse(any(result.get(k, None) is None for k in ['token_type','access_token']))
+        self.assertIn('token_type', result)
+        self.assertIn('access_token', result)
         auth_headers = {
             'Authorization': "{type} {token}".format(type=result.get("token_type"), token=result.get("access_token"))
         }

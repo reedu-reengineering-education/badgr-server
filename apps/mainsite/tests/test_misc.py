@@ -4,19 +4,53 @@ import urlparse
 import warnings
 
 import os
+from datetime import timedelta
+from operator import attrgetter
+
 from django.core import mail
 from django.core.cache import cache, CacheKeyWarning
 from django.core.management import call_command
 from django.test import override_settings, TransactionTestCase
+from django.utils import timezone
+from oauth2_provider.models import AccessToken
 
 from badgeuser.models import BadgeUser, CachedEmailAddress
-from mainsite.models import BadgrApp
+from mainsite.models import BadgrApp, AccessTokenProxy, AccessTokenScope
 from mainsite import TOP_DIR, blacklist
+from mainsite.tests import SetupIssuerHelper
 from mainsite.tests.base import BadgrTestCase
 from hashlib import sha256
 import responses
 from issuer.models import BadgeClass, Issuer, BadgeInstance
 import mock
+
+
+class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
+    def test_scopes_created(self):
+        self.setup_user(email="foo@bar.com", authenticate=True, token_scope="rw:backpack r:profile")
+        self.assertEqual(2, AccessTokenScope.objects.all().count())
+
+    def test_library_access_token_scope_denormalization(self):
+        # Creating an AccessToken (library model) results in correct scopes
+        scope_string = 'foo bar'
+        scopes = sorted(scope_string.split(' '))
+
+        token = AccessToken.objects.create(
+            scope=scope_string,
+            expires=timezone.now() + timedelta(hours=1))
+        qs = AccessTokenScope.objects.filter(token=token).order_by('scope')
+        self.assertQuerysetEqual(qs, scopes, attrgetter('scope'))
+
+    def test_access_token_proxy_scope_denormalization(self):
+        # Creating an AccessTokenProxy (our model) results in correct scopes
+        scope_string = 'badgr is great'
+        scopes = sorted(scope_string.split(' '))
+
+        proxy_token = AccessTokenProxy.objects.create(
+            scope=scope_string,
+            expires=timezone.now() + timedelta(hours=1))
+        qs = AccessTokenScope.objects.filter(token=proxy_token).order_by('scope')
+        self.assertQuerysetEqual(qs, scopes, attrgetter('scope'))
 
 
 class TestCacheSettings(TransactionTestCase):

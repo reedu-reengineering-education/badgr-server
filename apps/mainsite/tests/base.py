@@ -10,13 +10,13 @@ from django.core.cache import cache
 from django.core.cache.backends.filebased import FileBasedCache
 from django.test import override_settings, TransactionTestCase
 from django.utils import timezone
-from oauth2_provider.models import AccessToken, Application
+from oauth2_provider.models import Application
 from rest_framework.test import APITransactionTestCase
 
-from badgeuser.models import BadgeUser, TermsVersion
+from badgeuser.models import BadgeUser, TermsVersion, UserRecipientIdentifier
 from issuer.models import Issuer, BadgeClass
 from mainsite import TOP_DIR
-from mainsite.models import BadgrApp, ApplicationInfo
+from mainsite.models import BadgrApp, ApplicationInfo, AccessTokenProxy
 
 
 class SetupOAuth2ApplicationHelper(object):
@@ -54,6 +54,7 @@ class SetupOAuth2ApplicationHelper(object):
 
 
 class SetupUserHelper(object):
+
     def setup_user(self,
                    email=None,
                    first_name='firsty',
@@ -98,7 +99,7 @@ class SetupUserHelper(object):
             app = Application.objects.create(
                 client_id='test', client_secret='testsecret', authorization_grant_type='client-credentials',  # 'authorization-code'
                 user=user)
-            token = AccessToken.objects.create(
+            token = AccessTokenProxy.objects.create(
                 user=user, scope=token_scope, expires=timezone.now() + timedelta(hours=1),
                 token='prettyplease', application=app
             )

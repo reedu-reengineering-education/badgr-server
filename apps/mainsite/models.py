@@ -17,11 +17,8 @@ from oauthlib.common import generate_token
 import cachemodel
 from django.db.models import Manager
 from django.utils.deconstruct import deconstructible
-from oauth2_provider.models import AccessToken, Application
+from oauth2_provider.models import AccessToken, Application, AbstractAccessToken
 from rest_framework.authtoken.models import Token
-
-from mainsite.utils import OriginSetting
-
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 DEFAULT_BADGRAPP_PK = getattr(settings, 'BADGR_APP_ID', None)
@@ -173,7 +170,8 @@ class AccessTokenProxyManager(models.Manager):
                     ApplicationInfo.objects.create(application=application)
 
             if expires is None:
-                access_token_expires_seconds = getattr(settings, 'OAUTH2_PROVIDER', {}).get('ACCESS_TOKEN_EXPIRE_SECONDS', 86400)
+                access_token_expires_seconds = getattr(settings, 'OAUTH2_PROVIDER', {}).get(
+                    'ACCESS_TOKEN_EXPIRE_SECONDS', 86400)
                 expires = timezone.now() + timezone.timedelta(seconds=access_token_expires_seconds)
 
             accesstoken = self.create(
@@ -190,7 +188,7 @@ class AccessTokenProxyManager(models.Manager):
         # lookup by a faked
         padding = len(entity_id) % 4
         if padding > 0:
-            entity_id = '{}{}'.format(entity_id, (4-padding)*'=')
+            entity_id = '{}{}'.format(entity_id, (4 - padding) * '=')
         decoded = base64.urlsafe_b64decode(entity_id.encode('utf-8'))
         id = re.sub(r'^{}'.format(self.model.fake_entity_id_prefix), '', decoded)
         try:
@@ -253,6 +251,17 @@ class AccessTokenProxy(AccessToken):
     def obscured_token(self):
         if self.token:
             return "{}***".format(self.token[:4])
+
+
+class AccessTokenScope(models.Model):
+    token = models.ForeignKey(AccessToken)
+    scope = models.CharField(max_length=256)
+
+    class Meta:
+        unique_together = ['token', 'scope']
+
+    def __str__(self):
+        return self.scope
 
 
 class LegacyTokenProxy(Token):

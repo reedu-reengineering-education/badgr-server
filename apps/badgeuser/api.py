@@ -32,7 +32,7 @@ from badgeuser.models import BadgeUser, CachedEmailAddress, TermsVersion
 from badgeuser.permissions import BadgeUserIsAuthenticatedUser
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserTokenSerializerV1
 from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerializerV2, AccessTokenSerializerV2
-from badgeuser.tasks import process_email_verification
+from badgeuser.tasks import process_email_verification, process_post_recipient_id_verification_change
 from badgrsocialauth.utils import redirect_to_frontend_error_toast
 import badgrlog
 from entity.api import BaseEntityDetailView, BaseEntityListView
@@ -447,6 +447,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         email_address.save()
 
         process_email_verification.delay(email_address.pk)
+        process_post_recipient_id_verification_change.delay(email_address, 'email', True)
 
         # Create an OAuth AccessTokenProxy instance for this user
         accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(

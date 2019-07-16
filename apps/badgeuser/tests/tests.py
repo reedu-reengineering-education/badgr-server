@@ -10,10 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.test import override_settings
 from django.utils import timezone
-from oauth2_provider.models import AccessToken, Application
-from oauthlib.common import generate_token
 
-from badgeuser.authcode import encrypt_authcode, decrypt_authcode, authcode_for_accesstoken
 from mainsite import TOP_DIR
 from rest_framework.authtoken.models import Token
 

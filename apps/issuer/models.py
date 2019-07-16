@@ -399,6 +399,20 @@ class IssuerStaff(cachemodel.CacheModel):
     def cached_issuer(self):
         return Issuer.cached.get(pk=self.issuer_id)
 
+def get_user_or_none(recipient_id, recipient_type):
+    from badgeuser.models import UserRecipientIdentifier, CachedEmailAddress
+    user = None
+    if recipient_type=='email':
+        verified_email = CachedEmailAddress.objects.filter(verified=True, email=recipient_id).first()
+        if verified_email:
+            user = verified_email.user
+    else:
+        verified_recipient_id = UserRecipientIdentifier.objects.filter(verified=True,
+                                                                       identifier=recipient_id).first()
+        if verified_recipient_id:
+            user = verified_recipient_id.user
+
+    return user
 
 class BadgeClass(ResizeUploadedImage,
                  ScrubUploadedSvgImage,
@@ -597,8 +611,10 @@ class BadgeClass(ResizeUploadedImage,
             narrative=narrative, evidence=evidence,
             notify=notify, created_by=created_by, allow_uppercase=allow_uppercase,
             badgr_app=badgr_app,
+            user=get_user_or_none(recipient_id, recipient_type),
             **kwargs
         )
+
 
     def get_json(self, obi_version=CURRENT_OBI_VERSION, include_extra=True, use_canonical_id=False):
         obi_version, context_iri = get_obi_context(obi_version)
@@ -696,6 +712,7 @@ class BadgeInstance(BaseAuditedModel,
 
     badgeclass = models.ForeignKey(BadgeClass, blank=False, null=False, on_delete=models.CASCADE, related_name='badgeinstances')
     issuer = models.ForeignKey(Issuer, blank=False, null=False)
+    user = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, on_delete=models.SET_NULL)
 
     RECIPIENT_TYPE_CHOICES = (
         (RECIPIENT_TYPE_EMAIL, 'email'),

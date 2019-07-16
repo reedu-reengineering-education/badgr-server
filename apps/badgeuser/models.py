@@ -16,11 +16,11 @@ from django.core.mail import send_mail
 from django.core.validators import URLValidator, RegexValidator
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
-from oauth2_provider.models import AccessToken, Application
-from oauthlib.oauth2 import BearerToken
+from oauth2_provider.models import Application
 from rest_framework.authtoken.models import Token
 
 from backpack.models import BackpackCollection
+from badgeuser.tasks import process_post_recipient_id_deletion, process_post_recipient_id_verification_change
 from entity.models import BaseVersionedEntity
 from issuer.models import Issuer, BadgeInstance, BaseAuditedModel
 from badgeuser.managers import CachedEmailAddressManager, BadgeUserManager
@@ -68,6 +68,7 @@ class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
         user = self.user
         self.publish_delete('email')
         self.publish_delete('pk')
+        process_post_recipient_id_deletion.delay(self.email)
         super(CachedEmailAddress, self).delete(*args, **kwargs)
         user.publish()
 
@@ -83,7 +84,7 @@ class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
 
     def save(self, *args, **kwargs):
         super(CachedEmailAddress, self).save(*args, **kwargs)
-
+        process_post_recipient_id_verification_change.delay(self.email, 'email', self.verified)
         if not self.emailaddressvariant_set.exists() and self.email != self.email.lower():
             self.add_variant(self.email.lower())
 
@@ -193,12 +194,17 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
 
     def save(self, *args, **kwargs):
         self.validate_identifier()
-        return super(UserRecipientIdentifier, self).save(*args, **kwargs)
+        super(UserRecipientIdentifier, self).save(*args, **kwargs)
+        process_post_recipient_id_verification_change.delay(self.identifier, self.type, self.verified)
+
 
     def publish(self):
         super(UserRecipientIdentifier, self).publish()
         self.user.publish()
 
+    def delete(self):
+        super(UserRecipientIdentifier, self).delete()
+        process_post_recipient_id_deletion.delay(self.identifier)
 
 class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     """
