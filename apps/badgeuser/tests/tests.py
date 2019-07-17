@@ -524,6 +524,7 @@ class UserEmailTests(BadgrTestCase):
         response = self.client.get(verify_url)
         self.assertEqual(response.status_code, 302)
         self.assertIn('authToken', response['location'])
+        self.assertNotIn('authError', response['location'])
 
         # second verification attempt fails
         response = self.client.get(verify_url)
