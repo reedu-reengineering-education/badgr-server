@@ -140,9 +140,7 @@ def saml2_client_for(idp_name=None):
             'sp': {
                 'endpoints': {
                     'assertion_consumer_service': [
-                        (acs_url, BINDING_HTTP_REDIRECT),
                         (acs_url, BINDING_HTTP_POST),
-                        (https_acs_url, BINDING_HTTP_REDIRECT),
                         (https_acs_url, BINDING_HTTP_POST)
                     ],
                 },
@@ -174,15 +172,9 @@ def assertion_consumer_service(request, idp_name):
     authn_response.get_identity()
     user_info = authn_response.get_subject()
     email = user_info.text
-    try:
-        first_name = authn_response.ava['FirstName'][0]
-        last_name = authn_response.ava['LastName'][0]
-    except:
-        raise Exception("Could not get first and/or last name from SAML2 ava")
-    try:
-        badgr_app = BadgrApp.objects.get(pk=request.session.get('badgr_app_pk'))
-    except:
-        raise Exception("Could not find badgr_app_pk in session")
+    first_name = authn_response.ava['FirstName'][0]
+    last_name = authn_response.ava['LastName'][0]
+    badgr_app = BadgrApp.objects.get(pk=request.session.get('badgr_app_pk'))
     return auto_provision(request, email, first_name, last_name, badgr_app, config)
 
 
