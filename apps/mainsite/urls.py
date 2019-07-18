@@ -44,10 +44,6 @@ urlpatterns = [
     # Service health endpoint
     url(r'^health', include('health.urls')),
 
-    # SAML2 Identidy Provider
-    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/$', saml2_redirect, name='saml2login'),
-    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/acs/', assertion_consumer_service, name='assertion_consumer_service'),
-
     # Swagger Docs
     #
     # api docs
@@ -70,7 +66,9 @@ urlpatterns = [
 
     # REST Framework
     url(r'^api-auth/token$', LoginAndObtainAuthToken.as_view()),
-    url(r'^account/', include('badgrsocialauth.redirect_urls')),
+
+    # Social Auth (oAuth2 and SAML)
+    url(r'^account/', include('badgrsocialauth.urls')),
 
     # v1 API endpoints
     url(r'^v1/user/', include('badgeuser.v1_api_urls'), kwargs={'version': 'v1'}),
