@@ -1,5 +1,4 @@
 from badgeuser.models import CachedEmailAddress, BadgeUser
-from badgrsocialauth.views import auto_provision
 from mainsite.models import BadgrApp
 from mainsite.tests import BadgrTestCase
 
