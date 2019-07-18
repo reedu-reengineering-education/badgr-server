@@ -14,5 +14,5 @@ class Saml2Account(models.Model):
     config = models.ForeignKey(Saml2Configuration)
     uuid = models.CharField(max_length=255, unique=True)
 
-    def __str__(self):
-        return self.user.primary_email
+    def __unicode__(self):
+        return "{} on {}".format(self.uuid, self.config)
