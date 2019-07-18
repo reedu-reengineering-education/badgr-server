@@ -114,3 +114,17 @@ class OtherUsersEmailConfirmationToken(BaseBadgrEvent):
             'other_user_email': self.other_user.email,
             'token': self.token,
         }
+
+
+class EmailConfirmationAlreadyVerified(BaseBadgrEvent):
+
+    def __init__(self, request, email_address, token, **kwargs):
+        self.request = request
+        self.email_address = email_address
+        self.token = token
+
+    def to_representation(self):
+        return {
+            'email': self.email_address.email,
+            'token': self.token,
+        }
