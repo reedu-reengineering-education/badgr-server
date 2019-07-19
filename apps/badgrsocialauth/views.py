@@ -22,7 +22,6 @@ from mainsite.utils import set_url_query_params
 
 from saml2 import (
     BINDING_HTTP_POST,
-    BINDING_HTTP_REDIRECT,
     entity,
 )
 from saml2.client import Saml2Client
@@ -114,22 +113,15 @@ def saml2_client_for(idp_name=None):
     Given the name of an Identity Provider look up the Saml2Configuration and build a SAML Client. Return these.
     '''
 
-    origin = getattr(settings, 'HTTP_ORIGIN').split('://')[1]
-    acs_url = 'http://' + origin + reverse('assertion_consumer_service', args=[idp_name])
-    https_acs_url = 'https://' + origin + reverse('assertion_consumer_service', args=[idp_name])
-
-    # SAML metadata changes very rarely.
+    # SAML metadata changes very rarely, check for cached version first
     try:
         config = Saml2Configuration.objects.get(slug=idp_name)
+        rv = config.cached_metadata
     except Saml2Configuration.DoesNotExist:
-        raise Exception("Saml2Configuration for IDP '{}' not found".format(idp_name))
-    try:
-        if not config.cached_metadata:
-            rv = requests.get(config.metadata_conf_url)
-        else:
-            rv = config.cached_metadata
-    except:
-        raise Exception("Could not fetch Saml2Configuration.metadata_conf_url: {}".format(config.metadata_conf_url))
+        rv = requests.get(config.metadata_conf_url)
+
+    origin = getattr(settings, 'HTTP_ORIGIN').split('://')[1]
+    https_acs_url = 'https://' + origin + reverse('assertion_consumer_service', args=[idp_name])
 
     setting = {
         'metadata': {
@@ -140,7 +132,6 @@ def saml2_client_for(idp_name=None):
             'sp': {
                 'endpoints': {
                     'assertion_consumer_service': [
-                        (acs_url, BINDING_HTTP_POST),
                         (https_acs_url, BINDING_HTTP_POST)
                     ],
                 },
