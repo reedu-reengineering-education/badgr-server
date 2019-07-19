@@ -25,6 +25,12 @@ from rest_framework import serializers
 
 
 class AssertionTests(SetupIssuerHelper, BadgrTestCase):
+    def test_local_pending(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        award = test_badgeclass.issue(recipient_id="nobody@example.com")
+        self.assertEqual(award.pending, False)
 
     def test_assertion_pagination(self):
         test_user = self.setup_user(authenticate=True)

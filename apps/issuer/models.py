@@ -826,6 +826,10 @@ class BadgeInstance(BaseAuditedModel,
                 existing_identifier = UserRecipientIdentifier.cached.get(identifier=self.recipient_identifier)
         except (UserRecipientIdentifier.DoesNotExist, CachedEmailAddress.DoesNotExist,):
             return False
+
+        if not self.source_url:
+            return False
+
         return not existing_identifier.verified
 
     def save(self, *args, **kwargs):
