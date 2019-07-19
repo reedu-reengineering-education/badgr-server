@@ -116,16 +116,17 @@ def saml2_client_for(idp_name=None):
     # SAML metadata changes very rarely, check for cached version first
     try:
         config = Saml2Configuration.objects.get(slug=idp_name)
-        rv = config.cached_metadata
+        metadata = config.cached_metadata
     except Saml2Configuration.DoesNotExist:
-        rv = requests.get(config.metadata_conf_url)
+        r = requests.get(config.metadata_conf_url)
+        metadata = r.text
 
     origin = getattr(settings, 'HTTP_ORIGIN').split('://')[1]
     https_acs_url = 'https://' + origin + reverse('assertion_consumer_service', args=[idp_name])
 
     setting = {
         'metadata': {
-            'inline': [rv.text],
+            'inline': [metadata],
         },
         'entityid': "badgrserver",
         'service': {
