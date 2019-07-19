@@ -15,7 +15,7 @@ class SAML2Tests(BadgrTestCase):
     def test_oauth_to_saml2_redirection_flow(self):
         resp = self.client.get('/account/sociallogin?provider=' + self.config.slug)
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp.url, '/saml2/{}/'.format(self.config.slug))
+        self.assertEqual(resp.url, '/account/saml2/{}/'.format(self.config.slug))
 
     def test_login_with_registered_saml2_account(self):
         email = "test123@example.com"
