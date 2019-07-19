@@ -9,7 +9,7 @@ from django.db import IntegrityError
 from django.http import (HttpResponse, HttpResponseServerError,
                          HttpResponseNotFound, HttpResponseRedirect)
 from django.shortcuts import redirect
-from django.template import loader, TemplateDoesNotExist, Context
+from django.template import loader, TemplateDoesNotExist
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import FormView, RedirectView
@@ -24,8 +24,6 @@ from mainsite.admin_actions import clear_cache
 from mainsite.models import EmailBlacklist, BadgrApp
 from mainsite.serializers import VerifiedAuthTokenSerializer
 from pathway.tasks import resave_all_elements
-from badgrsocialauth.utils import get_session_badgr_app
-
 
 ##
 #
