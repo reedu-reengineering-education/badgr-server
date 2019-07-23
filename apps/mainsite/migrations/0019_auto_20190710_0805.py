@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL),
-        ('mainsite', '0017_accesstokenscope'),
+        ('mainsite', '0018_auto_20190723_1532'),
     ]
 
     operations = [
