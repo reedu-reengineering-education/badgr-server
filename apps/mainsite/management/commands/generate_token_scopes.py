@@ -6,12 +6,23 @@ from mainsite.models import AccessTokenProxy, AccessTokenScope
 class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write('Splitting all scopes on tokens')
-        scopes = []
-        for a in AccessTokenProxy.objects.all():
-            for s in a.scope.split():
-                scopes.append(AccessTokenScope(scope=s, token=a))
 
+        chunk_size = 1000
+        page = 0
+
+        self.stdout.write('Deleting AccessTokenScopes')
+        AccessTokenScope.objects.all().delete()
+        
         self.stdout.write('Bulk creating AccessTokenScope')
-        AccessTokenScope.objects.bulk_create(scopes)
+        while True:
+            tokens = AccessTokenProxy.objects.all()[page:page+chunk_size]
+            for t in tokens:
+                scopes = []
+                for s in t.scope.split():
+                    scopes.append(AccessTokenScope(scope=s, token=t))
+
+                AccessTokenScope.objects.bulk_create(scopes)
+            if len(tokens) < chunk_size: break
+            page += chunk_size
 
         self.stdout.write('All done.')
