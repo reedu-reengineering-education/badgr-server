@@ -6,7 +6,10 @@ python:
 services:
   - mysql
 
+before_install:
+  - 'travis_retry sudo apt-get update'
+  - 'travis_retry sudo apt-get install libxmlsec1 libxmlsec1-openssl'
+
 install: pip install tox-travis
 
 script: tox
-
