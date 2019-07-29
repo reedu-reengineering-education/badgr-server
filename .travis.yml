@@ -8,7 +8,7 @@ services:
 
 before_install:
   - 'travis_retry sudo apt-get update'
-  - 'travis_retry sudo apt-get install libxmlsec1 libxmlsec1-openssl'
+  - 'travis_retry sudo apt-get install xmlsec1'
 
 install: pip install tox-travis
 
