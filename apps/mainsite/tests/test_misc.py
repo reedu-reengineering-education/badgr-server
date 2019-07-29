@@ -46,8 +46,9 @@ class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
         # Creating an AccessTokenProxy (our model) results in correct scopes
         scope_string = 'badgr is great'
         scopes = sorted(scope_string.split(' '))
-
+        app = Application.objects.create(client_id="app", client_type="public", authorization_grant_type="implicit", )
         proxy_token = AccessTokenProxy.objects.create(
+            application=app,
             scope=scope_string,
             expires=timezone.now() + timedelta(hours=1))
         qs = AccessTokenScope.objects.filter(token=proxy_token).order_by('scope')
