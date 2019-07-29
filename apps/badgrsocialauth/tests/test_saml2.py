@@ -3,14 +3,18 @@ from mainsite.models import BadgrApp
 from mainsite.tests import BadgrTestCase
 
 from badgrsocialauth.models import Saml2Configuration, Saml2Account
-from badgrsocialauth.views import auto_provision
-
+from badgrsocialauth.views import auto_provision, saml2_client_for
 
 
 class SAML2Tests(BadgrTestCase):
     def setUp(self):
         super(SAML2Tests, self).setUp()
-        self.config = Saml2Configuration.objects.create(metadata_conf_url="example.com", slug="saml2.test")
+        self.config = Saml2Configuration.objects.create(metadata_conf_url="http://example.com", slug="saml2.test")
+
+    def test_create_saml2_client(self):
+        Saml2Configuration.objects.create(metadata_conf_url="http://example.com", cached_metadata="<xml></xml>",  slug="saml2.test2")
+        client = saml2_client_for("saml2.test2")
+        self.assertNotEqual(client, None)
 
     def test_oauth_to_saml2_redirection_flow(self):
         resp = self.client.get('/account/sociallogin?provider=' + self.config.slug)

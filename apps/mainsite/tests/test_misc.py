@@ -36,6 +36,7 @@ class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
         scopes = sorted(scope_string.split(' '))
 
         token = AccessToken.objects.create(
+            application=None,
             scope=scope_string,
             expires=timezone.now() + timedelta(hours=1))
         qs = AccessTokenScope.objects.filter(token=token).order_by('scope')
