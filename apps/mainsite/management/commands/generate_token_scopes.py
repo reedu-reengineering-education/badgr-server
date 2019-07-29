@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from mainsite.models import AccessTokenProxy, AccessTokenScope
 
@@ -15,7 +16,7 @@ class Command(BaseCommand):
         
         self.stdout.write('Bulk creating AccessTokenScope')
         while True:
-            tokens = AccessTokenProxy.objects.all()[page:page+chunk_size]
+            tokens = AccessTokenProxy.objects.filter(expires__gt=timezone.now())[page:page+chunk_size]
             for t in tokens:
                 scopes = []
                 for s in t.scope.split():
