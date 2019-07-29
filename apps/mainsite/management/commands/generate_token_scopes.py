@@ -7,7 +7,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write('Splitting all scopes on tokens')
 
-        chunk_size = 1000
+        chunk_size = 5000
         page = 0
 
         self.stdout.write('Deleting AccessTokenScopes')
