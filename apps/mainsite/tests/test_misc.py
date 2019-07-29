@@ -12,7 +12,7 @@ from django.core.cache import cache, CacheKeyWarning
 from django.core.management import call_command
 from django.test import override_settings, TransactionTestCase
 from django.utils import timezone
-from oauth2_provider.models import AccessToken
+from oauth2_provider.models import AccessToken, Application
 
 from badgeuser.models import BadgeUser, CachedEmailAddress
 from mainsite.models import BadgrApp, AccessTokenProxy, AccessTokenScope
@@ -34,9 +34,9 @@ class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
         # Creating an AccessToken (library model) results in correct scopes
         scope_string = 'foo bar'
         scopes = sorted(scope_string.split(' '))
-
+        app = Application.objects.create(client_id = "app",client_type = "public",authorization_grant_type = "implicit",)
         token = AccessToken.objects.create(
-            application=None,
+            application=app,
             scope=scope_string,
             expires=timezone.now() + timedelta(hours=1))
         qs = AccessTokenScope.objects.filter(token=token).order_by('scope')
