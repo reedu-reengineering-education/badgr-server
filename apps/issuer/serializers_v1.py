@@ -1,4 +1,5 @@
 import os
+import pytz
 import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -278,7 +279,7 @@ class EvidenceItemSerializer(serializers.Serializer):
 
 
 class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
-    created_at = serializers.DateTimeField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True, default_timezone=pytz.utc)
     created_by = BadgeUserIdentifierFieldV1(read_only=True)
     slug = serializers.CharField(max_length=255, read_only=True, source='entity_id')
     image = serializers.FileField(read_only=True)  # use_url=True, might be necessary
@@ -293,7 +294,7 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
     revoked = HumanReadableBooleanField(read_only=True)
     revocation_reason = serializers.CharField(read_only=True)
 
-    expires = serializers.DateTimeField(source='expires_at', required=False, allow_null=True)
+    expires = serializers.DateTimeField(source='expires_at', required=False, allow_null=True, default_timezone=pytz.utc)
 
     create_notification = HumanReadableBooleanField(write_only=True, required=False, default=False)
     allow_duplicate_awards = serializers.BooleanField(write_only=True, required=False, default=True)

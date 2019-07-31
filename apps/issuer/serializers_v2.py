@@ -1,6 +1,6 @@
 from collections import OrderedDict
 import os
-import re
+import pytz
 import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -386,7 +386,7 @@ class EvidenceItemSerializerV2(BaseSerializerV2, OriginalJsonSerializerMixin):
 
 class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     openBadgeId = serializers.URLField(source='jsonld_id', read_only=True)
-    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True, default_timezone=pytz.utc)
     createdBy = EntityRelatedFieldV2(source='cached_creator', read_only=True)
     badgeclass = EntityRelatedFieldV2(source='cached_badgeclass', required=False, queryset=BadgeClass.cached)
     badgeclassOpenBadgeId = CachedUrlHyperlinkedRelatedField(
@@ -400,14 +400,14 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
     image = serializers.FileField(read_only=True)
     recipient = BadgeRecipientSerializerV2(source='*', required=False)
 
-    issuedOn = serializers.DateTimeField(source='issued_on', required=False)
+    issuedOn = serializers.DateTimeField(source='issued_on', required=False, default_timezone=pytz.utc)
     narrative = MarkdownCharField(required=False, allow_null=True)
     evidence = EvidenceItemSerializerV2(source='evidence_items', many=True, required=False)
 
     revoked = HumanReadableBooleanField(read_only=True)
     revocationReason = serializers.CharField(source='revocation_reason', read_only=True)
 
-    expires = serializers.DateTimeField(source='expires_at', required=False, allow_null=True)
+    expires = serializers.DateTimeField(source='expires_at', required=False, allow_null=True, default_timezone=pytz.utc)
 
     notify = HumanReadableBooleanField(write_only=True, required=False, default=False)
     allowDuplicateAwards = serializers.BooleanField(write_only=True, required=False, default=True)

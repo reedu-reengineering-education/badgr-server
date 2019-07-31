@@ -117,7 +117,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         test_assertion = test_badgeclass.issue(recipient_id='test1@email.test')
 
         # v1 api
-        v1_backdate = datetime.datetime(year=2021, month=3, day=3, tzinfo=pytz.UTC)
+        v1_backdate = datetime.datetime(year=2021, month=3, day=3, tzinfo=pytz.utc)
         updated_data = dict(
             expires=v1_backdate.isoformat()
         )
