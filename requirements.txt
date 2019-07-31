@@ -83,7 +83,7 @@ backports.csv==1.0.4
 
 apispec==0.22.0
 
-apispec-djangorestframework==1.0.5
+apispec-djangorestframework==1.0.6
 responses==0.8.1
 django_mock_queries==2.0.0
 
