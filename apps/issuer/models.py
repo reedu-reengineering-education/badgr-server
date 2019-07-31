@@ -459,6 +459,8 @@ class BadgeClass(ResizeUploadedImage,
         verbose_name_plural = "Badge classes"
 
     def publish(self):
+        if hasattr(self, '_issuer_cache'):
+            del self._issuer_cache
         super(BadgeClass, self).publish()
         self.issuer.publish(publish_staff=False)
         if self.created_by:

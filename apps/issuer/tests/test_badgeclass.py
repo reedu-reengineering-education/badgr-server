@@ -927,3 +927,46 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             badgeclass=test_badgeclass.entity_id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.get('description', None), "")
+
+    def test_updating_issuer_cache(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user, name='Issuer 1')
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name='Badge 1', description='test')
+
+        assertion_data = {
+            "email": "test@example.com",
+            "create_notification": False,
+        }
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ), assertion_data)
+        self.assertEqual(response.status_code, 201)
+        assertion_slug = response.data.get('slug')
+
+        updated_issuer_props = {
+            'name': 'Issuer 1 updated',
+            'description': 'test',
+            'url': 'http://example.com/',
+            'email': 'example@example.org'
+        }
+        response = self.client.put('/v1/issuer/issuers/{}'.format(test_issuer.entity_id), updated_issuer_props)
+        self.assertEqual(response.status_code, 200)
+
+        badgeclass_props = {
+            'name': 'Badge 1 updated',
+            'description': 'test',
+            'criteria': 'http://example.com',
+        }
+
+        response = self.client.put(
+            '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_issuer.entity_id,
+                badge=test_badgeclass.entity_id
+            ),
+            dict(badgeclass_props, image='http://example.com/example.png')
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get('/public/assertions/{}.json?expand=badge&expand=badge.issuer'.format(assertion_slug))
+        self.assertEqual(response.data['badge']['issuer']['name'], 'Issuer 1 updated')
