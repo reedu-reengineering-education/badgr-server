@@ -37,6 +37,16 @@ class StaffUserProfileSerializerV2(DetailSerializerV2):
     firstName = StripTagsCharField(source='first_name', read_only=True)
     lastName = StripTagsCharField(source='last_name', read_only=True)
     emails = BadgeUserEmailSerializerV2(many=True, source='email_items', required=False, read_only=True)
+    url = serializers.ListField(child=serializers.URLField(),
+                                read_only=True,
+                                source='cached_verified_urls',
+                                required=False,
+                                max_length=100)
+    telephone = serializers.ListField(child=serializers.CharField(),
+                                      read_only=True,
+                                      source='cached_verified_phone_numbers',
+                                      required=False,
+                                      max_length=100)
     badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
 
 

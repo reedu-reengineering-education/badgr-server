@@ -8,8 +8,8 @@ from django.contrib.auth import get_user_model
 from django.core.files.images import get_image_dimensions
 from oauth2_provider.models import Application
 
-from badgeuser.models import CachedEmailAddress
-from issuer.models import Issuer, BadgeClass
+from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
+from issuer.models import Issuer, BadgeClass, IssuerStaff
 from mainsite.models import ApplicationInfo
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 
@@ -369,3 +369,63 @@ class IssuerTests(SetupIssuerHelper, BadgrTestCase):
 
         response = self.client.post('/v1/issuer/issuers', new_issuer_props)
         self.assertEqual(response.status_code, 201)
+
+    def test_issuer_staff_serialization(self):
+        test_user = self.setup_user(authenticate=True)
+
+        # issuer_email = CachedEmailAddress.objects.create(
+        #     user=test_user, email=self.example_issuer_props['email'], verified=True)
+
+        email_staff= self.setup_user()
+
+        url_staff = self.setup_user(email="", create_email_address=False)
+        url_for_staff = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+                                                               identifier='http://example.com',
+                                                               user=url_staff, verified=True)
+
+        phone_staff = self.setup_user(email="", create_email_address=False)
+        phone_for_staff = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
+                                                                 identifier='5555555555',
+                                                                 user=phone_staff, verified=True)
+
+        issuer = self.setup_issuer(owner=test_user)
+
+        #add url user as staff
+        response1 = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=issuer.entity_id), {
+            'action': 'add',
+            'username': url_staff.username,
+            'role': 'staff'
+        })
+        self.assertEqual(response1.status_code, 200)
+
+        #add phone user as editor
+        response2 = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=issuer.entity_id), {
+            'action': 'add',
+            'username': phone_staff.username,
+            'role': 'editor'
+        })
+        self.assertEqual(response2.status_code, 200)
+
+        #get issuer object and check staff serialization
+        response = self.client.get('/v2/issuers')
+        response_issuers = response.data['result']
+        self.assertEqual(len(response_issuers), 1)
+        our_issuer = response_issuers[0]
+        self.assertEqual(len(our_issuer['staff']), 3)
+        for staff_user in our_issuer['staff']:
+            if (staff_user['role'] == IssuerStaff.ROLE_OWNER):
+                #check emails
+                self.assertEqual(len(staff_user['userProfile']['url']), 0)
+                self.assertEqual(len(staff_user['userProfile']['telephone']), 0)
+                self.assertEqual(len(staff_user['userProfile']['emails']), 1)
+            elif (staff_user['role'] == IssuerStaff.ROLE_EDITOR):
+                #check phone
+                self.assertEqual(len(staff_user['userProfile']['url']), 0)
+                self.assertEqual(len(staff_user['userProfile']['telephone']), 1)
+                self.assertEqual(staff_user['userProfile']['telephone'][0], phone_for_staff.identifier)
+                self.assertEqual(len(staff_user['userProfile']['emails']), 0)
+            else:
+                self.assertEqual(len(staff_user['userProfile']['url']), 1)
+                self.assertEqual(staff_user['userProfile']['url'][0], url_for_staff.identifier)
+                self.assertEqual(len(staff_user['userProfile']['telephone']), 0)
+                self.assertEqual(len(staff_user['userProfile']['emails']), 0)
