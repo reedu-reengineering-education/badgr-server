@@ -382,11 +382,17 @@ class IssuerTests(SetupIssuerHelper, BadgrTestCase):
         url_for_staff = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
                                                                identifier='http://example.com',
                                                                user=url_staff, verified=True)
+        url_for_staff2 = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+                                                               identifier='http://example2.com',
+                                                               user=url_staff, verified=False)
 
         phone_staff = self.setup_user(email="", create_email_address=False)
         phone_for_staff = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
                                                                  identifier='5555555555',
                                                                  user=phone_staff, verified=True)
+        phone_for_staff2 = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
+                                                                 identifier='5555555556',
+                                                                 user=phone_staff, verified=False)
 
         issuer = self.setup_issuer(owner=test_user)
 
@@ -423,9 +429,11 @@ class IssuerTests(SetupIssuerHelper, BadgrTestCase):
                 self.assertEqual(len(staff_user['userProfile']['url']), 0)
                 self.assertEqual(len(staff_user['userProfile']['telephone']), 1)
                 self.assertEqual(staff_user['userProfile']['telephone'][0], phone_for_staff.identifier)
+                self.assertFalse(phone_for_staff2.identifier in staff_user['userProfile']['telephone'])
                 self.assertEqual(len(staff_user['userProfile']['emails']), 0)
             else:
                 self.assertEqual(len(staff_user['userProfile']['url']), 1)
                 self.assertEqual(staff_user['userProfile']['url'][0], url_for_staff.identifier)
+                self.assertFalse(url_for_staff2.identifier in staff_user['userProfile']['url'])
                 self.assertEqual(len(staff_user['userProfile']['telephone']), 0)
                 self.assertEqual(len(staff_user['userProfile']['emails']), 0)
