@@ -1,10 +1,11 @@
+import pytz
 import re
 import urllib
 import urlparse
 import warnings
 
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from operator import attrgetter
 
 from django.core import mail
@@ -17,13 +18,38 @@ from oauth2_provider.models import AccessToken, Application
 from badgeuser.models import BadgeUser, CachedEmailAddress
 from mainsite.models import BadgrApp, AccessTokenProxy, AccessTokenScope
 from mainsite import TOP_DIR, blacklist
+from mainsite.serializers import DateTimeWithUtcZAtEndField
 from mainsite.tests import SetupIssuerHelper
 from mainsite.tests.base import BadgrTestCase
 from hashlib import sha256
-import responses
 from issuer.models import BadgeClass, Issuer, BadgeInstance
 import mock
+import responses
+from rest_framework import serializers
 
+
+class TestDateSerialization(BadgrTestCase):
+    class TestSerializer(serializers.Serializer):
+        the_date = DateTimeWithUtcZAtEndField(source="date_field")
+
+    class TestHolder(object):
+        date_field = None
+
+        def __init__(self, date_field):
+            self.date_field = date_field
+
+    def test_date_serialization(self):
+        utc_date = self.TestHolder(datetime(2019, 12, 6, 12, 0, tzinfo=pytz.utc))
+        la_date = self.TestHolder(pytz.timezone('America/Los_Angeles').localize(datetime(2019, 12, 6, 12, 0))) # -8 hours
+        ny_date = self.TestHolder(pytz.timezone('America/New_York').localize(datetime(2019, 12, 6, 12, 0))) # -5 hours
+
+        utc_serializer = self.TestSerializer(utc_date)
+        la_serializer = self.TestSerializer(la_date)
+        ny_serializer = self.TestSerializer(ny_date)
+
+        self.assertEqual(utc_serializer.data['the_date'], '2019-12-06T12:00:00Z')
+        self.assertEqual(la_serializer.data['the_date'], '2019-12-06T20:00:00Z')
+        self.assertEqual(ny_serializer.data['the_date'], '2019-12-06T17:00:00Z')
 
 class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
     def test_scopes_created(self):

@@ -1,6 +1,7 @@
 import json
 from collections import OrderedDict
 import collections
+import pytz
 
 import rest_framework
 from django.conf import settings
@@ -200,3 +201,10 @@ class CursorPaginatedListSerializer(serializers.ListSerializer):
     @property
     def data(self):
         return super(serializers.ListSerializer, self).data
+
+
+class DateTimeWithUtcZAtEndField(serializers.DateTimeField):
+    def to_representation(self, value):
+        if value:
+            value = value.astimezone(pytz.utc)
+        return super(DateTimeWithUtcZAtEndField, self).to_representation(value)
