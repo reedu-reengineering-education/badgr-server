@@ -204,7 +204,4 @@ class CursorPaginatedListSerializer(serializers.ListSerializer):
 
 
 class DateTimeWithUtcZAtEndField(serializers.DateTimeField):
-    def to_representation(self, value):
-        if value:
-            value = value.astimezone(pytz.utc)
-        return super(DateTimeWithUtcZAtEndField, self).to_representation(value)
+    timezone = pytz.utc

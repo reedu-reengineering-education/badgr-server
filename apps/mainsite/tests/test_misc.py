@@ -51,6 +51,7 @@ class TestDateSerialization(BadgrTestCase):
         self.assertEqual(la_serializer.data['the_date'], '2019-12-06T20:00:00Z')
         self.assertEqual(ny_serializer.data['the_date'], '2019-12-06T17:00:00Z')
 
+
 class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
     def test_scopes_created(self):
         self.setup_user(email="foo@bar.com", authenticate=True, token_scope="rw:backpack r:profile")
