@@ -16,6 +16,7 @@ Prerequisites:
 * virtualenv
 * mysql
 * [cairo](https://www.cairographics.org/download/) (SVG utility)
+* xmlsec1
 
 #### Optional extras:
 
