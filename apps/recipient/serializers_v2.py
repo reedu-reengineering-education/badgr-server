@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from entity.serializers import DetailSerializerV2, EntityRelatedFieldV2
 from issuer.serializers_v2 import BadgeRecipientSerializerV2
-from mainsite.serializers import StripTagsCharField
+from mainsite.serializers import DateTimeWithUtcZAtEndField, StripTagsCharField
 from pathway.models import Pathway
 from recipient.models import RecipientGroup, RecipientProfile
 
@@ -16,7 +16,7 @@ class RecipientGroupMembershipSerializerV2(DetailSerializerV2):
 
 
 class RecipientGroupSerializerV2(DetailSerializerV2):
-    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    createdAt = DateTimeWithUtcZAtEndField(source='created_at', read_only=True)
     createdBy = EntityRelatedFieldV2(source='cached_creator', read_only=True)
     issuer = EntityRelatedFieldV2(source='cached_issuer', read_only=True)
 

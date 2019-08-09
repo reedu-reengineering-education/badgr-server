@@ -1,10 +1,12 @@
 from rest_framework import serializers
 
+from mainsite.serializers import DateTimeWithUtcZAtEndField
+
 
 class BadgrSocialAccountSerializerV1(serializers.Serializer):
     id = serializers.CharField()
     provider = serializers.CharField()
-    dateAdded = serializers.DateTimeField(source='date_joined')
+    dateAdded = DateTimeWithUtcZAtEndField(source='date_joined')
     uid = serializers.CharField()
 
     def to_representation(self, instance):

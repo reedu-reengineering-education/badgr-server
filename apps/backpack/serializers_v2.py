@@ -13,7 +13,7 @@ from issuer.helpers import BadgeCheckHelper
 from issuer.models import BadgeInstance, BadgeClass, Issuer
 from issuer.serializers_v2 import BadgeRecipientSerializerV2, EvidenceItemSerializerV2
 from mainsite.drf_fields import ValidImageField
-from mainsite.serializers import MarkdownCharField, HumanReadableBooleanField, OriginalJsonSerializerMixin
+from mainsite.serializers import DateTimeWithUtcZAtEndField, MarkdownCharField, HumanReadableBooleanField, OriginalJsonSerializerMixin
 from issuer.utils import generate_sha256_hashstring, CURRENT_OBI_VERSION
 
 
@@ -29,12 +29,12 @@ class BackpackAssertionSerializerV2(DetailSerializerV2, OriginalJsonSerializerMi
 
     image = serializers.FileField(read_only=True)
     recipient = BadgeRecipientSerializerV2(source='*')
-    issuedOn = serializers.DateTimeField(source='issued_on', read_only=True)
+    issuedOn = DateTimeWithUtcZAtEndField(source='issued_on', read_only=True)
     narrative = MarkdownCharField(required=False)
     evidence = EvidenceItemSerializerV2(many=True, required=False)
     revoked = HumanReadableBooleanField(read_only=True)
     revocationReason = serializers.CharField(source='revocation_reason', read_only=True)
-    expires = serializers.DateTimeField(source='expires_at', required=False)
+    expires = DateTimeWithUtcZAtEndField(source='expires_at', required=False)
     pending = serializers.ReadOnlyField()
 
     class Meta(DetailSerializerV2.Meta):

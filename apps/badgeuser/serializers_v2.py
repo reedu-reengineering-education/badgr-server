@@ -8,7 +8,7 @@ from badgeuser.models import BadgeUser, TermsVersion
 from badgeuser.utils import notify_on_password_change
 from entity.serializers import DetailSerializerV2, BaseSerializerV2
 from mainsite.models import BadgrApp
-from mainsite.serializers import StripTagsCharField
+from mainsite.serializers import DateTimeWithUtcZAtEndField, StripTagsCharField
 from mainsite.validators import PasswordValidator
 
 
@@ -142,12 +142,12 @@ class ApplicationInfoSerializer(serializers.Serializer):
     clientId = serializers.CharField(read_only=True, source='application.client_id')
 
 
+
 class AccessTokenSerializerV2(DetailSerializerV2):
     application = ApplicationInfoSerializer(source='applicationinfo')
     scope = serializers.CharField(read_only=True)
-    expires = serializers.DateTimeField(read_only=True)
-    created = serializers.DateTimeField(read_only=True)
+    expires = DateTimeWithUtcZAtEndField(read_only=True)
+    created = DateTimeWithUtcZAtEndField(read_only=True)
 
     class Meta:
         apispec_definition = ('AccessToken', {})
-
