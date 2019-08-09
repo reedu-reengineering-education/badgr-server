@@ -16,7 +16,7 @@ from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance, RECIPI
 from issuer.utils import generate_sha256_hashstring
 from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
-from mainsite.serializers import (CachedUrlHyperlinkedRelatedField, StripTagsCharField, MarkdownCharField,
+from mainsite.serializers import (CachedUrlHyperlinkedRelatedField, DateTimeWithUtcZAtEndField, StripTagsCharField, MarkdownCharField,
                                   HumanReadableBooleanField, OriginalJsonSerializerMixin)
 from mainsite.validators import ChoicesValidator, TelephoneValidator, BadgeExtensionValidator, PositiveIntegerValidator
 
@@ -24,7 +24,7 @@ from mainsite.validators import ChoicesValidator, TelephoneValidator, BadgeExten
 class IssuerAccessTokenSerializerV2(BaseSerializerV2):
     token = serializers.CharField()
     issuer = serializers.CharField()
-    expires = serializers.DateTimeField()
+    expires = DateTimeWithUtcZAtEndField()
 
     class Meta(DetailSerializerV2.Meta):
         apispec_definition = ('AccessToken', {})
@@ -67,7 +67,7 @@ class IssuerStaffSerializerV2(DetailSerializerV2):
 
 class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     openBadgeId = serializers.URLField(source='jsonld_id', read_only=True)
-    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    createdAt = DateTimeWithUtcZAtEndField(source='created_at', read_only=True)
     createdBy = EntityRelatedFieldV2(source='cached_creator', read_only=True)
     name = StripTagsCharField(max_length=1024)
     image = ValidImageField(required=False)
@@ -190,7 +190,7 @@ class BadgeClassExpirationSerializerV2(serializers.Serializer):
 
 class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     openBadgeId = serializers.URLField(source='jsonld_id', read_only=True)
-    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    createdAt = DateTimeWithUtcZAtEndField(source='created_at', read_only=True)
     createdBy = EntityRelatedFieldV2(source='cached_creator', read_only=True)
     issuer = EntityRelatedFieldV2(source='cached_issuer', required=False, queryset=Issuer.cached)
     issuerOpenBadgeId = serializers.URLField(source='issuer_jsonld_id', read_only=True)
@@ -394,7 +394,7 @@ class EvidenceItemSerializerV2(BaseSerializerV2, OriginalJsonSerializerMixin):
 
 class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     openBadgeId = serializers.URLField(source='jsonld_id', read_only=True)
-    createdAt = serializers.DateTimeField(source='created_at', read_only=True, default_timezone=pytz.utc)
+    createdAt = DateTimeWithUtcZAtEndField(source='created_at', read_only=True, default_timezone=pytz.utc)
     createdBy = EntityRelatedFieldV2(source='cached_creator', read_only=True)
     badgeclass = EntityRelatedFieldV2(source='cached_badgeclass', required=False, queryset=BadgeClass.cached)
     badgeclassOpenBadgeId = CachedUrlHyperlinkedRelatedField(
@@ -408,14 +408,14 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
     image = serializers.FileField(read_only=True)
     recipient = BadgeRecipientSerializerV2(source='*', required=False)
 
-    issuedOn = serializers.DateTimeField(source='issued_on', required=False, default_timezone=pytz.utc)
+    issuedOn = DateTimeWithUtcZAtEndField(source='issued_on', required=False, default_timezone=pytz.utc)
     narrative = MarkdownCharField(required=False, allow_null=True)
     evidence = EvidenceItemSerializerV2(source='evidence_items', many=True, required=False)
 
     revoked = HumanReadableBooleanField(read_only=True)
     revocationReason = serializers.CharField(source='revocation_reason', read_only=True)
 
-    expires = serializers.DateTimeField(source='expires_at', required=False, allow_null=True, default_timezone=pytz.utc)
+    expires = DateTimeWithUtcZAtEndField(source='expires_at', required=False, allow_null=True, default_timezone=pytz.utc)
 
     notify = HumanReadableBooleanField(write_only=True, required=False, default=False)
     allowDuplicateAwards = serializers.BooleanField(write_only=True, required=False, default=True)
