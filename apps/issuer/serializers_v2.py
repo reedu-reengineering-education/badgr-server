@@ -293,7 +293,7 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         })
 
     def to_internal_value(self, data):
-        if 'expires' in data:
+        if not isinstance(data, BadgeClass) and 'expires' in data:
             if not data['expires'] or len(data['expires']) == 0:
                 # if expires was included blank, remove it so to_internal_value() doesnt choke
                 del data['expires']

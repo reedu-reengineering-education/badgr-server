@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import os.path
+from urllib import quote_plus
 
 import os
 from django.contrib.auth import get_user_model
@@ -437,3 +438,32 @@ class IssuerTests(SetupIssuerHelper, BadgrTestCase):
                 self.assertFalse(url_for_staff2.identifier in staff_user['userProfile']['url'])
                 self.assertEqual(len(staff_user['userProfile']['telephone']), 0)
                 self.assertEqual(len(staff_user['userProfile']['emails']), 0)
+
+
+class IssuersChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
+    def test_application_can_get_changed_issuers(self):
+        issuer_user = self.setup_user(authenticate=True, verified=True)
+        test_issuer = self.setup_issuer(owner=issuer_user)
+        test_issuer2 = self.setup_issuer(owner=issuer_user)
+        test_issuer3 = self.setup_issuer(owner=issuer_user)
+
+        other_user = self.setup_user(authenticate=False, verified=True)
+        other_issuer = self.setup_issuer(owner=other_user)
+        other_issuer2 = self.setup_issuer(owner=other_user)
+        other_issuer3 = self.setup_issuer(owner=other_user)
+
+        response = self.client.get('/v2/issuers/changed')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 3)
+        timestamp = response.data['timestamp']
+
+        response = self.client.get('/v2/issuers/changed?since={}'.format(quote_plus(timestamp)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 0)
+
+        test_issuer.name = 'Issuer updated'
+        test_issuer.save()
+
+        response = self.client.get('/v2/issuers/changed?since={}'.format(quote_plus(timestamp)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)

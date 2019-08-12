@@ -626,3 +626,107 @@ class AssertionsChangedSince(BaseEntityView):
             context=context)
         serializer.is_valid()
         return Response(serializer.data)
+
+
+class PaginatedBadgeClassesSinceSerializer(CursorPaginatedListSerializer):
+    child = BadgeClassSerializerV2()
+
+    def __init__(self, *args, **kwargs):
+        self.timestamp = timezone.now()  # take timestamp now before SQL query is run in super.__init__
+        super(PaginatedBadgeClassesSinceSerializer, self).__init__(*args, **kwargs)
+
+    def to_representation(self, data):
+        representation = super(PaginatedBadgeClassesSinceSerializer, self).to_representation(data)
+        representation['timestamp'] = self.timestamp.isoformat()
+        return representation
+
+
+class BadgeClassesChangedSince(BaseEntityView):
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasEntityScope)
+    valid_scopes = ["r:issuer"]
+
+    def get_queryset(self, request, since=None):
+        user = request.user
+
+        expr = Q(issuer__issuerstaff__user=user)
+
+        if since is not None:
+            expr &= Q(updated_at__gt=since)
+
+        qs = BadgeClass.objects.filter(expr).distinct()
+        return qs
+
+    def get(self, request, **kwargs):
+        since = request.GET.get('since', None)
+        if since is not None:
+            try:
+                since = dateutil.parser.isoparse(since)
+            except ValueError as e:
+                err = V2ErrorSerializer(
+                    data={}, field_errors={'since': ["must be ISO-8601 format with time zone"]},
+                    validation_errors=[])
+                err._success = False
+                err._description = "bad request"
+                err.is_valid(raise_exception=False)
+                return Response(err.data, status=HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset(request, since=since)
+        context = self.get_context_data(**kwargs)
+        serializer = PaginatedBadgeClassesSinceSerializer(
+            queryset=queryset,
+            request=request,
+            context=context)
+        serializer.is_valid()
+        return Response(serializer.data)
+
+
+class PaginatedIssuersSinceSerializer(CursorPaginatedListSerializer):
+    child = IssuerSerializerV2()
+
+    def __init__(self, *args, **kwargs):
+        self.timestamp = timezone.now()  # take timestamp now before SQL query is run in super.__init__
+        super(PaginatedIssuersSinceSerializer, self).__init__(*args, **kwargs)
+
+    def to_representation(self, data):
+        representation = super(PaginatedIssuersSinceSerializer, self).to_representation(data)
+        representation['timestamp'] = self.timestamp.isoformat()
+        return representation
+
+
+class IssuersChangedSince(BaseEntityView):
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasEntityScope)
+    valid_scopes = ["r:issuer"]
+
+    def get_queryset(self, request, since=None):
+        user = request.user
+
+        expr = Q(issuerstaff__user=user)
+
+        if since is not None:
+            expr &= Q(updated_at__gt=since)
+
+        qs = Issuer.objects.filter(expr).distinct()
+        return qs
+
+    def get(self, request, **kwargs):
+        since = request.GET.get('since', None)
+        if since is not None:
+            try:
+                since = dateutil.parser.isoparse(since)
+            except ValueError as e:
+                err = V2ErrorSerializer(
+                    data={}, field_errors={'since': ["must be ISO-8601 format with time zone"]},
+                    validation_errors=[])
+                err._success = False
+                err._description = "bad request"
+                err.is_valid(raise_exception=False)
+                return Response(err.data, status=HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset(request, since=since)
+        context = self.get_context_data(**kwargs)
+        serializer = PaginatedIssuersSinceSerializer(
+            queryset=queryset,
+            request=request,
+            context=context)
+        serializer.is_valid()
+        return Response(serializer.data)

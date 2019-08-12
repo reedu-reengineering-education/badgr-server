@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import base64
 import json
+from urllib import quote_plus
 
 from django.core.files.images import get_image_dimensions
 from django.core.urlresolvers import reverse
@@ -970,3 +971,41 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
         response = self.client.get('/public/assertions/{}.json?expand=badge&expand=badge.issuer'.format(assertion_slug))
         self.assertEqual(response.data['badge']['issuer']['name'], 'Issuer 1 updated')
+
+
+class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
+    def test_application_can_get_changed_badgeclasses(self):
+        issuer_user = self.setup_user(authenticate=True, verified=True)
+        test_issuer = self.setup_issuer(owner=issuer_user)
+        test_badgeclass = self.setup_badgeclass(
+            issuer=test_issuer, name='Badge Class 1', description='test')
+        test_badgeclass2 = self.setup_badgeclass(
+            issuer=test_issuer, name='Badge Class 2', description='test')
+        test_badgeclass3 = self.setup_badgeclass(
+            issuer=test_issuer, name='Badge Class 3', description='test')
+
+        other_user = self.setup_user(authenticate=False, verified=True)
+        other_issuer = self.setup_issuer(owner=other_user)
+
+        other_badgeclass = self.setup_badgeclass(
+            issuer=other_issuer, name='Badge Class 1', description='test')
+        other_badgeclass2 = self.setup_badgeclass(
+            issuer=other_issuer, name='Badge Class 2', description='test')
+        other_badgeclass3 = self.setup_badgeclass(
+            issuer=other_issuer, name='Badge Class 3', description='test')
+
+        response = self.client.get('/v2/badgeclasses/changed')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 3)
+        timestamp = response.data['timestamp']
+
+        response = self.client.get('/v2/badgeclasses/changed?since={}'.format(quote_plus(timestamp)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 0)
+
+        test_badgeclass.name = 'Badge Class 1 updated'
+        test_badgeclass.save()
+
+        response = self.client.get('/v2/badgeclasses/changed?since={}'.format(quote_plus(timestamp)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
