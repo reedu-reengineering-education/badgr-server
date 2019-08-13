@@ -83,7 +83,7 @@ class OriginalJsonMixin(models.Model):
 
 class BaseOpenBadgeObjectModel(OriginalJsonMixin, cachemodel.CacheModel):
     source = models.CharField(max_length=254, default='local')
-    source_url = models.CharField(max_length=254, blank=True, null=True, default=None)
+    source_url = models.CharField(max_length=254, blank=True, null=True, default=None, unique=True)
 
     class Meta:
         abstract = True
@@ -163,8 +163,6 @@ class Issuer(ResizeUploadedImage,
     # slug has been deprecated for now, but preserve existing values
     slug = models.CharField(max_length=255, blank=True, null=True, default=None)
     #slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
-
-    source_url = models.CharField(max_length=254, blank=True, null=True, default=None, unique=True)
 
     badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None)
 
