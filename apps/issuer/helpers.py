@@ -8,13 +8,16 @@ import openbadges
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from requests_cache.backends import BaseCache
 
+import logging
 from issuer.models import Issuer, BadgeClass, BadgeInstance
 from mainsite.utils import first_node_match
 import json
 
+
+logger = logging.getLogger(__name__)
 
 class DjangoCacheDict(MutableMapping):
     """TODO: Fix this class, its broken!"""
@@ -196,13 +199,19 @@ class BadgeCheckHelper(object):
 
         recipient_identifier = report.get('recipientProfile', {}).get('email', None)
 
-        with transaction.atomic():
-            issuer, issuer_created = Issuer.objects.get_or_create_from_ob2(issuer_obo, original_json=original_json.get(issuer_obo.get('id')))
-            badgeclass, badgeclass_created = BadgeClass.objects.get_or_create_from_ob2(issuer, badgeclass_obo, original_json=original_json.get(badgeclass_obo.get('id')))
-            if badgeclass_created and getattr(settings, 'BADGERANK_NOTIFY_ON_BADGECLASS_CREATE', True):
-                from issuer.tasks import notify_badgerank_of_badgeclass
-                notify_badgerank_of_badgeclass.delay(badgeclass_pk=badgeclass.pk)
-            return BadgeInstance.objects.get_or_create_from_ob2(badgeclass, assertion_obo, recipient_identifier=recipient_identifier, original_json=original_json.get(assertion_obo.get('id')))
+        def commit_new_badge():
+            with transaction.atomic():
+                issuer, issuer_created = Issuer.objects.get_or_create_from_ob2(issuer_obo, original_json=original_json.get(issuer_obo.get('id')))
+                badgeclass, badgeclass_created = BadgeClass.objects.get_or_create_from_ob2(issuer, badgeclass_obo, original_json=original_json.get(badgeclass_obo.get('id')))
+                if badgeclass_created and getattr(settings, 'BADGERANK_NOTIFY_ON_BADGECLASS_CREATE', True):
+                    from issuer.tasks import notify_badgerank_of_badgeclass
+                    notify_badgerank_of_badgeclass.delay(badgeclass_pk=badgeclass.pk)
+                return BadgeInstance.objects.get_or_create_from_ob2(badgeclass, assertion_obo, recipient_identifier=recipient_identifier, original_json=original_json.get(assertion_obo.get('id')))
+        try:
+            return commit_new_badge()
+        except IntegrityError:
+            logger.error("Race condition caught when saving new assertion: {}".format(query))
+            return commit_new_badge()
 
     @classmethod
     def get_assertion_obo(cls, badge_instance):

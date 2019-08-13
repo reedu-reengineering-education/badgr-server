@@ -2,6 +2,8 @@ import base64
 import collections
 import dateutil.parser
 import json
+
+from django.db import IntegrityError
 from openbadges.verifier.openbadges_context import (OPENBADGES_CONTEXT_V2_URI, OPENBADGES_CONTEXT_V1_URI,
                                                     OPENBADGES_CONTEXT_V2_DICT)
 from openbadges_bakery import bake, unbake
@@ -23,6 +25,12 @@ from .utils import setup_basic_0_5_0, setup_basic_1_0, setup_resources, CURRENT_
 
 
 class TestBadgeUploads(BadgrTestCase):
+    def test_uniqueness(self):
+        ditto = "http://example.com"
+        with self.assertRaises(IntegrityError):
+            Issuer.objects.create(name="test1", source_url=ditto)
+            Issuer.objects.create(name="test2", source_url=ditto)
+
     @responses.activate
     def test_submit_basic_1_0_badge_via_url(self):
         setup_basic_1_0()
