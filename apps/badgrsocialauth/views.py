@@ -115,7 +115,10 @@ def saml2_client_for(idp_name=None):
 
     # SAML metadata changes very rarely, check for cached version first
     config = Saml2Configuration.objects.filter(slug=idp_name).first()
-    metadata = config.get('cached_metadata', None)
+    metadata = None
+    if config:
+        metadata = config.cached_metadata
+
     if not metadata:
         r = requests.get(config.metadata_conf_url)
         metadata = r.text
