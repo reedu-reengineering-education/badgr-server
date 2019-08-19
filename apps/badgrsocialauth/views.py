@@ -114,7 +114,7 @@ def saml2_client_for(idp_name=None):
     '''
 
     # SAML metadata changes very rarely, check for cached version first
-    config = Saml2Configuration.objects.filter(slug=idp_name).first()
+    config = Saml2Configuration.objects.get(slug=idp_name)
     metadata = None
     if config:
         metadata = config.cached_metadata
@@ -164,8 +164,7 @@ def assertion_consumer_service(request, idp_name):
         request.POST.get('SAMLResponse'),
         entity.BINDING_HTTP_POST)
     authn_response.get_identity()
-    user_info = authn_response.get_subject()
-    email = user_info.text
+    email = authn_response.ava['Email'][0]
     first_name = authn_response.ava['FirstName'][0]
     last_name = authn_response.ava['LastName'][0]
     badgr_app = BadgrApp.objects.get(pk=request.session.get('badgr_app_pk'))
