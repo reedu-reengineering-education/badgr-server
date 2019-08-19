@@ -27,3 +27,8 @@ class UnverifiedGoogleProviderTests(SendsVerificationEmailMixin, BadgrOAuth2Test
                email,
                given_name,
                (repr(verified_email).lower())))
+
+    def test_can_add_google_account_to_profile(self):
+        user = self.setup_user(token_scope="rw:profile")
+        response = self.client.get('/v1/user/socialaccounts/connect?provider=google')
+        self.assertEqual(response.status_code, 200)
