@@ -418,14 +418,15 @@ class IssuerBadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, 
 
     def get_queryset(self, request=None, **kwargs):
         issuer = self.get_object(request, **kwargs)
-        queryset = BadgeInstance.objects.filter(
-            issuer=issuer,
-            revoked=False
-        )
+        queryset = BadgeInstance.objects.filter(issuer=issuer)
         recipients = request.query_params.getlist('recipient', None)
         if recipients:
             queryset = queryset.filter(recipient_identifier__in=recipients)
-
+        if request.query_params.get('include_expired', '').lower() not in ['1', 'true']:
+            queryset = queryset.filter(
+                Q(expires_at__gte=datetime.datetime.now()) | Q(expires_at__isnull=True))
+        if request.query_params.get('include_revoked', '').lower() not in ['1', 'true']:
+            queryset = queryset.filter(revoked=False)
         return queryset
 
     @apispec_list_operation('Assertion',
@@ -443,7 +444,19 @@ class IssuerBadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, 
                 'name': "num",
                 'type': "string",
                 'description': 'Request pagination of results'
-            }
+            },
+            {
+                'in': 'query',
+                'name': "include_expired",
+                'type': "boolean",
+                'description': 'Include expired assertions'
+            },
+            {
+                'in': 'query',
+                'name': "include_revoked",
+                'type': "boolean",
+                'description': 'Include revoked assertions'
+            },
         ]
     )
     def get(self, request, **kwargs):
