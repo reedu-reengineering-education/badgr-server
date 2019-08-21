@@ -49,9 +49,20 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     marketingOptIn = serializers.BooleanField(source='marketing_opt_in', required=False)
     badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
     hasPasswordSet = serializers.SerializerMethodField('get_has_password_set')
+    recipient = serializers.SerializerMethodField()
 
     def get_has_password_set(self, obj):
         return is_password_usable(obj.password)
+
+    def get_recipient(self, obj):
+        primary_email = next((e for e in obj.cached_emails() if e.primary), None)
+        if primary_email:
+            return dict(type='email', identity=primary_email.email)
+        identifier = obj.userrecipientidentifier_set.filter(verified=True).order_by('pk').first()
+        if identifier:
+            return dict(type=identifier.type, identity=identifier.identifier)
+        return None
+
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeUser
