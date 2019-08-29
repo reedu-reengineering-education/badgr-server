@@ -389,6 +389,26 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         ), assertion, format="json")
         self.assertRaises(serializers.ValidationError)
 
+    def test_cannot_issue_badge_to_invalid_email_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "example.com",
+                "type": "email"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertRaises(serializers.ValidationError)
+
     def test_cannot_issue_email_assertion_to_non_email(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
