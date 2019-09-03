@@ -783,6 +783,27 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
         self.assertNotIn(url, v1serialized['telephone'])
         self.assertNotIn(url, v2serialized['telephone'])
 
+    def test_recipient_identity_serialized_to_correct_fields(self):
+        user = self.setup_user(create_email_address=False)
+        v2serialized = BadgeUserSerializerV2(user).data['result'][0]
+        self.assertEqual(None, v2serialized['recipient'])
+        
+        url = 'http://example.com'
+        phone = '+15413428456'
+        user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL, identifier=url, verified=True)
+        user.userrecipientidentifier_set.create(
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier=phone, verified=True)
+        v2serialized = BadgeUserSerializerV2(user).data['result'][0]
+        self.assertIn(url, v2serialized['recipient']['identity'])
+        self.assertIn('url', v2serialized['recipient']['type'])
+
+        primary_email = 'primary@example.com'
+        CachedEmailAddress.objects.create(user=user, email=primary_email, primary=True, verified=True)
+        v2serialized = BadgeUserSerializerV2(user).data['result'][0]
+        self.assertIn(primary_email, v2serialized['recipient']['identity'])
+        self.assertIn('email', v2serialized['recipient']['type'])
+
     def test_verified_recipient_receives_assertion(self):
         url = 'http://example.com'
         self.first_user.userrecipientidentifier_set.create(identifier=url, verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
