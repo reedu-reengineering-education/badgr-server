@@ -123,7 +123,7 @@ class LocalBadgeInstanceUploadSerializerV1(serializers.Serializer):
             instance.acceptance = 'Accepted'
 
             instance.save()
-            owner = validated_data.get('created_by', None)
+            owner = instance.user
             if owner:
                 owner.publish()
 

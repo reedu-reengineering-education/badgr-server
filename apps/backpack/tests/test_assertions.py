@@ -758,6 +758,22 @@ class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
         self.assertEqual(len(get_response.data), 1)
 
 
+class TestAcceptanceHandling(BadgrTestCase, SetupIssuerHelper):
+    def test_can_accept_badge(self):
+        test_issuer_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_issuer_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        test_recipient = self.setup_user(email='test_recipient@email.test', authenticate=True)
+        assertion = test_badgeclass.issue(recipient_id='test_recipient@email.test', recipient_type='email')
+
+        response = self.client.put(
+            '/v2/backpack/assertions/{}'.format(assertion.entity_id),
+            {'acceptance': assertion.ACCEPTANCE_ACCEPTED}
+        )
+        self.assertEqual(response.status_code, 200)
+
+
 class TestExpandAssertions(BadgrTestCase, SetupIssuerHelper):
     def test_no_expands(self):
         '''Expect correct result if no expand parameters are passed in'''

@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from backpack.models import BackpackCollection, BackpackBadgeShare, BackpackCollectionShare
 from backpack.serializers_v1 import CollectionSerializerV1, LocalBadgeInstanceUploadSerializerV1
 from backpack.serializers_v2 import BackpackAssertionSerializerV2, BackpackCollectionSerializerV2, \
-    BackpackImportSerializerV2
+    BackpackImportSerializerV2, BackpackAssertionAcceptanceSerializerV2
 from entity.api import BaseEntityListView, BaseEntityDetailView
 from issuer.models import BadgeInstance
 from issuer.permissions import AuditedModelOwner, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope
@@ -142,7 +142,21 @@ class BackpackAssertionDetail(BaseEntityDetailView):
     def put(self, request, **kwargs):
         fields_whitelist = ('acceptance',)
         data = {k: v for k, v in request.data.items() if k in fields_whitelist}
-        return super(BackpackAssertionDetail, self).put(request, data=data, **kwargs)
+
+        obj = self.get_object(request, **kwargs)
+        if not self.has_object_permissions(request, obj):
+            return Response(status=HTTP_404_NOT_FOUND)
+
+        context = self.get_context_data(**kwargs)
+
+        update_serializer = BackpackAssertionAcceptanceSerializerV2(obj, data, context=context)
+        update_serializer.is_valid(raise_exception=True)
+        update_serializer.save(updated_by=request.user)
+
+        main_serializer_class = self.get_serializer_class()
+        serializer = main_serializer_class(update_serializer.instance, context=context)
+
+        return Response(serializer.data)
 
 
 class BackpackAssertionDetailImage(ImagePropertyDetailView, BadgrOAuthTokenHasScope):

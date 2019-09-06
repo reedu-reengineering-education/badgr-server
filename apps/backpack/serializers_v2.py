@@ -59,6 +59,20 @@ class BackpackAssertionSerializerV2(DetailSerializerV2, OriginalJsonSerializerMi
         return representation
 
 
+class BackpackAssertionAcceptanceSerializerV2(serializers.Serializer):
+    acceptance = serializers.ChoiceField(choices=[BadgeInstance.ACCEPTANCE_ACCEPTED], write_only=True)
+
+    def update(self, instance, validated_data):
+        instance.acceptance = 'Accepted'
+
+        instance.save()
+        owner = instance.user
+        if owner:
+            owner.publish()
+
+        return instance
+
+
 class BackpackCollectionSerializerV2(DetailSerializerV2):
     name = serializers.CharField()
     description = MarkdownCharField(required=False)
