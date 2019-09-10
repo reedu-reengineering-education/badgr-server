@@ -404,10 +404,11 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             "badgeclassName": badgeclass_name,
         }
 
-        self.client.post('/v2/issuers/{issuer}/assertions'.format(
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
             issuer=test_issuer.entity_id
         ), assertion, format="json")
         self.assertRaises(serializers.ValidationError)
+        self.assertEqual(response.status_code, 400)
 
     def test_cannot_issue_email_assertion_to_non_email(self):
         test_user = self.setup_user(authenticate=True)
