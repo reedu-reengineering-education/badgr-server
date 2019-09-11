@@ -494,7 +494,7 @@ class OEmbedAPIEndpoint(APIView):
         ret = '{redirect}{path}'.format(
             redirect=redirect_url,
             path=stripped_path)
-        ret = set_url_query_params(ret, embedVersion=1)
+        ret = set_url_query_params(ret, embedVersion=2)
         return ret
 
     def get(self, request, **kwargs):
@@ -529,8 +529,8 @@ class OEmbedAPIEndpoint(APIView):
             'thumbnail_url': badgeinstance.image_url(),
             'thumnail_width': 400,  # TODO: get real data; respect maxwidth
             'thumbnail_height': 400,  # TODO: get real data; respect maxheight
-            'width': min(800, maxwidth),
-            'height': min(800, maxheight)
+            'width': '100%',
+            'height': 'auto'
         }
 
         data['html'] = """<iframe src="{src}" frameborder="0" width="{width}" height="{height}"></iframe>""".format(
