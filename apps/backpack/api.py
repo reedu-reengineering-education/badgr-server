@@ -1,6 +1,7 @@
 # encoding: utf-8
 from __future__ import unicode_literals
 
+from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -32,23 +33,20 @@ class BackpackAssertionList(BaseEntityListView):
         'post': ['rw:backpack'],
     }
 
-    def badge_filter(self, include_pending):
-        """
-        For assertions without a source url (locally issued assertions) 
-        only list assertions which are not in a pending state (awarded to 
-        an unverified email). as long as the include_pending param is set
-        """
-        def filter(b):
-            ok = (not b.revoked) and b.acceptance != BadgeInstance.ACCEPTANCE_REJECTED
-            if include_pending:
-                if b.source_url:
-                    return ok
-            return ok and not b.pending
-        return filter
-    
     def get_objects(self, request, **kwargs):
-        include_pending = True if request.query_params.get(u'include_pending', None) in ['1', 'true'] else False
-        return filter(self.badge_filter(include_pending), self.request.user.cached_badgeinstances())
+        include_expired = request.query_params.get(u'include_expired', '').lower() in ['1', 'true']
+        include_revoked = request.query_params.get(u'include_revoked', '').lower() in ['1', 'true']
+        include_pending = request.query_params.get(u'include_pending', '').lower() in ['1', 'true']
+
+        def badge_filter(b):
+            if ((b.acceptance == BadgeInstance.ACCEPTANCE_REJECTED) or
+                    (not include_expired and b.expires_at != None and b.expires_at < timezone.now()) or
+                    (not include_revoked and b.revoked) or
+                    (not include_pending and b.pending)):
+                return False
+            return True
+
+        return filter(badge_filter, self.request.user.cached_badgeinstances())
 
     @apispec_list_operation('Assertion',
         summary="Get a list of Assertions in authenticated user's backpack ",
