@@ -529,12 +529,12 @@ class OEmbedAPIEndpoint(APIView):
             'thumbnail_url': badgeinstance.image_url(),
             'thumnail_width': 400,  # TODO: get real data; respect maxwidth
             'thumbnail_height': 400,  # TODO: get real data; respect maxheight
-            'width': '100%',
-            'height': 'auto'
+            'width': 800,
+            'height': 800
         }
 
-        data['html'] = """<iframe src="{src}" frameborder="0" width="{width}" height="{height}"></iframe>""".format(
-            src=self.get_badgrapp_redirect(badgeinstance), width=data['width'], height=data['height']
+        data['html'] = """<iframe src="{src}" frameborder="0" width="100%" height="auto"></iframe>""".format(
+            src=self.get_badgrapp_redirect(badgeinstance)
         )
 
         return Response(data, status=status.HTTP_200_OK)
