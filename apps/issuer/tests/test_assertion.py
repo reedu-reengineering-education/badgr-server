@@ -389,6 +389,27 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         ), assertion, format="json")
         self.assertRaises(serializers.ValidationError)
 
+    def test_cannot_issue_badge_to_invalid_email_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "example.com",
+                "type": "email"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertRaises(serializers.ValidationError)
+        self.assertEqual(response.status_code, 400)
+
     def test_cannot_issue_email_assertion_to_non_email(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -724,6 +745,85 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         ))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)
+
+    def test_issuer_instance_list_assertions_with_expired(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        expired_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        expired_assertion.expires_at = datetime.datetime.now() - datetime.timedelta(days=1)
+        expired_assertion.save()
+        test_badgeclass.issue(recipient_id='second.recipient@email.test')
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_expired=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+    def test_issuer_instance_list_assertions_with_revoked(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        revoked_assertion = test_badgeclass.issue(recipient_id='second.recipient@email.test')
+        revoked_assertion.revoked = True
+        revoked_assertion.save()
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_revoked=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+
+
+    def test_issuer_instance_list_assertions_with_revoked_and_expired(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        revoked_assertion = test_badgeclass.issue(recipient_id='second.recipient@email.test')
+        revoked_assertion.revoked = True
+        revoked_assertion.save()
+        expired_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        expired_assertion.expires_at = datetime.datetime.now() - datetime.timedelta(days=1)
+        expired_assertion.save()
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_revoked=1&include_expired=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 3)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_revoked=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_expired=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
 
     def test_issuer_instance_list_assertions_with_id(self):
         test_user = self.setup_user(authenticate=True)

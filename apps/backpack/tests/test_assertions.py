@@ -1,5 +1,6 @@
 import base64
 import collections
+import datetime
 import dateutil.parser
 import json
 
@@ -1008,3 +1009,68 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         get_resp2 = self.client.get('/v1/earner/badges?json_format=plain')
         self.assertEqual(get_resp2.status_code, 200)
         self.assertEqual(len(get_resp2.data), 0)
+
+
+class TestInclusionFlags(BadgrTestCase, SetupIssuerHelper):
+    def test_include_revoked(self):
+        test_user = self.setup_user(email='test@example.com', authenticate=True)
+        test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
+        test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
+        revoked_assertion = test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
+        revoked_assertion.revoked = True
+        revoked_assertion.save()
+        test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
+
+        result = self.client.get('/v2/backpack/assertions?include_revoked=1')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data.get('result')), 2)
+
+        result = self.client.get('/v2/backpack/assertions')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data.get('result')), 1)
+
+    def test_include_expired(self):
+        test_user = self.setup_user(email='test@example.com', authenticate=True)
+        test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
+        test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
+        expired_assertion = test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
+        expired_assertion.expires_at = datetime.datetime.now() - datetime.timedelta(days=1)
+        expired_assertion.save()
+        test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
+
+        result = self.client.get('/v2/backpack/assertions?include_expired=1')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data.get('result')), 2)
+
+        result = self.client.get('/v2/backpack/assertions')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data.get('result')), 1)
+
+    def test_include_expired_and_revoked(self):
+        test_user = self.setup_user(email='test@example.com', authenticate=True)
+        test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
+        test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
+        expired_assertion = test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
+        expired_assertion.expires_at = datetime.datetime.now() - datetime.timedelta(days=1)
+        expired_assertion.save()
+        revoked_assertion = test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
+        revoked_assertion.revoked = True
+        revoked_assertion.save()
+        test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
+
+        result = self.client.get('/v2/backpack/assertions?include_expired=1&include_revoked=1')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data.get('result')), 3)
+
+        result = self.client.get('/v2/backpack/assertions?include_expired=1')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data.get('result')), 2)
+
+        result = self.client.get('/v2/backpack/assertions?include_revoked=1')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data.get('result')), 2)
+
+        result = self.client.get('/v2/backpack/assertions')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data.get('result')), 1)
+        
