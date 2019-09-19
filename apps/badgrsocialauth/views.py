@@ -102,11 +102,14 @@ class BadgrAccountConnected(RedirectView):
         badgr_app = BadgrApp.objects.get_current(self.request)
         if badgr_app is not None:
             return set_url_query_params(badgr_app.ui_connect_success_redirect)
+
+
 """
 
 SAML2 Authentication Flow 
 
 """
+
 
 def saml2_client_for(idp_name=None):
     '''
@@ -210,6 +213,7 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config):
     except CachedEmailAddress.DoesNotExist:
         # Email does not exist, auto-provision account and log in
         return login(new_account(email))
+
 
 def saml2_redirect(request, idp_name):
     saml_client, _ = saml2_client_for(idp_name)

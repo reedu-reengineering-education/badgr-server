@@ -9,6 +9,7 @@ from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_204_NO_CONTENT, HTTP_
 from rest_framework.views import APIView
 
 from badgeuser.authcode import authcode_for_accesstoken
+from badgeuser.models import UserRecipientIdentifier
 from badgrsocialauth.permissions import IsSocialAccountOwner
 from badgrsocialauth.serializers import BadgrSocialAccountSerializerV1
 from entity.api import BaseEntityListView, BaseEntityDetailView
@@ -80,6 +81,14 @@ class BadgrSocialAccountDetail(BaseEntityDetailView):
             get_adapter().validate_disconnect(social_account, user_social_accounts)
         except ValidationError as e:
             return Response(e.message, status=HTTP_403_FORBIDDEN)
+
+        if social_account.provider == 'twitter':
+            identifier = 'https://twitter.com/{}'.format(social_account.extra_data.get('screen_name', '').lower())
+            try:
+                uri = UserRecipientIdentifier.objects.get(identifier=identifier)
+                uri.delete()
+            except UserRecipientIdentifier.DoesNotExist:
+                pass
 
         social_account.delete()
 

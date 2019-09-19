@@ -14,19 +14,9 @@ class TwitterProviderWithIdentifier(TwitterProvider):
     package = 'allauth.socialaccount.providers.twitter'
     account_class = TwitterAccount
 
-    def sociallogin_from_response(self, request, response):
-        sociallogin = super(TwitterProviderWithIdentifier, self).sociallogin_from_response(request, response)
-
-        url = urlparse(sociallogin.account.get_profile_url())
-        identifier = 'https://{}{}'.format(url.netloc, url.path.lower())
-
-        user_identifier, created = UserRecipientIdentifier.objects.get_or_create(
-            identifier=identifier, defaults=dict(verified=True, user=sociallogin.user))
-        if created is False and user_identifier.user != sociallogin.user:
-            raise ValidationError("This Twitter identifier is already associated with another account.")
-
-        return sociallogin
-
-
+    def extract_common_fields(self, data):
+        common_fields = super(TwitterProviderWithIdentifier, self).extract_common_fields(data)
+        common_fields['url'] = 'https://twitter.com/{}'.format(data.get('screen_name'))
+        return common_fields
 
 providers.registry.register(TwitterProviderWithIdentifier)
