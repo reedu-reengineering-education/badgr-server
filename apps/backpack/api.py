@@ -3,11 +3,8 @@ from __future__ import unicode_literals
 
 from django.utils import timezone
 from rest_framework import permissions
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST, HTTP_302_FOUND, \
-    HTTP_204_NO_CONTENT
-from rest_framework.views import APIView
+from rest_framework import status
 
 from backpack.models import BackpackCollection, BackpackBadgeShare, BackpackCollectionShare
 from backpack.serializers_v1 import CollectionSerializerV1, LocalBadgeInstanceUploadSerializerV1
@@ -131,7 +128,7 @@ class BackpackAssertionDetail(BaseEntityDetailView):
             collection.save()
 
         request.user.save()
-        return Response(status=HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @apispec_put_operation('Assertion',
                            summary="Update acceptance of an Assertion in the user's Backpack",
@@ -143,7 +140,7 @@ class BackpackAssertionDetail(BaseEntityDetailView):
 
         obj = self.get_object(request, **kwargs)
         if not self.has_object_permissions(request, obj):
-            return Response(status=HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         context = self.get_context_data(**kwargs)
 
@@ -227,7 +224,7 @@ class BackpackCollectionDetail(BaseEntityDetailView):
 
 class BackpackImportBadge(BaseEntityListView):
     v2_serializer_class = BackpackImportSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedIdentifier,BadgrOAuthTokenHasScope)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope,)
     http_method_names = ('post',)
     valid_scopes = ['rw:backpack']
 
@@ -289,25 +286,25 @@ class ShareBackpackAssertion(BaseEntityDetailView):
 
         provider = request.query_params.get('provider')
         if not provider:
-            return Response({'error': "unspecified share provider"}, status=HTTP_400_BAD_REQUEST)
+            return Response({'error': "unspecified share provider"}, status=status.HTTP_400_BAD_REQUEST)
         provider = provider.lower()
 
         source = request.query_params.get('source', 'unknown')
 
         badge = self.get_object(request, **kwargs)
         if not badge:
-            return Response(status=HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         share = BackpackBadgeShare(provider=provider, badgeinstance=badge, source=source)
         share_url = share.get_share_url(provider)
         if not share_url:
-            return Response({'error': "invalid share provider"}, status=HTTP_400_BAD_REQUEST)
+            return Response({'error': "invalid share provider"}, status=status.HTTP_400_BAD_REQUEST)
 
         share.save()
 
         if redirect:
             headers = {'Location': share_url}
-            return Response(status=HTTP_302_FOUND, headers=headers)
+            return Response(status=status.HTTP_302_FOUND, headers=headers)
         else:
             return Response({'url': share_url})
 
@@ -333,24 +330,24 @@ class ShareBackpackCollection(BaseEntityDetailView):
 
         provider = request.query_params.get('provider')
         if not provider:
-            return Response({'error': "unspecified share provider"}, status=HTTP_400_BAD_REQUEST)
+            return Response({'error': "unspecified share provider"}, status=status.HTTP_400_BAD_REQUEST)
         provider = provider.lower()
 
         source = request.query_params.get('source', 'unknown')
 
         collection = self.get_object(request, **kwargs)
         if not collection:
-            return Response(status=HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         share = BackpackCollectionShare(provider=provider, collection=collection, source=source)
         share_url = share.get_share_url(provider, title=collection.name, summary=collection.description)
         if not share_url:
-            return Response({'error': "invalid share provider"}, status=HTTP_400_BAD_REQUEST)
+            return Response({'error': "invalid share provider"}, status=status.HTTP_400_BAD_REQUEST)
 
         share.save()
 
         if redirect:
             headers = {'Location': share_url}
-            return Response(status=HTTP_302_FOUND, headers=headers)
+            return Response(status=status.HTTP_302_FOUND, headers=headers)
         else:
             return Response({'url': share_url})
