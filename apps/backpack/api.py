@@ -262,7 +262,15 @@ class BackpackImportBadge(BaseEntityListView):
         ]
     )
     def post(self, request, **kwargs):
-        return super(BackpackImportBadge, self).post(request, **kwargs)
+        context = self.get_context_data(**kwargs)
+        serializer_class = self.get_serializer_class()
+        serializer = serializer_class(data=request.data, context=context)
+        serializer.is_valid(raise_exception=True)
+        new_instance = serializer.save(created_by=request.user)
+        self.log_create(new_instance)
+
+        response_serializer = BackpackAssertionSerializerV2(new_instance, context=context)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class ShareBackpackAssertion(BaseEntityDetailView):
