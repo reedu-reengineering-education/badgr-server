@@ -552,20 +552,24 @@ class IssuerTokensList(BaseEntityListView):
 
         tokens = []
         expires = timezone.now() + datetime.timedelta(weeks=5200)
+
+        application_user = request.auth.application.user
+
         for issuer in issuers:
             scope = "rw:issuer:{}".format(issuer.entity_id)
 
-            # grant application user staff access to issuer if needed
-            staff, staff_created = IssuerStaff.cached.get_or_create(
-                issuer=issuer,
-                user=request.auth.application.user,
-                defaults=dict(
-                    role=IssuerStaff.ROLE_STAFF
+            if application_user:
+                # grant application user staff access to issuer if needed
+                staff, staff_created = IssuerStaff.cached.get_or_create(
+                    issuer=issuer,
+                    user=application_user,
+                    defaults=dict(
+                        role=IssuerStaff.ROLE_STAFF
+                    )
                 )
-            )
 
             accesstoken, created = AccessTokenProxy.objects.get_or_create(
-                user=request.auth.application.user,
+                user=application_user,
                 application=request.auth.application,
                 scope=scope,
                 defaults=dict(
