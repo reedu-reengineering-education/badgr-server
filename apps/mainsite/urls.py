@@ -9,6 +9,7 @@ badgr_admin.autodiscover()
 # make sure that any view/model/form imports occur AFTER admin.autodiscover
 
 from django.views.generic.base import RedirectView, TemplateView
+from oauth2_provider.urls import base_urlpatterns as oauth2_provider_base_urlpatterns
 
 from mainsite.views import SitewideActionFormView, LoginAndObtainAuthToken, RedirectToUiLogin, DocsAuthorizeRedirect
 from mainsite.views import info_view, email_unsubscribe, AppleAppSiteAssociation, error404, error500
@@ -30,7 +31,7 @@ urlpatterns = [
     url(r'^o/authorize/?$', AuthorizationApiView.as_view(), name='oauth2_api_authorize'),
     url(r'^o/token/?$', TokenView.as_view(), name='oauth2_provider_token'),
     url(r'^o/code/?$', AuthCodeExchange.as_view(), name='oauth2_code_exchange'),
-    url(r'^o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
+    url(r'^o/', include(oauth2_provider_base_urlpatterns, namespace='oauth2_provider')),
 
     # Home
     url(r'^$', info_view, name='index'),
