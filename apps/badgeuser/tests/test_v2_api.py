@@ -8,10 +8,10 @@ from mainsite.models import AccessTokenProxy, ApplicationInfo
 class AccessTokenHandling(SetupIssuerHelper, BadgrTestCase):
     def test_token_deletion(self):
         staff = self.setup_user(email='staff@example.com', authenticate=True)
-        clientAppUser = self.setup_user(email='clientApp@example.com', token_scope='r:assertions')
+        client_app_user = self.setup_user(email='clientApp@example.com', token_scope='r:assertions')
         app = Application.objects.create(
             client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
-            user=clientAppUser)
+            user=client_app_user)
         ApplicationInfo.objects.create(application=app, allowed_scopes='r:assertions', trust_email_verification=True)
 
         t = AccessTokenProxy.objects.create(
