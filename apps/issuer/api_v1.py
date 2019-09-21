@@ -15,7 +15,8 @@ from badgeuser.models import CachedEmailAddress
 from entity.api import BaseEntityListView, BaseEntityDetailView, VersionedObjectMixin
 from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance
 from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass,
-                                IsEditor, IsStaff, IsOwnerOrStaff, ApprovedIssuersOnly)
+                                IsEditor, IsStaff, IsOwnerOrStaff, ApprovedIssuersOnly,
+                                BadgrOAuthTokenHasEntityScope)
 from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
                                    BadgeInstanceSerializerV1, IssuerRoleActionSerializerV1,
                                    IssuerStaffSerializerV1)
@@ -78,7 +79,8 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
     role = 'staff'
     queryset = Issuer.objects.all()
     model = Issuer
-    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsOwnerOrStaff,)
+    permission_classes = [AuthenticatedWithVerifiedIdentifier, IsOwnerOrStaff|BadgrOAuthTokenHasEntityScope]
+    valid_scopes = ["rw:issuerOwner:*"]
 
     @apispec_list_operation('IssuerStaff',
         tags=['Issuers'],
@@ -147,9 +149,6 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
                 "Issuer not found. Authenticated user must be Issuer's owner to modify user permissions.",
                 status=status.HTTP_404_NOT_FOUND
             )
-
-        if not request.user.is_superuser and request.user not in current_issuer.owners:
-            raise PermissionDenied("Must be an owner of an issuer profile to modify permissions")
 
         try:
             if serializer.validated_data.get('username'):

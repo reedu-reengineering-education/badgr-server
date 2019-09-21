@@ -7,15 +7,18 @@ from urllib import quote_plus
 import os
 from django.contrib.auth import get_user_model
 from django.core.files.images import get_image_dimensions
+from django.urls import reverse
+from django.utils import timezone
 from oauth2_provider.models import Application
 
 from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import Issuer, BadgeClass, IssuerStaff
-from mainsite.models import ApplicationInfo
+from mainsite.models import ApplicationInfo, AccessTokenProxy
+from mainsite.tests import SetupOAuth2ApplicationHelper
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 
 
-class IssuerTests(SetupIssuerHelper, BadgrTestCase):
+class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase):
     example_issuer_props = {
         'name': 'Awesome Issuer',
         'description': 'An issuer of awe-inspiring credentials',
@@ -438,6 +441,44 @@ class IssuerTests(SetupIssuerHelper, BadgrTestCase):
                 self.assertFalse(url_for_staff2.identifier in staff_user['userProfile']['url'])
                 self.assertEqual(len(staff_user['userProfile']['telephone']), 0)
                 self.assertEqual(len(staff_user['userProfile']['emails']), 0)
+
+    def test_can_edit_staff_with_oauth(self):
+        issuer_owner = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=issuer_owner)
+
+        user = self.setup_user(email='lilstudent@example.com')
+        client_app_user = self.setup_user(email='clientApp@example.com', token_scope='rw:issuerOwner:*')
+        app = Application.objects.create(
+            client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
+            user=client_app_user)
+        ApplicationInfo.objects.create(application=app, allowed_scopes='rw:issuerOwner*')
+        t = AccessTokenProxy.objects.create(
+            user=client_app_user, scope='rw:issuerOwner:' + test_issuer.entity_id,
+            expires=timezone.now() + timezone.timedelta(hours=1),
+            token='123', application=app
+        )
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer 123")
+        badgr_user_email = 'user@email.test'
+        badgr_user = self.setup_user(email=badgr_user_email, authenticate=False)
+
+        response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
+            'action': 'add',
+            'email': badgr_user_email,
+            'role': 'staff'
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(IssuerStaff.objects.filter(user=badgr_user)), 1)
+
+        # Verify token cannot be used to modify some other issuer
+        other_issuer = self.setup_issuer(owner=issuer_owner)
+
+        response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=other_issuer.entity_id), {
+            'action': 'add',
+            'email': badgr_user_email,
+            'role': 'staff'
+        })
+        self.assertEqual(response.status_code, 404)
 
 
 class IssuersChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
