@@ -20,9 +20,18 @@ class Command(BaseCommand):
             self.update(verified_id.user, verified_id.identifier)
 
         # Trigger cache updates
+        chunk_size = 500
+        page = 0
+
         self.stdout.write("3. Triggering cache updates")
-        for b in BadgeInstance.objects.filter(user__isnull=False):
-            b.publish()
+        while True:
+            badges = BadgeInstance.objects.filter(user__isnull=False)[page:page+chunk_size]
+            self.stdout.write("Processing badges %d through %d" % (page+1, page+len(badges)))
+            for b in badges:
+                b.publish()
+            if len(badges) < chunk_size:
+                break
+            page = page + chunk_size
 
         self.stdout.write("All done.")
 
