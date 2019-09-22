@@ -206,6 +206,7 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
         super(UserRecipientIdentifier, self).delete()
         process_post_recipient_id_deletion.delay(self.identifier)
 
+
 class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     """
     A full-featured user model that can be an Earner, Issuer, or Consumer of Open Badges
@@ -227,7 +228,8 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         db_table = 'users'
 
     def __unicode__(self):
-        return u"{} <{}>".format(self.get_full_name(), self.email)
+        primary_identifier = self.email or next((e for e in self.all_verified_recipient_identifiers), '')
+        return u"{} ({})".format(self.get_full_name(), primary_identifier)
 
     def get_full_name(self):
         return u"%s %s" % (self.first_name, self.last_name)
@@ -279,6 +281,9 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         :param value: list(BadgeUserEmailSerializerV2)
         :return: None
         """
+        return self.set_email_items(value)
+
+    def set_email_items(self, value, send_confirmations=True, allow_verify=False):
         if len(value) < 1:
             raise ValidationError("Must have at least 1 email")
 
@@ -298,10 +303,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
                         'user': self,
                         'primary': primary
                     })
-                if created:
-                    # new email address send a confirmation
-                    emailaddress.send_confirmation()
-                else:
+                if not created:
                     if emailaddress.user_id == self.id:
                         # existing email address owned by user
                         emailaddress.primary = primary
@@ -315,6 +317,14 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
                     else:
                         # existing email address used by someone else
                         raise ValidationError("Email '{}' may already be in use".format(email_data.get('email')))
+                else:
+                    # email is new
+                    if allow_verify and email_data.get('verified') is True:
+                        emailaddress.verified = True
+                        emailaddress.save()
+                    if emailaddress.verified is False and created is True and send_confirmations is True:
+                        # new email address send a confirmation
+                        emailaddress.send_confirmation()
 
             # remove old items
             for emailaddress in self.email_items:

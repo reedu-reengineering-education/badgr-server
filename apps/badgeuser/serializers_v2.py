@@ -49,7 +49,7 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     marketingOptIn = serializers.BooleanField(source='marketing_opt_in', required=False)
     badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
     hasPasswordSet = serializers.SerializerMethodField('get_has_password_set')
-    recipient = serializers.SerializerMethodField()
+    recipient = serializers.SerializerMethodField(read_only=True)
 
     def get_has_password_set(self, obj):
         return is_password_usable(obj.password)
@@ -62,7 +62,6 @@ class BadgeUserSerializerV2(DetailSerializerV2):
         if identifier:
             return dict(type=identifier.type, identity=identifier.identifier)
         return None
-
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeUser
