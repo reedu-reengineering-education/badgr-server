@@ -765,7 +765,7 @@ class TestAcceptanceHandling(BadgrTestCase, SetupIssuerHelper):
         test_issuer = self.setup_issuer(owner=test_issuer_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
 
-        test_recipient = self.setup_user(email='test_recipient@email.test', authenticate=True)
+        test_recipient = self.setup_user(email='test_recipient@email.test', authenticate=True, token_scope='rw:backpack')
         assertion = test_badgeclass.issue(recipient_id='test_recipient@email.test', recipient_type='email')
 
         response = self.client.put(
@@ -938,9 +938,9 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
         test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
         test_badgeclass_one.issue(recipient_id='verified@example.com')
-        
+
         get_resp = self.client.get('/v2/backpack/assertions?include_pending=1')
-        
+
         self.assertEqual(post_resp.status_code, 201)
 
         self.assertEqual(get_resp.status_code, 200)
@@ -980,7 +980,7 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
 
         get_resp2 = self.client.get('/v1/earner/badges?json_format=plain')
         self.assertEqual(len(get_resp2.data), 0)
-        
+
         get_resp3 = self.client.get('/v1/earner/badges?json_format=plain&include_pending=1')
         self.assertEqual(len(get_resp3.data), 1)
 
@@ -1002,10 +1002,10 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
         test_badgeclass_one.issue(recipient_id='test@example.com', recipient_type='email')
         get_resp = self.client.get('/v2/backpack/assertions?include_pending=1')
-        
+
         self.assertEqual(get_resp.status_code, 200)
         self.assertEqual(len(get_resp.data.get('result')), 0)
-        
+
         get_resp2 = self.client.get('/v1/earner/badges?json_format=plain')
         self.assertEqual(get_resp2.status_code, 200)
         self.assertEqual(len(get_resp2.data), 0)
@@ -1073,4 +1073,4 @@ class TestInclusionFlags(BadgrTestCase, SetupIssuerHelper):
         result = self.client.get('/v2/backpack/assertions')
         self.assertEqual(result.status_code, 200)
         self.assertEqual(len(result.data.get('result')), 1)
-        
+
