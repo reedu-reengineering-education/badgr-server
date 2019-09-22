@@ -69,7 +69,6 @@ class SetupUserHelper(object):
                    terms_version=1
                    ):
 
-
         if email is None:
             email = 'setup_user_{}@email.test'.format(random.random())
         user = BadgeUser.objects.create(email=email,

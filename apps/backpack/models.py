@@ -95,17 +95,31 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
     def badge_items(self, value):
         """
         Update this collection's list of BackpackCollectionBadgeInstance from a list of BadgeInstance EntityRelatedFieldV2 serializer data
+        :param value: list of BadgeInstance instances or list of BadgeInstance entity_id strings.
         """
+        def _is_in_requested_badges(entity_id):
+            if entity_id in value:
+                return True
+            try:
+                if entity_id in [i.entity_id for i in value]:
+                    return True
+            except AttributeError:
+                pass
+            return False
+
         with transaction.atomic():
             existing_badges = {b.entity_id: b for b in self.badge_items}
             # add missing badges
-            for badge_entity_id in value:
+            for badge_reference in value:
                 try:
-                    badgeinstance = BadgeInstance.cached.get(entity_id=badge_entity_id)
+                    if isinstance(badge_reference, BadgeInstance):
+                        badgeinstance = badge_reference
+                    else:
+                        badgeinstance = BadgeInstance.cached.get(entity_id=badge_reference)
                 except BadgeInstance.DoesNotExist:
                     pass
                 else:
-                    if badge_entity_id not in existing_badges.keys():
+                    if badgeinstance.entity_id not in existing_badges.keys():
                         BackpackCollectionBadgeInstance.cached.get_or_create(
                             collection=self,
                             badgeinstance=badgeinstance
@@ -113,7 +127,7 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
 
             # remove badges no longer in collection
             for badge_entity_id, badgeinstance in existing_badges.items():
-                if badge_entity_id not in value:
+                if not _is_in_requested_badges(badge_entity_id):
                     BackpackCollectionBadgeInstance.objects.filter(
                         collection=self,
                         badgeinstance=badgeinstance

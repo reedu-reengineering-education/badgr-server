@@ -132,8 +132,6 @@ class BackpackCollectionSerializerV2(DetailSerializerV2):
                     },
                     'description': "List of Assertions in the collection",
                 }),
-
-
             ])
         })
 

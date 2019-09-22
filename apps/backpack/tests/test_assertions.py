@@ -761,7 +761,7 @@ class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
 
 class TestAcceptanceHandling(BadgrTestCase, SetupIssuerHelper):
     def test_can_accept_badge(self):
-        test_issuer_user = self.setup_user(authenticate=True)
+        test_issuer_user = self.setup_user(authenticate=False)
         test_issuer = self.setup_issuer(owner=test_issuer_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
 

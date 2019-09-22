@@ -3,7 +3,8 @@ from issuer.models import BadgeClass, Issuer, BadgeInstance
 from mainsite.tests.base import BadgrTestCase
 
 from backpack.models import BackpackCollection, BackpackCollectionBadgeInstance
-from backpack.serializers_v1 import (CollectionSerializerV1)
+from backpack.serializers_v1 import CollectionSerializerV1
+from backpack.serializers_v2 import BackpackCollectionSerializerV2
 
 from .utils import setup_basic_0_5_0, setup_basic_1_0, setup_resources
 
@@ -194,7 +195,7 @@ class TestCollections(BadgrTestCase):
 
         self.assertFalse(self.collection.published)
 
-    def test_can_add_remove_collection_badges_via_serializer(self):
+    def test_can_add_remove_collection_badges_via_serializer_v1(self):
         """
         The CollectionSerializer should be able to update an existing collection's badge list
         """
@@ -216,6 +217,37 @@ class TestCollections(BadgrTestCase):
         serializer = CollectionSerializerV1(
             collection,
             data={'badges': [{'id': self.local_badge_instance_2.entity_id}, {'id': self.local_badge_instance_3.entity_id}]},
+            partial=True
+        )
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        self.assertEqual(collection.cached_badgeinstances().count(), 2)
+        self.assertEqual([i.entity_id for i in collection.cached_badgeinstances()], [self.local_badge_instance_2.entity_id, self.local_badge_instance_3.entity_id])
+
+    def test_can_add_remove_collection_badges_via_serializer_v2(self):
+        """
+        The BackpackCollectionSerializerV2 should be able to update an existing collection's badge list
+        """
+        collection = BackpackCollection.objects.first()
+        self.assertEqual(len(self.collection.cached_badgeinstances()), 0)
+
+        serializer = BackpackCollectionSerializerV2(
+            collection,
+            data={'assertions': [self.local_badge_instance_1.entity_id, self.local_badge_instance_2.entity_id]},
+            partial=True
+        )
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        self.assertEqual(collection.cached_badgeinstances().count(), 2)
+        self.assertEqual([i.entity_id for i in collection.cached_badgeinstances()], [self.local_badge_instance_1.entity_id, self.local_badge_instance_2.entity_id])
+
+        serializer = BackpackCollectionSerializerV2(
+            collection,
+            data={'assertions': [self.local_badge_instance_2.entity_id, self.local_badge_instance_3.entity_id]},
             partial=True
         )
 
