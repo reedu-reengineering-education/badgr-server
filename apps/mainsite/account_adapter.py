@@ -170,7 +170,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             raise ImmediateHttpResponse(
                 self.respond_email_verification_sent(request, user))
 
-        badgr_app = get_session_badgr_app(request)
+        badgr_app = BadgrApp.objects.get_current(request)
         ret = super(BadgrAccountAdapter, self).login(request, user)
         set_session_badgr_app(request, badgr_app)
         return ret

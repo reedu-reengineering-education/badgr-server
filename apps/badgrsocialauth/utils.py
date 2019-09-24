@@ -51,3 +51,10 @@ def redirect_to_frontend_error_toast(request, message):
         url=badgr_app.ui_login_redirect,
         message=urllib.quote(message))
     return HttpResponseRedirect(redirect_to=redirect_url)
+
+
+def generate_provider_identifier(sociallogin=None, socialaccount=None):
+    if socialaccount is None:
+        socialaccount = sociallogin.account
+    if socialaccount.provider == 'twitter':
+        return 'https://twitter.com/{}'.format(socialaccount.extra_data['screen_name'].lower())
