@@ -17,7 +17,8 @@ class Base64FileField(FileField):
     # mimetypes.guess_extension() may return different values for same mimetype, but we need one extension for one mime
     _MIME_MAPPING = {
         'image/jpeg': '.jpg',
-        'audio/wav': '.wav'
+        'audio/wav': '.wav',
+        'image/svg+xml': '.svg'
     }
     _ERROR_MESSAGE = _('Base64 string is incorrect')
 
