@@ -175,7 +175,3 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         ret = super(BadgrAccountAdapter, self).login(request, user)
         set_session_badgr_app(request, badgr_app)
         return ret
-
-    def respond_email_verification_sent(self, request, user):
-        badgr_app = BadgrApp.objects.get_current(request)
-        return HttpResponseRedirect(badgr_app.signup_redirect)
