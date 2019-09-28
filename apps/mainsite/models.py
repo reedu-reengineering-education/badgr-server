@@ -17,7 +17,7 @@ from oauthlib.common import generate_token
 import cachemodel
 from django.db.models import Manager
 from django.utils.deconstruct import deconstructible
-from oauth2_provider.models import AccessToken, Application, AbstractAccessToken
+from oauth2_provider.models import AccessToken, Application, RefreshToken
 from rest_framework.authtoken.models import Token
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
@@ -182,6 +182,14 @@ class AccessTokenProxyManager(models.Manager):
                 scope=scope
             )
 
+            if refresh_token:
+                accesstoken.refresh_token = RefreshToken.objects.create(
+                    access_token=accesstoken,
+                    user=user,
+                    application=application,
+                    token=generate_token()
+                )
+
         return accesstoken
 
     def get_from_entity_id(self, entity_id):
@@ -215,7 +223,6 @@ class AccessTokenProxy(AccessToken):
         verbose_name_plural = 'access tokens'
 
     def revoke(self):
-        from oauth2_provider.models import RefreshToken
         RefreshToken.objects.filter(access_token=self.pk).delete()
         self.delete()
 
@@ -251,6 +258,11 @@ class AccessTokenProxy(AccessToken):
     def obscured_token(self):
         if self.token:
             return "{}***".format(self.token[:4])
+
+    @property
+    def seconds_to_expiration(self):
+        valid_for = self.expires - timezone.now()
+        return int(round(valid_for.total_seconds()))
 
 
 class AccessTokenScope(models.Model):
