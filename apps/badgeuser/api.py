@@ -31,7 +31,8 @@ from badgeuser.authcode import authcode_for_accesstoken, decrypt_authcode
 from badgeuser.models import BadgeUser, CachedEmailAddress, TermsVersion
 from badgeuser.permissions import BadgeUserIsAuthenticatedUser
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserTokenSerializerV1
-from badgeuser.serializers_v2 import BadgeUserTokenSerializerV2, BadgeUserSerializerV2, AccessTokenSerializerV2
+from badgeuser.serializers_v2 import (BadgeUserTokenSerializerV2, BadgeUserSerializerV2, AccessTokenSerializerV2,
+                                      TermsVersionSerializerV2,)
 from badgeuser.tasks import process_email_verification, process_post_recipient_id_verification_change
 from badgrsocialauth.utils import redirect_to_frontend_error_toast
 import badgrlog
@@ -576,3 +577,16 @@ class AccessTokenDetail(BaseEntityDetailView):
             return Response(status=HTTP_404_NOT_FOUND)
         obj.revoke()
         return Response(status=204)
+
+
+class LatestTermsVersionDetail(BaseEntityDetailView):
+    model = TermsVersion
+    v2_serializer_class = TermsVersionSerializerV2
+    permission_classes = (permissions.AllowAny,)
+
+    def get_object(self, request, **kwargs):
+        latest = TermsVersion.cached.cached_latest()
+        if latest:
+            return latest
+
+        raise Http404("No TermsVersion has been defined. Please contact server administrator.")

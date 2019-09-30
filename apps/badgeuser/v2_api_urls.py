@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from django.conf.urls import url
 
 from badgeuser.api import (BadgeUserAccountConfirm, BadgeUserToken, BadgeUserForgotPassword, BadgeUserEmailConfirm,
-                           BadgeUserDetail, AccessTokenList, AccessTokenDetail,)
+                           BadgeUserDetail, AccessTokenList, AccessTokenDetail, LatestTermsVersionDetail,)
 
 urlpatterns = [
 
@@ -18,4 +18,6 @@ urlpatterns = [
 
     url(r'^users/(?P<entity_id>self)$', BadgeUserDetail.as_view(), name='v2_api_user_self'),
     url(r'^users/(?P<entity_id>[^/]+)$', BadgeUserDetail.as_view(), name='v2_api_user_detail'),
+
+    url(r'^termsVersions/latest$', LatestTermsVersionDetail.as_view(), name='v2_latest_terms_version_detail'),
 ]

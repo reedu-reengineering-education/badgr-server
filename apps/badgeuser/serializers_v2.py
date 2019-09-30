@@ -46,6 +46,7 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     url = serializers.ListField(read_only=True, source='cached_verified_urls')
     telephone = serializers.ListField(read_only=True, source='cached_verified_phone_numbers')
     agreedTermsVersion = serializers.IntegerField(source='agreed_terms_version', required=False)
+    hasAgreedToLatestTermsVersion = serializers.SerializerMethodField(read_only=True)
     marketingOptIn = serializers.BooleanField(source='marketing_opt_in', required=False)
     badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
     hasPasswordSet = serializers.SerializerMethodField('get_has_password_set')
@@ -62,6 +63,10 @@ class BadgeUserSerializerV2(DetailSerializerV2):
         if identifier:
             return dict(type=identifier.type, identity=identifier.identifier)
         return None
+
+    def get_hasAgreedToLatestTermsVersion(self, obj):
+        latest = TermsVersion.cached.cached_latest()
+        return obj.agreed_terms_version == latest.version
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeUser
@@ -152,7 +157,6 @@ class ApplicationInfoSerializer(serializers.Serializer):
     clientId = serializers.CharField(read_only=True, source='application.client_id')
 
 
-
 class AccessTokenSerializerV2(DetailSerializerV2):
     application = ApplicationInfoSerializer(source='applicationinfo')
     scope = serializers.CharField(read_only=True)
@@ -161,3 +165,10 @@ class AccessTokenSerializerV2(DetailSerializerV2):
 
     class Meta:
         apispec_definition = ('AccessToken', {})
+
+
+class TermsVersionSerializerV2(DetailSerializerV2):
+    version = serializers.IntegerField(read_only=True)
+    shortDescription = serializers.CharField(read_only=True, source='short_description')
+    created = DateTimeWithUtcZAtEndField(read_only=True, source='created_at')
+    updated = DateTimeWithUtcZAtEndField(read_only=True, source='updated_at')
