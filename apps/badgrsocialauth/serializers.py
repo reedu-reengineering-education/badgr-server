@@ -14,6 +14,7 @@ class BadgrSocialAccountSerializerV1(serializers.Serializer):
         provider = instance.get_provider()
         common_fields = provider.extract_common_fields(instance.extra_data)
         email = common_fields.get('email', None)
+        url = common_fields.get('url', None)
         if not email and 'userPrincipalName' in instance.extra_data:
             email = instance.extra_data['userPrincipalName']
 
@@ -21,6 +22,7 @@ class BadgrSocialAccountSerializerV1(serializers.Serializer):
             'firstName': common_fields.get('first_name', None),
             'lastName': common_fields.get('last_name', None),
             'primaryEmail': email,
+            'url': url,
         })
 
         return representation

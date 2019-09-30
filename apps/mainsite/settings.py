@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'badgrsocialauth',
     'badgrsocialauth.providers.kony',
     'badgrsocialauth.providers.google',
+    'badgrsocialauth.providers.twitter',
     'allauth.socialaccount.providers.facebook',
     'allauth.socialaccount.providers.azure',
     'allauth.socialaccount.providers.linkedin_oauth2',

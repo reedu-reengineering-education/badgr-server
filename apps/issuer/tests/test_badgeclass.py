@@ -41,7 +41,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
     def _create_badgeclass_for_issuer_authenticated(self, image_path, **kwargs):
         with open(image_path, 'r') as badge_image:
 
-            image_str = self._base64_data_uri_encode(badge_image, "image/png")
+            image_str = self._base64_data_uri_encode(badge_image, kwargs.get("image_mimetype", "image/png"))
             example_badgeclass_props = {
                 'name': 'Badge of Awesome',
                 'description': "An awesome badge only awarded to awesome people or non-existent test entities",
@@ -222,7 +222,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(date.day, 6)
 
     def test_can_create_badgeclass_with_svg(self):
-        self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path())
+        self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path(), image_mimetype='image/svg+xml')
 
     def test_create_badgeclass_scrubs_svg(self):
         with open(self.get_testfiles_path('hacked-svg-with-embedded-script-tags.svg'), 'r') as attack_badge_image:

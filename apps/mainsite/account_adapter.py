@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.urlresolvers import resolve, Resolver404, reverse
+from django.http import HttpResponseRedirect
 
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import CachedEmailAddress
@@ -69,7 +70,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             source = request.query_params.get('source', None)
             if source:
                 query_params['source'] = source
-            
+
             signup = request.query_params.get('signup', None)
             if signup:
                 query_params['signup'] = 'true'
@@ -170,7 +171,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             raise ImmediateHttpResponse(
                 self.respond_email_verification_sent(request, user))
 
-        badgr_app = get_session_badgr_app(request)
+        badgr_app = BadgrApp.objects.get_current(request)
         ret = super(BadgrAccountAdapter, self).login(request, user)
         set_session_badgr_app(request, badgr_app)
         return ret
