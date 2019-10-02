@@ -12,10 +12,12 @@ import urlparse
 import uuid
 
 import os
+import puremagic
 import requests
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import SuspiciousFileOperation
 from django.core.files.storage import DefaultStorage
 from django.core.urlresolvers import get_callable
 from xml.etree import cElementTree as ET
@@ -105,7 +107,7 @@ def verify_svg(fileobj):
     return tag == '{http://www.w3.org/2000/svg}svg'
 
 
-def fetch_remote_file_to_storage(remote_url, upload_to=''):
+def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types = ()):
     """
     Fetches a remote url, and stores it in DefaultStorage
     :return: (status_code, new_storage_name)
@@ -113,6 +115,12 @@ def fetch_remote_file_to_storage(remote_url, upload_to=''):
     store = DefaultStorage()
     r = requests.get(remote_url, stream=True)
     if r.status_code == 200:
+        if len(allowed_mime_types):
+            mime_type = puremagic.from_string(r.content, mime=True)
+            if not mime_type and re.search(b'<svg', r.content[:256]) and r.content.strip()[-6:] == b'</svg>':
+                mime_type = 'image/svg+xml'
+            if mime_type not in allowed_mime_types:
+                raise SuspiciousFileOperation("{} is not an allowed mime type for upload".format(mime_type))
         name, ext = os.path.splitext(urlparse.urlparse(r.url).path)
         storage_name = '{upload_to}/cached/{filename}{ext}'.format(
             upload_to=upload_to,

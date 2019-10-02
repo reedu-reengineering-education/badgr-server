@@ -123,7 +123,8 @@ class BadgeInstanceEvidenceManager(models.Manager):
 
 
 def _fetch_image_and_get_file(url, upload_to=''):
-    status_code, storage_name = fetch_remote_file_to_storage(url, upload_to=upload_to)
+    status_code, storage_name = fetch_remote_file_to_storage(url, upload_to=upload_to,
+                                                             allowed_mime_types=['image/png', 'image/svg+xml'])
     if status_code == 200:
         image = DefaultStorage().open(storage_name)
         image.name = storage_name
