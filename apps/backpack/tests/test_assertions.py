@@ -22,7 +22,7 @@ from mainsite.utils import first_node_match, OriginSetting
 from backpack.models import BackpackCollection, BackpackCollectionBadgeInstance
 from backpack.serializers_v1 import (CollectionSerializerV1)
 
-from .utils import setup_basic_0_5_0, setup_basic_1_0, setup_resources, CURRENT_DIRECTORY
+from .utils import setup_basic_0_5_0, setup_basic_1_0, setup_basic_1_0_bad_image, setup_resources, CURRENT_DIRECTORY
 
 
 class TestBadgeUploads(BadgrTestCase):
@@ -699,6 +699,28 @@ class TestBadgeUploads(BadgrTestCase):
         )
         self.assertEqual(response.status_code, 201)
 
+    @responses.activate
+    def test_submit_badge_without_valid_image(self):
+        setup_basic_1_0_bad_image()
+        setup_resources([
+            {'url': OPENBADGES_CONTEXT_V1_URI, 'filename': 'v1_context.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)}
+        ])
+        self.setup_user(email='test@example.com', token_scope='rw:backpack')
+
+        post_input = {
+            'url': 'http://a.com/instance'
+        }
+        response = self.client.post(
+            '/v1/earner/badges', post_input
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        get_response = self.client.get('/v1/earner/badges')
+        self.assertEqual(get_response.status_code, 200)
+        self.assertEqual(len(get_response.data), 0, "The backpack should be empty")
+        self.assertEqual(BadgeInstance.objects.count(), 0)
 
 class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
     @responses.activate
