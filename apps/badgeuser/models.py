@@ -92,6 +92,9 @@ class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
     def cached_variants(self):
         return self.emailaddressvariant_set.all()
 
+    def cached_variant_emails(self):
+        return [e.email for e in self.cached_variants()]
+
     def add_variant(self, email_variation):
         existing_variants = EmailAddressVariant.objects.filter(
             canonical_email=self, email=email_variation
@@ -325,6 +328,19 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
                     if emailaddress.verified is False and created is True and send_confirmations is True:
                         # new email address send a confirmation
                         emailaddress.send_confirmation()
+
+                if not emailaddress.verified:
+                    continue  # only verified email addresses may have variants. Don't bother trying otherwise.
+
+                requested_variants = email_data.get('cached_variant_emails', [])
+                existing_variant_emails = emailaddress.cached_variant_emails()
+                for requested_variant in requested_variants:
+                    try:
+                        ev, ev_created = EmailAddressVariant.objects.get_or_create(
+                            canonical_email=emailaddress, email=requested_variant
+                        )
+                    except ValidationError:
+                        pass  # silently ignore cases where
 
             # remove old items
             for emailaddress in self.email_items:

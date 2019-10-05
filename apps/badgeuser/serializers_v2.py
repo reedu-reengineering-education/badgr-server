@@ -15,7 +15,8 @@ from mainsite.validators import PasswordValidator
 class BadgeUserEmailSerializerV2(DetailSerializerV2):
     email = serializers.EmailField()
     verified = serializers.BooleanField(read_only=True)
-    primary = serializers.BooleanField(required=False)
+    primary = serializers.BooleanField(required=False, default=False)
+    caseVariants = serializers.ListField(child=serializers.CharField(), required=False, source='cached_variant_emails')
 
     class Meta(DetailSerializerV2.Meta):
         apispec_definition = ('BadgeUserEmail', {
