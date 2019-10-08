@@ -414,6 +414,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
 
     revoked = HumanReadableBooleanField(read_only=True)
     revocationReason = serializers.CharField(source='revocation_reason', read_only=True)
+    acceptance = serializers.BooleanField(read_only=True)
 
     expires = DateTimeWithUtcZAtEndField(source='expires_at', required=False, allow_null=True, default_timezone=pytz.utc)
 
@@ -476,7 +477,10 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                     'format': "string",
                     'description': "Short description of why the Assertion was revoked",
                 }),
-
+                ('acceptance', {
+                    'type': 'string',
+                    'description': "Recipient interaction with Assertion. One of: Unaccepted, Accepted, or Rejected",
+                }),
                 ('image', {
                     'type': 'string',
                     'format': 'url',

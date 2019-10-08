@@ -6,7 +6,7 @@ from django.contrib.auth.hashers import is_password_usable
 
 from badgeuser.models import BadgeUser, TermsVersion
 from badgeuser.utils import notify_on_password_change
-from entity.serializers import DetailSerializerV2, BaseSerializerV2
+from entity.serializers import DetailSerializerV2, BaseSerializerV2, ListSerializerV2
 from mainsite.models import BadgrApp
 from mainsite.serializers import DateTimeWithUtcZAtEndField, StripTagsCharField
 from mainsite.validators import PasswordValidator
@@ -136,6 +136,7 @@ class BadgeUserTokenSerializerV2(BaseSerializerV2):
     token = serializers.CharField(read_only=True, source='cached_token')
 
     class Meta:
+        list_serializer_class = ListSerializerV2
         apispec_definition = ('BadgeUserToken', {
             'properties': OrderedDict([
                 ('token', {
