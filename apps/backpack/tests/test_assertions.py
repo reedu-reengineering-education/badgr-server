@@ -14,7 +14,7 @@ from issuer.utils import generate_sha256_hashstring
 
 from django.urls import reverse
 
-from badgeuser.models import CachedEmailAddress
+from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import BadgeClass, Issuer, BadgeInstance
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import first_node_match, OriginSetting
@@ -757,6 +757,32 @@ class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
         self.assertEqual(len(get_response.data), 1)
+
+    @responses.activate
+    def test_can_upload_non_hashed_url_badge(self):
+        test_recipient = self.setup_user(authenticate=True)
+        UserRecipientIdentifier.objects.create(
+            user=test_recipient, identifier='https://twitter.com/testuser1', verified=True,
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL
+        )
+        assertion_data = """{"@context":"https://w3id.org/openbadges/v2","type":"Assertion","id":"https://gist.githubusercontent.com/badgebotio/456assertion789/raw","recipient":{"type":"url","hashed":false,"identity":"https://twitter.com/testuser1"},"evidence":{"id:":"https://twitter.com/someuser/status/1176267317866635999","narrative":"Issued on Twitter by Badgebot from [@someuser](https://twitter.com/someuser)"},"issuedOn":"2019-10-02T11:29:25-04:00","badge":"https://gist.githubusercontent.com/badgebotio/456badgeclass789/raw","verification":{"type":"hosted"}}"""
+        badgeclass_data = """{"@context":"https://w3id.org/openbadges/v2","type":"BadgeClass","id":"https://gist.githubusercontent.com/badgebotio/456badgeclass789/raw","name":"You Rock! Badge","description":"Inaugural BadgeBot badge! Recipients of this badge are being recognized for making an impact.","image":"https://gist.githubusercontent.com/badgebotio/456badgeclass789/raw/you-rock-badge.svg","criteria":{"narrative":"Awarded on Twitter"},"issuer":"https://gist.githubusercontent.com/badgebotio/456issuer789/raw"}"""
+        badgeclass_image = """<?xml version="1.0" standalone="no"?><svg height="100" width="100"><circle cx="50" cy="50" r="40" stroke="black" stroke-width="3" fill="red" /></svg>"""
+        issuer_data = """{"@context":"https://w3id.org/openbadges/v2","type":"Issuer","id":"https://gist.githubusercontent.com/badgebotio/456issuer789/raw","name":"BadgeBot","url":"https://badgebot.io"}"""
+        setup_resources([
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
+            {'url': json.loads(assertion_data)['id'], 'response_body': assertion_data},
+            {'url': json.loads(badgeclass_data)['id'], 'response_body': badgeclass_data},
+            {
+                'url': json.loads(badgeclass_data)['image'],
+                'response_body': badgeclass_image,
+                'content_type': 'image/svg+xml'
+             },
+            {'url': json.loads(issuer_data)['id'], 'response_body': issuer_data},
+        ])
+
+        response = self.client.post('/v2/backpack/import', {'url': json.loads(assertion_data)['id']}, format='json')
+        self.assertEqual(response.status_code, 201)
 
 
 class TestAcceptanceHandling(BadgrTestCase, SetupIssuerHelper):

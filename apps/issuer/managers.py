@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import json
+import os
 import urlparse
 
 from django.conf import settings
@@ -133,7 +134,7 @@ def _fetch_image_and_get_file(url, upload_to=''):
 class BadgeInstanceManager(BaseOpenBadgeObjectManager):
 
     @transaction.atomic
-    def get_or_create_from_ob2(self, badgeclass, assertion_obo, recipient_identifier, source=None, original_json=None):
+    def get_or_create_from_ob2(self, badgeclass, assertion_obo, recipient_identifier, recipient_type='email', source=None, original_json=None):
         source_url = assertion_obo.get('id')
         local_object = self.get_local_object(source_url)
         if local_object:
@@ -143,6 +144,7 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         image = None
         if image_url is None:
             image = badgeclass.image.file
+            image.name = os.path.split(image.name)[1]
         else:
             if isinstance(image_url, dict):
                 image_url = image_url.get('id')
@@ -156,6 +158,7 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
             source_url=assertion_obo.get('id'),
             defaults=dict(
                 recipient_identifier=recipient_identifier,
+                recipient_type=recipient_type,
                 hashed=assertion_obo.get('recipient', {}).get('hashed', True),
                 source=source if source is not None else 'local',
                 original_json=original_json,

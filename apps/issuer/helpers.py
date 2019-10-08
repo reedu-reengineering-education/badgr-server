@@ -197,7 +197,8 @@ class BadgeCheckHelper(object):
 
         original_json = response.get('input').get('original_json', {})
 
-        recipient_identifier = report.get('recipientProfile', {}).get('email', None)
+        recipient_profile = report.get('recipientProfile', {})
+        recipient_type, recipient_identifier = recipient_profile.items()[0]
 
         def commit_new_badge():
             with transaction.atomic():
@@ -209,7 +210,11 @@ class BadgeCheckHelper(object):
                 ):
                     from issuer.tasks import notify_badgerank_of_badgeclass
                     notify_badgerank_of_badgeclass.delay(badgeclass_pk=badgeclass.pk)
-                return BadgeInstance.objects.get_or_create_from_ob2(badgeclass, assertion_obo, recipient_identifier=recipient_identifier, original_json=original_json.get(assertion_obo.get('id')))
+                return BadgeInstance.objects.get_or_create_from_ob2(
+                    badgeclass, assertion_obo,
+                    recipient_identifier=recipient_identifier, recipient_type=recipient_type,
+                    original_json=original_json.get(assertion_obo.get('id'))
+                )
         try:
             return commit_new_badge()
         except IntegrityError:
