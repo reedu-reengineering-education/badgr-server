@@ -19,7 +19,7 @@ class BadgrSocialAccountSerializerV1(serializers.Serializer):
             email = instance.extra_data['userPrincipalName']
 
         representation.update({
-            'firstName': common_fields.get('first_name', None),
+            'firstName': common_fields.get('first_name', common_fields.get('name', None)),
             'lastName': common_fields.get('last_name', None),
             'primaryEmail': email,
             'url': url,

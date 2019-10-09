@@ -11,8 +11,10 @@ from rest_framework.views import APIView
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import UserRecipientIdentifier
 from badgrsocialauth.permissions import IsSocialAccountOwner
-from badgrsocialauth.serializers import BadgrSocialAccountSerializerV1
+from badgrsocialauth.serializers_v1 import BadgrSocialAccountSerializerV1
+from badgrsocialauth.serializers_v2 import BadgrSocialAccountSerializerV2
 from entity.api import BaseEntityListView, BaseEntityDetailView
+from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
 from mainsite.models import AccessTokenProxy
 from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
@@ -22,11 +24,11 @@ from mainsite.utils import OriginSetting
 class BadgrSocialAccountList(BaseEntityListView):
     model = SocialAccount
     v1_serializer_class = BadgrSocialAccountSerializerV1
-    v2_serializer_class = None
+    v2_serializer_class = BadgrSocialAccountSerializerV2
     permission_classes = (AuthenticatedWithVerifiedIdentifier,)
 
     def get_objects(self, request, **kwargs):
-        obj =  self.request.user.socialaccount_set.all()
+        obj = self.request.user.socialaccount_set.all()
         return obj
 
     def get(self, request, **kwargs):
@@ -52,13 +54,17 @@ class BadgrSocialAccountConnect(APIView):
             provider=provider_name,
             code=authcode)
 
-        return Response(dict(url=redirect_url))
+        response_data = dict(url=redirect_url)
+        if kwargs['version'] == 'v1':
+            return Response(response_data)
+
+        return Response(BaseSerializerV2.response_envelope(response_data, True, 'OK'))
 
 
 class BadgrSocialAccountDetail(BaseEntityDetailView):
     model = SocialAccount
     v1_serializer_class = BadgrSocialAccountSerializerV1
-    v2_serializer_class = None
+    v2_serializer_class = BadgrSocialAccountSerializerV2
     permission_classes = (AuthenticatedWithVerifiedIdentifier, IsSocialAccountOwner)
 
     def get_object(self, request, **kwargs):
