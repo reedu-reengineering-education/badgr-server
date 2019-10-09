@@ -166,6 +166,7 @@ class AccessTokenSerializerV2(DetailSerializerV2):
     created = DateTimeWithUtcZAtEndField(read_only=True)
 
     class Meta:
+        list_serializer_class = ListSerializerV2
         apispec_definition = ('AccessToken', {})
 
 
