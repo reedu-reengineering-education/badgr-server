@@ -23,9 +23,9 @@ class AccessTokenHandling(SetupIssuerHelper, BadgrTestCase):
         url = reverse('v2_api_access_token_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['result']), 1)
         # Delete tokens in response
-        url = reverse('v2_api_access_token_detail', kwargs={'entity_id': response.data[0]['entityId']})
+        url = reverse('v2_api_access_token_detail', kwargs={'entity_id': response.data['result'][0]['entityId']})
         response = self.client.delete(url)
         self.assertEqual(response.status_code, 204)
         self.assertEqual(len(RefreshToken.objects.all()), 0)

@@ -36,7 +36,8 @@ def process_post_recipient_id_verification_change(self, identifier, type, verifi
     from issuer.models import BadgeInstance, get_user_or_none
     if verified:
         user = get_user_or_none(identifier, type)
-        BadgeInstance.objects.filter(recipient_identifier=identifier).update(user=user)
+        if user:
+            BadgeInstance.objects.filter(recipient_identifier=identifier).update(user=user)
     else:
         BadgeInstance.objects.filter(recipient_identifier=identifier).update(user=None)
     for b in BadgeInstance.objects.filter(recipient_identifier=identifier):
