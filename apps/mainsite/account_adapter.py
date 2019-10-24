@@ -61,7 +61,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             confirmation = EmailConfirmationHMAC.from_key(resolver_match.kwargs.get('confirm_id'))
             # publish changes to cache
             email_address = CachedEmailAddress.objects.get(pk=confirmation.email_address.pk)
-            email_address.save()
+            email_address.publish()
 
             query_params = {
                 'email': email_address.email.encode('utf8')

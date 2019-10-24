@@ -386,7 +386,7 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
             logger.event(badgrlog.NoEmailConfirmation())
             return redirect_to_frontend_error_toast(request,
                                                     "Your email confirmation link is invalid. Please attempt to "
-                                                    "create an account with this email address, again.")
+                                                    "create an account with this email address, again.")  # 202
         # Get EmailAddress instance
         else:
             try:
@@ -397,36 +397,39 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
                     request, email_address=emailconfirmation.email_address))
                 return redirect_to_frontend_error_toast(request,
                                                         "Your email confirmation link is invalid. Please attempt "
-                                                        "to create an account with this email address, again.")
+                                                        "to create an account with this email address, again.")  # 202
+
+        if email_address.verified:
+            logger.event(badgrlog.EmailConfirmationAlreadyVerified(
+                request, email_address=email_address, token=token))
+            return redirect_to_frontend_error_toast(request,
+                                                    "Your email address is already verified. You may now log in.")
 
         # Validate 'token' syntax from query param
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
             logger.event(badgrlog.InvalidEmailConfirmationToken(
                 request, token=token, email_address=email_address))
-            email_address.send_confirmation(request=request, signup=True)
+            email_address.send_confirmation(request=request, signup=False)
             return redirect_to_frontend_error_toast(request,
                                                     "Your email confirmation token is invalid. You have been sent "
-                                                    "a new link. Please check your email and try again.")
+                                                    "a new link. Please check your email and try again.")  # 2
         uidb36 = matches.group(1)
         key = matches.group(2)
         if not (uidb36 and key):
             logger.event(badgrlog.InvalidEmailConfirmationToken(
                 request, token=token, email_address=email_address))
-            email_address.send_confirmation(request=request, signup=True)
+            email_address.send_confirmation(request=request, signup=False)
             return redirect_to_frontend_error_toast(request,
                                                     "Your email confirmation token is invalid. You have been sent "
-                                                    "a new link. Please check your email and try again.")
-
-        redirect_url = get_adapter().get_email_confirmation_redirect_url(
-            request, badgr_app=badgrapp)
+                                                    "a new link. Please check your email and try again.")  # 2
 
         # Get User instance from literal 'token' value
         user = self._get_user(uidb36)
         if user is None or not default_token_generator.check_token(user, key):
             logger.event(badgrlog.EmailConfirmationTokenExpired(
                 request, email_address=email_address))
-            email_address.send_confirmation(request=request, signup=True)
+            email_address.send_confirmation(request=request, signup=False)
             return redirect_to_frontend_error_toast(request,
                                                     "Your authorization link has expired. You have been sent a new "
                                                     "link. Please check your email and try again.")
@@ -434,17 +437,9 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         if email_address.user != user:
             logger.event(badgrlog.OtherUsersEmailConfirmationToken(
                 request, email_address=email_address, token=token, other_user=user))
-            email_address.send_confirmation(request=request, signup=True)
             return redirect_to_frontend_error_toast(request,
-                                                    "Your email confirmation token is associated with another "
-                                                    "user. You have been sent a new link. Please check your email "
-                                                    "and try again.")
-
-        if email_address.verified:
-            logger.event(badgrlog.EmailConfirmationAlreadyVerified(
-                request, email_address=email_address, token=token))
-            return redirect_to_frontend_error_toast(request,
-                                                    "Your email address is already verified. You may now log in.")
+                                                    "Your email confirmation token is associated with an unexpected "
+                                                    "user. You may try again")
 
         # Perform main operation, set EmaiAddress .verified and .primary True
         old_primary = CachedEmailAddress.objects.get_primary(user)
@@ -454,13 +449,15 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         email_address.save()
 
         process_email_verification.delay(email_address.pk)
-        process_post_recipient_id_verification_change.delay(email_address.email, 'email', True)
 
         # Create an OAuth AccessTokenProxy instance for this user
         accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
             user,
             application=badgrapp.oauth_application if badgrapp.oauth_application_id else None,
             scope='rw:backpack rw:profile rw:issuer')
+
+        redirect_url = get_adapter().get_email_confirmation_redirect_url(
+            request, badgr_app=badgrapp)
 
         if badgrapp.use_auth_code_exchange:
             authcode = authcode_for_accesstoken(accesstoken)
