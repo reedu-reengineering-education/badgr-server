@@ -5,6 +5,7 @@ import urllib
 import urlparse
 
 import cairosvg
+import openbadges
 from PIL import Image
 from django.conf import settings
 from django.core.files.storage import DefaultStorage
@@ -22,9 +23,8 @@ import utils
 from backpack.models import BackpackCollection
 from entity.api import VersionedObjectMixin
 from mainsite.models import BadgrApp
-from mainsite.utils import OriginSetting, set_url_query_params
+from mainsite.utils import OriginSetting, set_url_query_params, first_node_match
 from .models import Issuer, BadgeClass, BadgeInstance
-
 logger = badgrlog.BadgrLogger()
 
 
@@ -501,8 +501,8 @@ class OEmbedAPIEndpoint(APIView):
         clamp = 800
         width = int(request.query_params.get('maxwidth', clamp))
         height = int(request.query_params.get('maxheight', clamp))
-        constraned_value = width if width == height else min(height, width)
-        return constraned_value if constraned_value < clamp else clamp
+        constrained_value = width if width == height else min(height, width)
+        return constrained_value if constrained_value < clamp else clamp
 
     def get(self, request, **kwargs):
         try:
@@ -546,4 +546,95 @@ class OEmbedAPIEndpoint(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+class VerifyBadgeAPIEndpoint(JSONComponentView):
+    permission_classes = (permissions.AllowAny,)
+    @staticmethod
+    def get_object(entity_id):
+        try:
+            return BadgeInstance.cached.get(entity_id=entity_id)
 
+        except BadgeInstance.DoesNotExist:
+            raise Http404
+
+    def post(self, request, **kwargs):
+        entity_id = request.data.get('entity_id')
+        badge_instance = self.get_object(entity_id)
+
+        recipient_profile = {
+            badge_instance.recipient_type: badge_instance.recipient_identifier
+        }
+
+        badge_check_options = {
+            'include_original_json': True,
+            'use_cache': True,
+        }
+
+        try:
+            response = openbadges.verify(badge_instance.jsonld_id, recipient_profile=recipient_profile, **badge_check_options)
+        except ValueError as e:
+            raise ValidationError([{'name': "INVALID_BADGE", 'description': str(e)}])
+
+        graph = response.get('graph', [])
+
+        revoked_obo = first_node_match(graph, dict(revoked=True))
+
+        if bool(revoked_obo):
+            instance = BadgeInstance.objects.get(source_url=revoked_obo['id'])
+            instance.revoke(revoked_obo.get('revocationReason'))
+            result = {
+                '@context': 'https://w3id.org/openbadges/v2',
+                'isRevoked': True,
+                'revocationReason': revoked_obo.get('revocationReason', 'Badge is revoked'),
+                'badgeAssertion': self.get_object(entity_id).get_json(expand_badgeclass=True, expand_issuer=True),
+            }
+
+        else:
+            report = response.get('report', {})
+            is_valid = report.get('valid')
+
+            if not is_valid:
+                if report.get('errorCount', 0) > 0:
+                    errors = [{'name': 'UNABLE_TO_VERIFY', 'description': 'Unable to verify the assertion'}]
+                raise ValidationError(errors)
+
+            validation_subject = report.get('validationSubject')
+
+            badge_instance_obo = first_node_match(graph, dict(id=validation_subject))
+            if not badge_instance_obo:
+                raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find an badge instance'}])
+
+            badgeclass_obo = first_node_match(graph, dict(id=badge_instance_obo.get('badge', None)))
+            if not badgeclass_obo:
+                raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find a badgeclass'}])
+
+            issuer_obo = first_node_match(graph, dict(id=badgeclass_obo.get('issuer', None)))
+            if not issuer_obo:
+                raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find an issuer'}])
+
+            original_json = response.get('input').get('original_json', {})
+
+            BadgeInstance.objects.update_from_ob2(
+                badge_instance.badgeclass,
+                badge_instance_obo,
+                badge_instance.recipient_identifier,
+                badge_instance.recipient_type,
+                original_json.get(badge_instance_obo.get('id', ''), None)
+            )
+
+            BadgeClass.objects.update_from_ob2(
+                badge_instance.issuer,
+                badgeclass_obo,
+                original_json.get(badgeclass_obo.get('id', ''), None)
+            )
+
+            Issuer.objects.update_from_ob2(
+                issuer_obo,
+                original_json.get(issuer_obo.get('id', ''), None)
+            )
+
+            result = {
+                '@context': 'https://w3id.org/openbadges/v2',
+                'badgeAssertion': self.get_object(entity_id).get_json(expand_badgeclass=True, expand_issuer=True),
+            }
+
+        return Response(result, status=status.HTTP_200_OK)
