@@ -299,6 +299,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         primary_count = sum(1 if d.get('primary', False) else 0 for d in value)
         if primary_count != 1:
             raise ValidationError("Must have exactly 1 primary email")
+        requested_primary = [d for d in value if d.get('primary', False)][0]
 
         with transaction.atomic():
             # add or update existing items
@@ -350,6 +351,11 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
             for emailaddress in self.email_items:
                 if emailaddress.email not in new_email_idx:
                     emailaddress.delete()
+
+        if self.email != requested_primary:
+            self.email = requested_primary['email']
+            self.save()
+
 
     def cached_email_variants(self):
         return chain.from_iterable(email.cached_variants() for email in self.cached_emails())
