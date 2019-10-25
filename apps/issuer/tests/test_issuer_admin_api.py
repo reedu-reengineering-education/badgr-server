@@ -1,0 +1,94 @@
+# encoding: utf-8
+from __future__ import unicode_literals
+
+
+import os
+from django.core.files.images import get_image_dimensions
+from django.urls import reverse
+from django.utils import timezone
+from oauth2_provider.models import Application
+
+from badgeuser.models import  TermsVersion
+from issuer.models import Issuer, BadgeClass, IssuerStaff
+from mainsite.models import ApplicationInfo, AccessTokenProxy
+from mainsite.tests import SetupOAuth2ApplicationHelper
+from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
+
+
+class IssuerAdminTests(BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationHelper):
+    def setUp(self):
+        super(IssuerAdminTests, self).setUp()
+
+        self.client_app_user = self.setup_user(email='clientApp@example.com', token_scope='rw:userAdmin')
+        self.app = self.setup_oauth2_application(
+            client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
+            user=self.client_app_user, allowed_scopes='rw:issuerAdmin'
+        )
+
+        self.t = AccessTokenProxy.objects.create(
+            user=self.client_app_user, scope='rw:issuerAdmin', expires=timezone.now() + timezone.timedelta(hours=1),
+            token='123', application=self.app
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(self.t.token))
+
+        self.latest_terms = TermsVersion.objects.create(version=3, short_description="test terms")
+
+        self.issuer_owner_user = self.setup_user(email='some_cool_user@example.com', verified=True)
+        self.issuer = self.setup_issuer(owner=self.issuer_owner_user)
+
+    def test_can_get_issuer_detail(self):
+        response = self.client.get('/v2/issuers/{}'.format(self.issuer.entity_id))
+        self.assertEqual(response.status_code, 200)
+
+    def test_can_get_issuer_badgeclasses_list(self):
+        response = self.client.get('/v2/issuers/{}/badgeclasses'.format(self.issuer.entity_id))
+        self.assertEqual(response.status_code, 200)
+
+    def test_can_get_badgeclass_detail(self):
+        badgeclass = self.setup_badgeclass(issuer=self.issuer, name='Example', criteria_text='Just earn it')
+        response = self.client.get('/v2/badgeclasses/{}'.format(badgeclass.entity_id))
+        self.assertEqual(response.status_code, 200)
+
+    def test_can_get_assertion_lists(self):
+        badgeclass = self.setup_badgeclass(issuer=self.issuer, name='Example', criteria_text='Just earn it')
+        assertion = badgeclass.issue(recipient_id='someone@somewhere.com')
+
+        # can get badgeclass-specific assertion list
+        response = self.client.get('/v2/badgeclasses/{}/assertions'.format(badgeclass.entity_id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+
+        # can get issuer assertion list
+        response = self.client.get('/v2/issuers/{}/assertions'.format(self.issuer.entity_id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+
+    def can_post_new_assertion(self):
+        badgeclass = self.setup_badgeclass(issuer=self.issuer, name='Example', criteria_text='Just earn it')
+        award_data = {
+            'recipient': {'identity': 'test@example.com'}
+        }
+        response = self.client.post(
+            '/v2/badgeclasses/{}/assertions'.format(badgeclass.entity_id),  award_data, format='json'
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def can_post_staff_v1(self):
+        staffer_user = self.setup_user(email='some_cool_staffer@example.com', verified=True)
+        staff_action = {
+            'action': 'add',
+            'email': 'some_cool_staffer@example.com',
+            'role': 'editor'
+        }
+        staff_url = '/v1/issuer/issuers/{}/staff'.format(self.issuer.entity_id)
+        response = self.client.post(staff_url, staff_action, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(staff_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+
+        response = self.client.get('/v2/issuers/{}'.format(self.issuer.entity_id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result'][0]['staff']), 2)

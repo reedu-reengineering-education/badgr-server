@@ -1,10 +1,7 @@
 # encoding: utf-8
 from __future__ import unicode_literals
-import urlparse
 
-from django.apps import apps
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status, authentication
 from rest_framework.exceptions import ValidationError, PermissionDenied, NotFound
 from rest_framework.response import Response
@@ -12,15 +9,10 @@ from rest_framework.views import APIView
 
 import badgrlog
 from badgeuser.models import CachedEmailAddress
-from entity.api import BaseEntityListView, BaseEntityDetailView, VersionedObjectMixin
-from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance
-from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass,
-                                IsEditor, IsStaff, IsOwnerOrStaff, ApprovedIssuersOnly,
-                                BadgrOAuthTokenHasEntityScope)
-from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
-                                   BadgeInstanceSerializerV1, IssuerRoleActionSerializerV1,
-                                   IssuerStaffSerializerV1)
-from issuer.serializers_v2 import IssuerSerializerV2
+from entity.api import VersionedObjectMixin
+from issuer.models import Issuer, IssuerStaff
+from issuer.permissions import IsIssuerAdmin, IsOwnerOrStaff, BadgrOAuthTokenHasEntityScope
+from issuer.serializers_v1 import BadgeClassSerializerV1, IssuerRoleActionSerializerV1, IssuerStaffSerializerV1
 from issuer.utils import get_badgeclass_by_identifier
 from apispec_drf.decorators import apispec_list_operation, apispec_operation
 from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
@@ -79,7 +71,11 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
     role = 'staff'
     queryset = Issuer.objects.all()
     model = Issuer
-    permission_classes = [AuthenticatedWithVerifiedIdentifier, IsOwnerOrStaff|BadgrOAuthTokenHasEntityScope]
+    permission_classes = [
+        IsIssuerAdmin |
+        (AuthenticatedWithVerifiedIdentifier & IsOwnerOrStaff) |
+        BadgrOAuthTokenHasEntityScope
+    ]
     valid_scopes = ["rw:issuerOwner:*"]
 
     @apispec_list_operation('IssuerStaff',
@@ -90,7 +86,9 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
         current_issuer = self.get_object(request, **kwargs)
         if not self.has_object_permissions(request, current_issuer):
             return Response(
-                "Issuer %s not found. Authenticated user must have owner, editor or staff rights on the issuer." % slug,
+                "Issuer %s not found. Authenticated user must have owner, editor or staff rights on the issuer.".format(
+                    kwargs.get('slug')
+                ),
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -144,12 +142,8 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         current_issuer = self.get_object(request, **kwargs)
-        if not self.has_object_permissions(request, current_issuer):
-            return Response(
-                "Issuer not found. Authenticated user must be Issuer's owner to modify user permissions.",
-                status=status.HTTP_404_NOT_FOUND
-            )
 
+        user_id = None
         try:
             if serializer.validated_data.get('username'):
                 user_id = serializer.validated_data.get('username')

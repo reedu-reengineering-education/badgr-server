@@ -423,6 +423,7 @@ OAUTH2_PROVIDER = {
 
         # private scopes used for integrations
         'rw:issuer:*':  'Create and update badge classes, and award assertions for a single issuer',
+        'rw:issuerAdmin': 'Superuser trusted operations on any issuer',
         'r:assertions': 'Batch receive assertions',
     },
     'DEFAULT_SCOPES': ['r:profile'],

@@ -64,6 +64,7 @@ class JSONComponentView(VersionedObjectMixin, APIView, SlugToEntityIdRedirectMix
     Abstract Component Class
     """
     permission_classes = (permissions.AllowAny,)
+    allow_any_unauthenticated_access = True
     authentication_classes = ()
     html_renderer_class = None
     template_name = 'public/bot_openbadge.html'
@@ -438,6 +439,7 @@ class BackpackCollectionJson(JSONComponentView):
 
 class BakedBadgeInstanceImage(VersionedObjectMixin, APIView, SlugToEntityIdRedirectMixin):
     permission_classes = (permissions.AllowAny,)
+    allow_any_unauthenticated_access = True
     model = BadgeInstance
 
     def get(self, request, **kwargs):

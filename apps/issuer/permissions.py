@@ -184,6 +184,17 @@ class AuthorizationIsBadgrOAuthToken(permissions.BasePermission):
         return isinstance(request.auth, oauth2_provider.models.AccessToken)
 
 
+class IsIssuerAdmin(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        token = request.auth
+
+        if token is None:
+            return False
+
+        token_sopes = set(token.scope.split())
+        return 'rw:issuerAdmin' in token_sopes
+
+
 class BadgrOAuthTokenHasScope(permissions.BasePermission):
     def has_permission(self, request, view):
         valid_scopes = self.valid_scopes_for_view(view, method=request.method)
@@ -227,11 +238,8 @@ class BadgrOAuthTokenHasEntityScope(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         token = request.auth
 
-        # Do not apply scope if using a non-oauth tokens
+        # This fails for authentication methods other than oauth2 token auth. Compose view permissions correctly.
         if not isinstance(token, oauth2_provider.models.AccessToken):
-            return True
-
-        if not token:
             return False
 
         # badgeclass/assertion objects defer to the issuer for permissions
