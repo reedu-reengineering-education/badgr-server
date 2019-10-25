@@ -36,6 +36,26 @@ class BaseOpenBadgeObjectManager(models.Manager):
 
 class IssuerManager(BaseOpenBadgeObjectManager):
 
+    def update_from_ob2(self, issuer_obo, original_json=None):
+
+        image_url = issuer_obo.get('image', None)
+        image = None
+        if image_url:
+            if isinstance(image_url, dict):
+                image_url = image_url.get('id')
+            image = _fetch_image_and_get_file(image_url, upload_to='remote/issuer')
+        return self.update_or_create(
+            source_url=issuer_obo.get('id'),
+            defaults=dict(
+                name=issuer_obo.get('name'),
+                description=issuer_obo.get('description', None),
+                url=issuer_obo.get('url', None),
+                email=issuer_obo.get('email', None),
+                image=image,
+                original_json=original_json
+            )
+        )
+
     @transaction.atomic
     def get_or_create_from_ob2(self, issuer_obo, source=None, original_json=None):
         source_url = issuer_obo.get('id')
@@ -76,6 +96,34 @@ class BadgeClassManager(BaseOpenBadgeObjectManager):
 
         return obj
 
+    def update_from_ob2(self, issuer, badgeclass_obo, original_json=None):
+        criteria_url = None
+        criteria_text = None
+        criteria = badgeclass_obo.get('criteria', None)
+        if isinstance(criteria, basestring):
+            criteria_text = criteria
+        elif criteria.get('type', 'Criteria') == 'Criteria':
+            criteria_url = criteria.get('id', None)
+            criteria_text = criteria.get('narrative', None)
+
+        image_url = badgeclass_obo.get('image')
+        if isinstance(image_url, dict):
+            image_url = image_url.get('id')
+        image = _fetch_image_and_get_file(image_url, upload_to='remote/badgeclass')
+
+        return self.update_or_create(
+            source_url=badgeclass_obo.get('id'),
+            defaults=dict(
+                issuer=issuer,
+                name=badgeclass_obo.get('name'),
+                description=badgeclass_obo.get('description', None),
+                image=image,
+                criteria_url=criteria_url,
+                criteria_text=criteria_text,
+                original_json=original_json
+            )
+        )
+
     @transaction.atomic
     def get_or_create_from_ob2(self, issuer, badgeclass_obo, source=None, original_json=None):
         source_url = badgeclass_obo.get('id')
@@ -111,11 +159,18 @@ class BadgeClassManager(BaseOpenBadgeObjectManager):
             )
         )
 
-
 class BadgeInstanceEvidenceManager(models.Manager):
     @transaction.atomic
     def create_from_ob2(self, badgeinstance, evidence_obo):
         return self.create(
+            badgeinstance=badgeinstance,
+            evidence_url=evidence_obo.get('id', None),
+            narrative=evidence_obo.get('narrative', None),
+            original_json=json.dumps(evidence_obo)
+        )
+
+    def update_from_ob2(self, badgeinstance, evidence_obo):
+        return self.update(
             badgeinstance=badgeinstance,
             evidence_url=evidence_obo.get('id', None),
             narrative=evidence_obo.get('narrative', None),
@@ -132,6 +187,42 @@ def _fetch_image_and_get_file(url, upload_to=''):
 
 
 class BadgeInstanceManager(BaseOpenBadgeObjectManager):
+    def update_from_ob2(self, badgeclass, assertion_obo, recipient_identifier, recipient_type='email', original_json=None):
+
+        image_url = assertion_obo.get('image', None)
+        if isinstance(image_url, dict):
+            image_url = image_url.get('id')
+        image = _fetch_image_and_get_file(image_url, upload_to='remote/assertion')
+
+        issued_on = None
+        if 'issuedOn' in assertion_obo:
+            issued_on = dateutil.parser.parse(assertion_obo.get('issuedOn'))
+
+        updated = self.update_or_create(
+            source_url=assertion_obo.get('id'),
+            defaults=dict(
+                recipient_identifier=recipient_identifier,
+                recipient_type=recipient_type,
+                hashed=assertion_obo.get('recipient', {}).get('hashed', True),
+                original_json=original_json,
+                badgeclass=badgeclass,
+                issuer=badgeclass.cached_issuer,
+                image=image,
+                acceptance=self.model.ACCEPTANCE_ACCEPTED,
+                narrative=assertion_obo.get('narrative', None),
+                issued_on=issued_on
+            )
+        )
+
+        evidence = list_of(assertion_obo.get('evidence', None))
+        if evidence:
+            from issuer.models import BadgeInstanceEvidence
+            for evidence_item in evidence:
+                # if we have come this far we all already using ob2
+                BadgeInstanceEvidence.objects.update_from_ob2(badgeclass, evidence_item)
+
+        return updated
+
 
     @transaction.atomic
     def get_or_create_from_ob2(self, badgeclass, assertion_obo, recipient_identifier, recipient_type='email', source=None, original_json=None):
