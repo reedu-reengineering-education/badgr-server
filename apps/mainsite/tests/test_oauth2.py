@@ -84,6 +84,11 @@ class OAuth2TokenTests(BadgrTestCase):
         )
         self.assertEqual(response.status_code, 201)
 
+        new_token_instance.expires = timezone.now() - timezone.timedelta(days=1)
+        new_token_instance.save()
+        response = self.client.get(reverse('v2_api_issuer_list'))
+        self.assertEqual(response.status_code, 401)
+
     def test_can_encrypt_decrypt_authcode(self):
         payload = "fakeentityid"
         code = encrypt_authcode(payload)

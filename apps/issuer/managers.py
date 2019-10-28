@@ -188,11 +188,12 @@ def _fetch_image_and_get_file(url, upload_to=''):
 
 class BadgeInstanceManager(BaseOpenBadgeObjectManager):
     def update_from_ob2(self, badgeclass, assertion_obo, recipient_identifier, recipient_type='email', original_json=None):
-
+        image = None
         image_url = assertion_obo.get('image', None)
         if isinstance(image_url, dict):
             image_url = image_url.get('id')
-        image = _fetch_image_and_get_file(image_url, upload_to='remote/assertion')
+        if image_url:
+            image = _fetch_image_and_get_file(image_url, upload_to='remote/assertion')
 
         issued_on = None
         if 'issuedOn' in assertion_obo:
