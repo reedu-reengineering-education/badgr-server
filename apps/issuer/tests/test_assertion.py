@@ -1316,3 +1316,41 @@ class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
             test_badgeclass.entity_id
         ), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 201, "Assertion should be allowed if existing award is revoked")
+
+    def test_single_award_allow_duplicates_against_not_expired(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        existing_assertion = test_badgeclass.issue(
+            'test3@example.com', expires_at=timezone.now() + timezone.timedelta(days=1)
+        )
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'test3@example.com'
+            },
+            'allowDuplicateAwards': False
+        }
+        response = self.client.post('/v2/badgeclasses/{}/assertions'.format(
+            test_badgeclass.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 400, "The badge should not award, given a unexpired existing award")
+
+    def test_single_award_allow_duplicates_against_expired(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        existing_assertion = test_badgeclass.issue(
+            'test3@example.com', expires_at=timezone.now() - timezone.timedelta(days=1)
+        )
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'test3@example.com'
+            },
+            'allowDuplicateAwards': False
+        }
+        response = self.client.post('/v2/badgeclasses/{}/assertions'.format(
+            test_badgeclass.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 201, "The badge should award, given an expired prior award.")

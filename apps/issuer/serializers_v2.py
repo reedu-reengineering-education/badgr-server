@@ -592,7 +592,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                 ).filter(
                     revoked=False
                 ).filter(
-                    Q(expires_at__isnull=True) | Q(expires_at__lt=timezone.now())
+                    Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
                 )
                 if previous_awards.exists():
                     raise serializers.ValidationError(
