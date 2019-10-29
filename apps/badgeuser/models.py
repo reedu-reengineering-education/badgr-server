@@ -340,12 +340,10 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
                 requested_variants = email_data.get('cached_variant_emails', [])
                 existing_variant_emails = emailaddress.cached_variant_emails()
                 for requested_variant in requested_variants:
-                    try:
-                        ev, ev_created = EmailAddressVariant.objects.get_or_create(
+                    if requested_variant not in existing_variant_emails:
+                        EmailAddressVariant.objects.create(
                             canonical_email=emailaddress, email=requested_variant
                         )
-                    except ValidationError:
-                        pass  # silently ignore cases where
 
             # remove old items
             for emailaddress in self.email_items:
