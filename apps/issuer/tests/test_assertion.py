@@ -1285,7 +1285,7 @@ class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
-        test_badgeclass.issue('test3@example.com')
+        existing_assertion = test_badgeclass.issue('test3@example.com')
 
         new_assertion_props = {
             'recipient': {
@@ -1309,3 +1309,10 @@ class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
             badge=test_badgeclass.entity_id
         ), new_assertion_props_v1)
         self.assertEqual(response.status_code, 400)
+
+        existing_assertion.revoked = True
+        existing_assertion.save()
+        response = self.client.post('/v2/badgeclasses/{}/assertions'.format(
+            test_badgeclass.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 201, "Assertion should be allowed if existing award is revoked")

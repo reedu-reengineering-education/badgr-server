@@ -590,6 +590,8 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                 previous_awards = BadgeInstance.objects.filter(
                     recipient_identifier=data['recipient_identifier'], badgeclass=data['badgeclass']
                 ).filter(
+                    revoked=False
+                ).filter(
                     Q(expires_at__isnull=True) | Q(expires_at__lt=timezone.now())
                 )
                 if previous_awards.exists():
