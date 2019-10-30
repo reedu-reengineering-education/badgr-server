@@ -290,7 +290,7 @@ class BatchAssertionsRevoke(VersionedObjectMixin, BaseEntityView):
     model = BadgeInstance
     permission_classes = [
         IsIssuerAdmin |
-        (AuthenticatedWithVerifiedIdentifier & IsEditor) |
+        (AuthenticatedWithVerifiedIdentifier & MayEditBadgeClass) |
         BadgrOAuthTokenHasEntityScope
     ]
     v2_serializer_class = BadgeInstanceSerializerV2
