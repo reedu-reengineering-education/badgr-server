@@ -324,9 +324,6 @@ class BatchAssertionsRevoke(VersionedObjectMixin, BaseEntityView):
         except Http404:
             return dict(response, reason="permission denied or object not found")
 
-        if not self.has_object_permissions(request, assertion):
-            dict(response, reason="permission denied or object not found")
-
         try:
             assertion.revoke(revocation_reason)
         except Exception as e:

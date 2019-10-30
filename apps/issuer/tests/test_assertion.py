@@ -861,6 +861,28 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             revoked=True
         ), assertion_obo)
 
+    def test_can_revoke_assertion_bulk(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        revocation_data = [{
+            'entityId': test_assertion.entity_id,
+            'revocationReason': 'Earner kind of sucked, after all.'
+        }]
+
+        response = self.client.post(reverse('v2_api_assertion_revoke'), data=revocation_data, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get('/public/assertions/{assertion}.json'.format(assertion=test_assertion.entity_id))
+        self.assertEqual(response.status_code, 200)
+        assertion_obo = json.loads(response.content)
+        self.assertDictContainsSubset(dict(
+            revocationReason=revocation_data[0]['revocationReason'],
+            revoked=True
+        ), assertion_obo)
+
     def test_cannot_revoke_assertion_if_missing_reason(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
