@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import json
 import os
+import six
 import urlparse
 
 from django.conf import settings
@@ -162,6 +163,12 @@ class BadgeClassManager(BaseOpenBadgeObjectManager):
 class BadgeInstanceEvidenceManager(models.Manager):
     @transaction.atomic
     def create_from_ob2(self, badgeinstance, evidence_obo):
+        if isinstance(evidence_obo, six.string_types):
+            return self.create(
+                badgeinstance=badgeinstance,
+                evidence_url=evidence_obo,
+                narrative=None,
+                original_json='')
         return self.create(
             badgeinstance=badgeinstance,
             evidence_url=evidence_obo.get('id', None),
@@ -170,6 +177,13 @@ class BadgeInstanceEvidenceManager(models.Manager):
         )
 
     def update_from_ob2(self, badgeinstance, evidence_obo):
+        if isinstance(evidence_obo, six.string_types):
+            return self.update(
+                badgeinstance=badgeinstance,
+                evidence_url=evidence_obo,
+                narrative=None,
+                original_json=''
+            )
         return self.update(
             badgeinstance=badgeinstance,
             evidence_url=evidence_obo.get('id', None),
