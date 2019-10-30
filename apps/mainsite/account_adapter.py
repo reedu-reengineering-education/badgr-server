@@ -175,3 +175,9 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         ret = super(BadgrAccountAdapter, self).login(request, user)
         set_session_badgr_app(request, badgr_app)
         return ret
+
+    def logout(self, request):
+        badgrapp_pk = request.session.get('badgr_app_pk')
+        super(BadgrAccountAdapter, self).logout(request)
+        if badgrapp_pk:
+            request.session['badgr_app_pk'] = badgrapp_pk
