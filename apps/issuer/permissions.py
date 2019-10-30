@@ -188,11 +188,11 @@ class IsIssuerAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         token = request.auth
 
-        if token is None:
+        if token is None or not isinstance(token, oauth2_provider.models.AccessToken):
             return False
 
-        token_sopes = set(token.scope.split())
-        return 'rw:issuerAdmin' in token_sopes
+        token_scopes = set(token.scope.split())
+        return 'rw:issuerAdmin' in token_scopes
 
 
 class BadgrOAuthTokenHasScope(permissions.BasePermission):
