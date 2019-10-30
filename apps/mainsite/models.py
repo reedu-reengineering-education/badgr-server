@@ -74,6 +74,12 @@ class BadgrAppManager(Manager):
                 origin = request.META.get('HTTP_REFERER')
             existing_session_app_id = request.session.get('badgr_app_pk', None)
 
+        if existing_session_app_id:
+            try:
+                return self.get(id=existing_session_app_id)
+            except self.model.DoesNotExist:
+                pass
+
         if origin:
             url = urlparse.urlparse(origin)
             try:
@@ -81,11 +87,6 @@ class BadgrAppManager(Manager):
             except self.model.DoesNotExist:
                 pass
 
-        if existing_session_app_id:
-            try:
-                return self.get(id=existing_session_app_id)
-            except self.model.DoesNotExist:
-                pass
         badgr_app_id = getattr(settings, 'BADGR_APP_ID', None)
         if raise_exception and not badgr_app_id:
             raise ImproperlyConfigured("Must specify a BADGR_APP_ID")
