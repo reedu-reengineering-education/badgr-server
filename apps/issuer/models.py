@@ -414,6 +414,7 @@ def get_user_or_none(recipient_id, recipient_type):
 
     return user
 
+
 class BadgeClass(ResizeUploadedImage,
                  ScrubUploadedSvgImage,
                  BaseAuditedModel,
