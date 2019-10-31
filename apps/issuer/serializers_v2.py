@@ -535,6 +535,13 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
             ])
         })
 
+    def validate_issuedOn(self, value):
+        if value > timezone.now():
+            raise serializers.ValidationError("Only issuedOn dates in the past are acceptable.")
+        if value.year < 1583:
+            raise serializers.ValidationError("Only issuedOn dates after the introduction of the Gregorian calendar are allowed.")
+        return value
+
     def update(self, instance, validated_data):
         updateable_fields = [
             'evidence_items',

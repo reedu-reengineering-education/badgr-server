@@ -401,7 +401,6 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
             'expires_at',
             'extension_items',
             'hashed',
-            'issued_on',
             'narrative',
             'recipient_identifier',
             'recipient_type'

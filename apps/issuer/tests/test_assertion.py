@@ -992,6 +992,33 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         ), invalid_batch_assertion_props, format='json')
         self.assertEqual(response.status_code, 400)
 
+    def test_issue_assertion_with_unacceptable_issuedOn(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        issue_time = timezone.now() + timezone.timedelta(days=1)
+        assertion_data = {
+            'recipient': {
+                "identity": "bar@baz.com",
+                "type": "email"
+            },
+            'issuedOn': issue_time.isoformat()
+        }
+
+        response = self.client.post('/v2/badgeclasses/{badge}/assertions'.format(
+            badge=test_badgeclass.entity_id
+        ), assertion_data, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['fieldErrors']['issuedOn'][0], 'Only issuedOn dates in the past are acceptable.')
+
+        assertion_data['issuedOn'] = '1492-01-01T13:00:00Z'  # A time prior to introduction of the Gregorian calendar.
+        response = self.client.post('/v2/badgeclasses/{badge}/assertions'.format(
+            badge=test_badgeclass.entity_id
+        ), assertion_data, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['fieldErrors']['issuedOn'][0], 'Only issuedOn dates after the introduction of the Gregorian calendar are allowed.')
+
     def test_batch_assertions_with_evidence(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
