@@ -250,7 +250,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     def delete(self, *args, **kwargs):
         cached_emails = self.cached_emails()
         if cached_emails.exists():
-            for email in self.cached_emails:
+            for email in cached_emails:
                 email.delete()
         super(BadgeUser, self).delete(*args, **kwargs)
         self.publish_delete('username')
