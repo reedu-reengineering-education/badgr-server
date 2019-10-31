@@ -48,7 +48,6 @@ class BaseEntityView(APIView):
 
 
 class BaseEntityListView(BaseEntityView):
-
     def get_objects(self, request, **kwargs):
         raise NotImplementedError
 
@@ -56,6 +55,9 @@ class BaseEntityListView(BaseEntityView):
         """
         GET a list of an entities the authenticated user is authorized for
         """
+        if self.allow_any_unauthenticated_access is False and not request.user.is_authenticated():
+            raise NotAuthenticated()
+
         objects = self.get_objects(request, **kwargs)
         context = self.get_context_data(**kwargs)
         serializer_class = self.get_serializer_class()
@@ -74,6 +76,8 @@ class BaseEntityListView(BaseEntityView):
         """
         POST a new entity to be owned by the authenticated user
         """
+        if not request.user.is_authenticated():
+            raise NotAuthenticated()
 
         context = self.get_context_data(**kwargs)
         serializer_class = self.get_serializer_class()

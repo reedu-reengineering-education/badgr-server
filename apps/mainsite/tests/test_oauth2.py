@@ -1,3 +1,4 @@
+import base64
 import urllib
 
 from django.core.cache import cache
@@ -9,11 +10,11 @@ from badgeuser.authcode import encrypt_authcode, decrypt_authcode, authcode_for_
 from mainsite.models import AccessTokenProxy
 from issuer.models import Issuer
 from mainsite.models import ApplicationInfo
-from mainsite.tests import BadgrTestCase
+from mainsite.tests import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import backoff_cache_key
 
 
-class OAuth2TokenTests(BadgrTestCase):
+class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
     def test_client_credentials_can_get_token(self):
         client_id = "test"
         client_secret = "secret"
@@ -120,8 +121,13 @@ class OAuth2TokenTests(BadgrTestCase):
         response = self.client.post(reverse('oauth2_code_exchange'), dict(code=expired_authcode))
         self.assertEqual(response.status_code, 400)
 
+    def _base64_data_uri_encode(self, file, mime):
+        encoded = base64.b64encode(file.read())
+        return "data:{};base64,{}".format(mime, encoded)
+
     def test_can_use_authcode_exchange_refresh(self):
         user = self.setup_user(authenticate=False)
+        issuer = self.setup_issuer(owner=user)
         application = Application.objects.create(
             client_id='testing-authcode',
             client_type=Application.CLIENT_CONFIDENTIAL,
@@ -161,6 +167,16 @@ class OAuth2TokenTests(BadgrTestCase):
         new_token.save()
 
         response = self.client.get('/v2/users/self')
+        self.assertEqual(response.status_code, 401)
+
+        with open(self.get_test_image_path(), 'r') as badge_image:
+            badgeclass_data = {
+                    'name': 'Badge of Slugs',
+                    'description': "Recognizes slimy learners with a penchant for lettuce",
+                    'image': self._base64_data_uri_encode(badge_image, 'image/png'),
+                    'criteriaNarrative': 'Eat lettuce. Grow big.'
+                }
+        response = self.client.post('/v2/badgeclasses', badgeclass_data)
         self.assertEqual(response.status_code, 401)
 
     def test_can_reset_failed_login_backoff(self):
