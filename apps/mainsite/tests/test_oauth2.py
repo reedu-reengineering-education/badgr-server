@@ -120,6 +120,49 @@ class OAuth2TokenTests(BadgrTestCase):
         response = self.client.post(reverse('oauth2_code_exchange'), dict(code=expired_authcode))
         self.assertEqual(response.status_code, 400)
 
+    def test_can_use_authcode_exchange_refresh(self):
+        user = self.setup_user(authenticate=False)
+        application = Application.objects.create(
+            client_id='testing-authcode',
+            client_type=Application.CLIENT_CONFIDENTIAL,
+            authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE
+        )
+        ApplicationInfo.objects.create(application=application)
+        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
+            user, application=application, scope='r:profile', refresh_token=True
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(accesstoken.token))
+        response = self.client.get('/v2/users/self')
+        self.assertEqual(response.status_code, 200)
+        accesstoken.expires = timezone.datetime.now() - timezone.timedelta(hours=1)
+        accesstoken.save()
+
+        response = self.client.get('/v2/users/self')
+        self.assertEqual(response.status_code, 401)
+
+        refresh_token = accesstoken.refresh_token.token
+        post_data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token,
+            'client_id': application.client_id,
+            'client_secret': application.client_secret
+        }
+        response = self.client.post('/o/token', data=post_data)
+        self.assertEqual(response.status_code, 200)
+        new_access_token = response.json()['access_token']
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(new_access_token))
+
+        response = self.client.get('/v2/users/self')
+        self.assertEqual(response.status_code, 200)
+
+        new_token = AccessTokenProxy.objects.get(token=new_access_token)
+        new_token.expires = accesstoken.expires
+        new_token.save()
+
+        response = self.client.get('/v2/users/self')
+        self.assertEqual(response.status_code, 401)
+
     def test_can_reset_failed_login_backoff(self):
         cache.clear()
         password = 'secret'
