@@ -563,71 +563,73 @@ class VerifyBadgeAPIEndpoint(JSONComponentView):
         entity_id = request.data.get('entity_id')
         badge_instance = self.get_object(entity_id)
 
-        recipient_profile = {
-            badge_instance.recipient_type: badge_instance.recipient_identifier
-        }
+        #only do badgecheck verify if not a local badge
+        if (badge_instance.source_url):
+            recipient_profile = {
+                badge_instance.recipient_type: badge_instance.recipient_identifier
+            }
 
-        badge_check_options = {
-            'include_original_json': True,
-            'use_cache': True,
-        }
+            badge_check_options = {
+                'include_original_json': True,
+                'use_cache': True,
+            }
 
-        try:
-            response = openbadges.verify(badge_instance.jsonld_id, recipient_profile=recipient_profile, **badge_check_options)
-        except ValueError as e:
-            raise ValidationError([{'name': "INVALID_BADGE", 'description': str(e)}])
+            try:
+                response = openbadges.verify(badge_instance.jsonld_id, recipient_profile=recipient_profile, **badge_check_options)
+            except ValueError as e:
+                raise ValidationError([{'name': "INVALID_BADGE", 'description': str(e)}])
 
-        graph = response.get('graph', [])
+            graph = response.get('graph', [])
 
-        revoked_obo = first_node_match(graph, dict(revoked=True))
+            revoked_obo = first_node_match(graph, dict(revoked=True))
 
-        if bool(revoked_obo):
-            instance = BadgeInstance.objects.get(source_url=revoked_obo['id'])
-            instance.revoke(revoked_obo.get('revocationReason', 'Badge is revoked'))
+            if bool(revoked_obo):
+                instance = BadgeInstance.objects.get(source_url=revoked_obo['id'])
+                instance.revoke(revoked_obo.get('revocationReason', 'Badge is revoked'))
 
-        else:
-            report = response.get('report', {})
-            is_valid = report.get('valid')
+            else:
+                report = response.get('report', {})
+                is_valid = report.get('valid')
 
-            if not is_valid:
-                if report.get('errorCount', 0) > 0:
-                    errors = [{'name': 'UNABLE_TO_VERIFY', 'description': 'Unable to verify the assertion'}]
-                raise ValidationError(errors)
+                if not is_valid:
+                    if report.get('errorCount', 0) > 0:
+                        errors = [{'name': 'UNABLE_TO_VERIFY', 'description': 'Unable to verify the assertion'}]
+                    raise ValidationError(errors)
 
-            validation_subject = report.get('validationSubject')
+                validation_subject = report.get('validationSubject')
 
-            badge_instance_obo = first_node_match(graph, dict(id=validation_subject))
-            if not badge_instance_obo:
-                raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find an badge instance'}])
+                badge_instance_obo = first_node_match(graph, dict(id=validation_subject))
+                if not badge_instance_obo:
+                    raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find an badge instance'}])
 
-            badgeclass_obo = first_node_match(graph, dict(id=badge_instance_obo.get('badge', None)))
-            if not badgeclass_obo:
-                raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find a badgeclass'}])
+                badgeclass_obo = first_node_match(graph, dict(id=badge_instance_obo.get('badge', None)))
+                if not badgeclass_obo:
+                    raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find a badgeclass'}])
 
-            issuer_obo = first_node_match(graph, dict(id=badgeclass_obo.get('issuer', None)))
-            if not issuer_obo:
-                raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find an issuer'}])
+                issuer_obo = first_node_match(graph, dict(id=badgeclass_obo.get('issuer', None)))
+                if not issuer_obo:
+                    raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find an issuer'}])
 
-            original_json = response.get('input').get('original_json', {})
+                original_json = response.get('input').get('original_json', {})
 
-            BadgeInstance.objects.update_from_ob2(
-                badge_instance.badgeclass,
-                badge_instance_obo,
-                badge_instance.recipient_identifier,
-                badge_instance.recipient_type,
-                original_json.get(badge_instance_obo.get('id', ''), None)
-            )
+                BadgeInstance.objects.update_from_ob2(
+                    badge_instance.badgeclass,
+                    badge_instance_obo,
+                    badge_instance.recipient_identifier,
+                    badge_instance.recipient_type,
+                    original_json.get(badge_instance_obo.get('id', ''), None)
+                )
 
-            BadgeClass.objects.update_from_ob2(
-                badge_instance.issuer,
-                badgeclass_obo,
-                original_json.get(badgeclass_obo.get('id', ''), None)
-            )
+                BadgeClass.objects.update_from_ob2(
+                    badge_instance.issuer,
+                    badgeclass_obo,
+                    original_json.get(badgeclass_obo.get('id', ''), None)
+                )
 
-            Issuer.objects.update_from_ob2(
-                issuer_obo,
-                original_json.get(issuer_obo.get('id', ''), None)
-            )
+                Issuer.objects.update_from_ob2(
+                    issuer_obo,
+                    original_json.get(issuer_obo.get('id', ''), None)
+                )
         result = self.get_object(entity_id).get_json(expand_badgeclass=True, expand_issuer=True)
 
         return Response(BaseSerializerV2.response_envelope([result], True, 'OK'), status=status.HTTP_200_OK)
