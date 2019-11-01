@@ -13,6 +13,7 @@ from django.core.urlresolvers import resolve, reverse, Resolver404, NoReverseMat
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import redirect, render_to_response
 from django.views.generic import RedirectView
+from entity.serializers import BaseSerializerV2
 from rest_framework import status, permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -582,13 +583,7 @@ class VerifyBadgeAPIEndpoint(JSONComponentView):
 
         if bool(revoked_obo):
             instance = BadgeInstance.objects.get(source_url=revoked_obo['id'])
-            instance.revoke(revoked_obo.get('revocationReason'))
-            result = {
-                '@context': 'https://w3id.org/openbadges/v2',
-                'isRevoked': True,
-                'revocationReason': revoked_obo.get('revocationReason', 'Badge is revoked'),
-                'badgeAssertion': self.get_object(entity_id).get_json(expand_badgeclass=True, expand_issuer=True),
-            }
+            instance.revoke(revoked_obo.get('revocationReason', 'Badge is revoked'))
 
         else:
             report = response.get('report', {})
@@ -633,10 +628,6 @@ class VerifyBadgeAPIEndpoint(JSONComponentView):
                 issuer_obo,
                 original_json.get(issuer_obo.get('id', ''), None)
             )
+        result = self.get_object(entity_id).get_json(expand_badgeclass=True, expand_issuer=True)
 
-            result = {
-                '@context': 'https://w3id.org/openbadges/v2',
-                'badgeAssertion': self.get_object(entity_id).get_json(expand_badgeclass=True, expand_issuer=True),
-            }
-
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(BaseSerializerV2.response_envelope([result], True, 'OK'), status=status.HTTP_200_OK)
