@@ -13,7 +13,6 @@ from mainsite.pagination import BadgrCursorPagination
 
 
 class BaseEntityView(APIView):
-    allow_any_unauthenticated_access = False
     create_event = None
     logger = None
 
@@ -48,6 +47,8 @@ class BaseEntityView(APIView):
 
 
 class BaseEntityListView(BaseEntityView):
+    allow_any_unauthenticated_access = False
+
     def get_objects(self, request, **kwargs):
         raise NotImplementedError
 
@@ -90,6 +91,7 @@ class BaseEntityListView(BaseEntityView):
 
 class VersionedObjectMixin(object):
     entity_id_field_name = 'entity_id'
+    allow_any_unauthenticated_access = False
 
     def has_object_permissions(self, request, obj):
         for permission in self.get_permissions():
@@ -98,9 +100,8 @@ class VersionedObjectMixin(object):
         return True
 
     def get_object(self, request, **kwargs):
-        if getattr(self, 'allow_any_unauthenticated_access', False) is False:
-            if request.user and not request.user.is_authenticated():
-                raise NotAuthenticated()
+        if self.allow_any_unauthenticated_access is False and not request.user.is_authenticated():
+            raise NotAuthenticated()
 
         version = getattr(request, 'version', 'v1')
         if version == 'v1':

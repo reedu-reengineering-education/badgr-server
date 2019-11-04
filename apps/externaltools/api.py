@@ -17,6 +17,7 @@ class ExternalToolList(BaseEntityListView):
     v2_serializer_class = ExternalToolSerializerV2
     permission_classes = ()
     http_method_names = ['get']
+    allow_any_unauthenticated_access = True
 
     def get_objects(self, request, **kwargs):
         tools = list(ExternalTool.cached.global_tools())
