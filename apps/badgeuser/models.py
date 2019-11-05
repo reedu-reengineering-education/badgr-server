@@ -305,6 +305,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
             # add or update existing items
             for email_data in value:
                 primary = email_data.get('primary', False)
+                verified = email_data.get('verified', False)
                 emailaddress, created = CachedEmailAddress.cached.get_or_create(
                     email=email_data['email'],
                     defaults={
@@ -312,19 +313,28 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
                         'primary': primary
                     })
                 if not created:
+                    dirty = False
+
                     if emailaddress.user_id == self.id:
                         # existing email address owned by user
                         emailaddress.primary = primary
-                        emailaddress.save()
+                        dirty = True
                     elif not emailaddress.verified:
                         # existing unverified email address, handover to this user
                         emailaddress.user = self
                         emailaddress.primary = primary
-                        emailaddress.save()
+                        emailaddress.save()  # in this case, don't mark as dirty
                         emailaddress.send_confirmation()
                     else:
                         # existing email address used by someone else
                         raise ValidationError("Email '{}' may already be in use".format(email_data.get('email')))
+
+                    if allow_verify and verified != emailaddress.verified:
+                        emailaddress.verified = verified
+                        dirty = True
+
+                    if dirty:
+                        emailaddress.save()
                 else:
                     # email is new
                     if allow_verify and email_data.get('verified') is True:
