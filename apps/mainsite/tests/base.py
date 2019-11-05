@@ -125,8 +125,23 @@ class SetupIssuerHelper(object):
     def get_test_image_path(self):
         return os.path.join(self.get_testfiles_path(), 'guinea_pig_testing_badge.png')
 
+    def get_test_png_image_path(self):
+        return self.get_test_image_path()
+
+    def get_test_png_with_no_extension_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'test_badge_png_with_no_extension')
+
+    def get_test_jpeg_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'test_jpeg.jpeg')
+
+    def get_test_jpeg_with_no_extension_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'test_jpeg_no_extension')
+
     def get_test_svg_image_path(self):
         return os.path.join(self.get_testfiles_path(), 'test_badgeclass.svg')
+
+    def get_test_svg_with_no_extension_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'test_badgeclass_with_no_svg_extension')
 
     def setup_badgeclass(self,
                          issuer,

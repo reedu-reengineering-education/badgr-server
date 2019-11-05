@@ -43,7 +43,8 @@ class Command(BaseCommand):
                 remote_image_url = original_json.get('image', None)
                 if remote_image_url:
                     try:
-                        status_code, image = fetch_remote_file_to_storage(remote_image_url, upload_to=badgeclass.image.field.upload_to)
+                        status_code, image = fetch_remote_file_to_storage(remote_image_url, upload_to=badgeclass.image.field.upload_to,
+                                                                          allowed_mime_types=['image/png', 'image/svg+xml'])
                     except IOError as e:
                         self.stdout.write("IOError fetching '{}': {}".format(remote_image_url, e.message))
                         report['ioerrors'].append((remote_image_url, unicode(e.message)))
