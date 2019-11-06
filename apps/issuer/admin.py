@@ -99,8 +99,8 @@ class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
         (None, {
             'fields': ('issuer', 'image', 'name', 'description')
         }),
-        ('Criteria', {
-            'fields': ('criteria_url', 'criteria_text',)
+        ('Configuration', {
+            'fields': ('criteria_url', 'criteria_text', 'expires_duration', 'expires_amount',)
         }),
         ('JSON', {
             'fields': ('old_json',)

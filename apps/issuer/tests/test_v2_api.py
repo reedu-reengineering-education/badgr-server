@@ -1,6 +1,10 @@
 # encoding: utf-8
 from __future__ import unicode_literals
 
+import time
+import urllib
+from urlparse import urlparse
+
 from django.core.urlresolvers import reverse
 from django.test import override_settings
 
@@ -138,9 +142,51 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 2)
 
-        # The most recently issued badge should appear first in the list (descending order)
-        self.assertEqual(response.data['result'][1]['entityId'], assertion_one.entity_id)
-        self.assertEqual(response.data['result'][0]['entityId'], assertion_two.entity_id)
+        # The oldest badge in the set should appear first in the list (ascending order)
+        self.assertEqual(response.data['result'][0]['entityId'], assertion_one.entity_id)
+        self.assertEqual(response.data['result'][1]['entityId'], assertion_two.entity_id)
+
+    def assertions_in_expected_order_through_pagination(self):
+        staff = self.setup_user(email='staff@example.com')
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False)
+        issuer = self.setup_issuer(owner=staff)
+        badgeclass = self.setup_badgeclass(issuer=issuer)
+
+        assertions = []
+        for n in range(5):
+            assertions.append(badgeclass.issue(recipient_id=recipient.email))
+
+        cut_time = urllib.quote(timezone.now().isoformat())
+        time.sleep(0.1)
+
+        for n in range(10):
+            assertions.append(badgeclass.issue(recipient_id=recipient.email))
+
+        clientAppUser = self.setup_user(email='clientApp@example.com', token_scope='r:assertions')
+        app = Application.objects.create(
+            client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
+            user=clientAppUser)
+        AccessTokenProxy.objects.create(
+            user=staff, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
+            token='123', application=app
+        )
+        token = AccessTokenProxy.objects.create(
+            user=recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
+            token='abc2', application=app
+        )
+
+        response = self.client.get(reverse('v2_api_assertions_changed_list') + '?num=5&since={}'.format(cut_time))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 5)  # There are the expected number of results in a page
+        self.assertEqual(response.data['result'][0]['entityId'], assertions[5].entity_id)
+        self.assertEqual(response.data['result'][4]['entityId'], assertions[9].entity_id)
+
+        next_url = urlparse(response.data['pagination']['nextResults'])
+        response = self.client.get("?".join([next_url.path, next_url.query]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 5)  # There are the expected number of results in a page
+        self.assertEqual(response.data['result'][0]['entityId'], assertions[10].entity_id)
+        self.assertEqual(response.data['result'][4]['entityId'], assertions[14].entity_id)
 
 
 class AssertionFetching(SetupIssuerHelper, BadgrTestCase):
