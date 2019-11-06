@@ -164,14 +164,16 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         Guard against unverified users and preserve badgr_app session data
         across Django login() boundary.
         """
-        if not user.verified:
+        badgr_app = BadgrApp.objects.get_current(request)
+
+        if not user.verified and badgr_app.ui_login_redirect != badgr_app.ui_signup_success_redirect:
             # The usual case if a user gets here without a verified recipient
             # identifier is a new sign-up with an unverified email. If that's
             # the case, we just sent them a confirmation.
+            # This is for UI clients that do not have the ability to function without a verified user identifier
             raise ImmediateHttpResponse(
                 self.respond_email_verification_sent(request, user))
 
-        badgr_app = BadgrApp.objects.get_current(request)
         ret = super(BadgrAccountAdapter, self).login(request, user)
         set_session_badgr_app(request, badgr_app)
         return ret
