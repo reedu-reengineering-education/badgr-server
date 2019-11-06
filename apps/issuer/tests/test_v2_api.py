@@ -86,8 +86,6 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get(url)
         self.assertEqual(len(response.data['result']), 1)
 
-        
-
     def test_user_cant_fetch_changed_assertions(self):
         staff = self.setup_user(email='staff@example.com')
         recipient = self.setup_user(email='recipient@example.com', authenticate=True)
@@ -108,8 +106,8 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
 
         issuer = self.setup_issuer(owner=staff)
         badgeclass = self.setup_badgeclass(issuer=issuer)
-        badgeclass.issue(recipient_id=recipient.email)
-        badgeclass.issue(recipient_id=staff.email)
+        assertion_one = badgeclass.issue(recipient_id=recipient.email)
+        assertion_two = badgeclass.issue(recipient_id=staff.email)
         badgeclass.issue(recipient_id=unrelated_recipient.email)
         url = reverse('v2_api_assertions_changed_list')
 
@@ -139,6 +137,10 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 2)
+
+        # The most recently issued badge should appear first in the list (descending order)
+        self.assertEqual(response.data['result'][1]['entityId'], assertion_one.entity_id)
+        self.assertEqual(response.data['result'][0]['entityId'], assertion_two.entity_id)
 
 
 class AssertionFetching(SetupIssuerHelper, BadgrTestCase):
