@@ -107,25 +107,45 @@ def verify_svg(fileobj):
     return tag == '{http://www.w3.org/2000/svg}svg'
 
 
-def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types = ()):
+def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()):
     """
     Fetches a remote url, and stores it in DefaultStorage
     :return: (status_code, new_storage_name)
     """
+
+    if not allowed_mime_types:
+        raise SuspiciousFileOperation("allowed mime types must be passed in")
+
     store = DefaultStorage()
     r = requests.get(remote_url, stream=True)
+
     if r.status_code == 200:
-        if len(allowed_mime_types):
-            mime_type = puremagic.from_string(r.content, mime=True)
-            if not mime_type and re.search(b'<svg', r.content[:256]) and r.content.strip()[-6:] == b'</svg>':
-                mime_type = 'image/svg+xml'
-            if mime_type not in allowed_mime_types:
-                raise SuspiciousFileOperation("{} is not an allowed mime type for upload".format(mime_type))
-        name, ext = os.path.splitext(urlparse.urlparse(r.url).path)
+
+        magic_strings = puremagic.magic_string(r.content)
+        derived_mime_type = None
+        derived_ext = None
+
+        for magic_string in magic_strings:
+            if getattr(magic_string, 'mime_type', None) in allowed_mime_types:
+                derived_mime_type = getattr(magic_string, 'mime_type', None)
+                derived_ext = getattr(magic_string, 'extension', None)
+                break
+
+        if not derived_mime_type and re.search(b'<svg', r.content[:1024]) and r.content.strip()[-6:] == b'</svg>':
+            derived_mime_type = 'image/svg+xml'
+            derived_ext = '.svg'
+
+        if derived_mime_type not in allowed_mime_types:
+            raise SuspiciousFileOperation("{} is not an allowed mime type for upload".format(derived_mime_type))
+
+        if not derived_ext:
+            raise SuspiciousFileOperation("could not determine a file extension")
+
         storage_name = '{upload_to}/cached/{filename}{ext}'.format(
             upload_to=upload_to,
             filename=hashlib.md5(remote_url).hexdigest(),
-            ext=ext)
+            ext=derived_ext)
+
         if not store.exists(storage_name):
             buf = StringIO.StringIO(r.content)
             store.save(storage_name, buf)

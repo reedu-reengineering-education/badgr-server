@@ -21,11 +21,15 @@ from mainsite import TOP_DIR, blacklist
 from mainsite.serializers import DateTimeWithUtcZAtEndField
 from mainsite.tests import SetupIssuerHelper
 from mainsite.tests.base import BadgrTestCase
+from mainsite.utils import fetch_remote_file_to_storage
+import hashlib
 from hashlib import sha256
 from issuer.models import BadgeClass, Issuer, BadgeInstance
 import mock
 import responses
 from rest_framework import serializers
+
+import shutil
 
 
 class TestDateSerialization(BadgrTestCase):
@@ -314,3 +318,145 @@ class TestBlacklist(BadgrTestCase):
             got = blacklist.generate_hash(id_type, id_value)
             expected = "{id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value).hexdigest())
             self.assertEqual(got, expected)
+
+
+class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
+    mime_types = ['image/png', 'image/svg+xml', 'image/jpeg']
+    test_uploaded_path = os.path.join(TOP_DIR, 'mediafiles', 'testfiles')
+    test_cached_dir = test_uploaded_path + "/cached"
+    test_url = 'http://example.com/123abc'
+
+    def setUp(self):
+        try:
+            shutil.rmtree(self.test_cached_dir)
+        except OSError as e:
+            print ("%s does not exist and was not deleted" % self.test_cached_dir)
+
+    def mimic_hashed_file_name(self, name, ext=''):
+        return hashlib.md5(name).hexdigest() + ext
+
+    @responses.activate
+    def test_svg_without_extension(self):
+        expected_extension = '.svg'
+        expected_file_name = self.mimic_hashed_file_name(self.test_url, expected_extension)
+
+        responses.add(
+            responses.GET,
+            self.test_url,
+            body=open(self.get_test_svg_with_no_extension_image_path()).read(),
+            status=200
+        )
+
+        fetch_remote_file_to_storage(
+            self.test_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        test_dir_contents = os.listdir(self.test_cached_dir)
+        self.assertIn(expected_file_name, test_dir_contents)
+
+    @responses.activate
+    def test_svg_with_extension(self):
+        expected_extension = '.svg'
+        expected_file_name = self.mimic_hashed_file_name(self.test_url, expected_extension)
+
+        responses.add(
+            responses.GET,
+            self.test_url,
+            body=open(self.get_test_svg_image_path()).read(),
+            status=200
+        )
+
+        fetch_remote_file_to_storage(
+            self.test_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        test_dir_contents = os.listdir(self.test_cached_dir)
+        self.assertIn(expected_file_name, test_dir_contents)
+
+    @responses.activate
+    def test_png_without_extension(self):
+        expected_extension = '.png'
+        expected_file_name = self.mimic_hashed_file_name(self.test_url, expected_extension)
+
+        responses.add(
+                responses.GET,
+                self.test_url,
+                body=open(self.get_test_png_with_no_extension_image_path()).read(),
+                status=200
+            )
+
+        fetch_remote_file_to_storage(
+            self.test_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        test_dir_contents = os.listdir(self.test_cached_dir)
+        self.assertIn(expected_file_name, test_dir_contents)
+
+    @responses.activate
+    def test_png_with_extension(self):
+        expected_extension = '.png'
+        expected_file_name = self.mimic_hashed_file_name(self.test_url, expected_extension)
+
+        responses.add(
+                responses.GET,
+                self.test_url,
+                body=open(self.get_test_png_image_path()).read(),
+                status=200
+            )
+
+        fetch_remote_file_to_storage(
+            self.test_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        test_dir_contents = os.listdir(self.test_cached_dir)
+        self.assertIn(expected_file_name, test_dir_contents)
+
+    @responses.activate
+    def test_jpeg_without_extension(self):
+        expected_extension = '.jpeg'
+        expected_file_name = self.mimic_hashed_file_name(self.test_url, expected_extension)
+
+        responses.add(
+            responses.GET,
+            self.test_url,
+            body=open(self.get_test_jpeg_with_no_extension_image_path()).read(),
+            status=200
+        )
+
+        fetch_remote_file_to_storage(
+            self.test_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        test_dir_contents = os.listdir(self.test_cached_dir)
+        self.assertIn(expected_file_name, test_dir_contents)
+
+    @responses.activate
+    def test_jpeg_with_extension(self):
+        expected_extension = '.jpeg'
+        expected_file_name = self.mimic_hashed_file_name(self.test_url, expected_extension)
+
+        responses.add(
+            responses.GET,
+            self.test_url,
+            body=open(self.get_test_jpeg_image_path()).read(),
+            status=200
+        )
+
+        fetch_remote_file_to_storage(
+            self.test_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        test_dir_contents = os.listdir(self.test_cached_dir)
+        self.assertIn(expected_file_name, test_dir_contents)
