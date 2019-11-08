@@ -172,8 +172,6 @@ class BaseEntityDetailView(BaseEntityView, VersionedObjectMixin):
         DELETE a single entity by identifier
         """
         obj = self.get_object(request, **kwargs)
-        if not self.has_object_permissions(request, obj):
-            return Response(status=HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=HTTP_204_NO_CONTENT)
 

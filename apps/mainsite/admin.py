@@ -1,14 +1,19 @@
-# Created by wiggins@concentricsky.com on 10/8/15.
+import requests
 from allauth.socialaccount.models import SocialToken, SocialAccount
+from django.contrib import messages
 from django.contrib.admin import AdminSite, ModelAdmin, StackedInline
+from django.http import HttpResponseRedirect
+from django.shortcuts import reverse
 from django.utils.module_loading import autodiscover_modules
 from django.utils.translation import ugettext_lazy
+from django_object_actions import DjangoObjectActions
 from oauth2_provider.models import get_application_model, get_grant_model, get_access_token_model, \
     get_refresh_token_model
 
 import badgrlog
 from badgeuser.models import CachedEmailAddress, ProxyEmailConfirmation
 from mainsite.models import BadgrApp, EmailBlacklist, ApplicationInfo, AccessTokenProxy, LegacyTokenProxy
+from mainsite.utils import set_url_query_params
 
 badgrlogger = badgrlog.BadgrLogger()
 
@@ -108,10 +113,23 @@ class ApplicationInfoInline(StackedInline):
     extra = 1
 
 
-class ApplicationInfoAdmin(ApplicationAdmin):
+class ApplicationInfoAdmin(DjangoObjectActions, ApplicationAdmin):
     inlines = [
         ApplicationInfoInline
     ]
+    change_actions = ['launch', ]
+
+    def launch(self, request, obj):
+        if obj.authorization_grant_type != Application.GRANT_AUTHORIZATION_CODE:
+            messages.add_message(request, messages.INFO, "This is not a Auth Code Application. Cannot Launch.")
+            return
+        launch_url = BadgrApp.objects.get_current(request).get_path('/auth/oauth2/authorize')
+        launch_url = set_url_query_params(
+            launch_url, client_id=obj.client_id, redirect_uri=obj.default_redirect_uri,
+            scope=obj.applicationinfo.allowed_scopes
+        )
+        return HttpResponseRedirect(launch_url)
+
 badgr_admin.register(Application, ApplicationInfoAdmin)
 # badgr_admin.register(Grant, GrantAdmin)
 # badgr_admin.register(RefreshToken, RefreshTokenAdmin)

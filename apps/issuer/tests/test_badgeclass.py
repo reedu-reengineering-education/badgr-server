@@ -80,6 +80,27 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
     def test_can_create_badgeclass(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_image_path())
 
+    def test_staff_cannot_create_badgeclass(self):
+        with open(self.get_test_image_path(), 'r') as badge_image:
+
+            image_str = self._base64_data_uri_encode(badge_image, "image/png")
+            example_badgeclass_props = {
+                'name': 'Badge of Awesome',
+                'description': "An awesome badge only awarded to awesome people or non-existent test entities",
+                'image': image_str,
+                'criteria': 'http://wikipedia.org/Awesome',
+            }
+
+            test_owner = self.setup_user(authenticate=False)
+            test_user = self.setup_user(authenticate=True)
+            test_issuer = self.setup_issuer(owner=test_owner)
+            self.issuer = test_issuer
+            response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
+                data=example_badgeclass_props,
+                format="json"
+            )
+            self.assertEqual(response.status_code, 404)
+
     def test_badgeclass_with_expires_in_days_v1(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -975,7 +996,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
 class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_badgeclasses(self):
-        issuer_user = self.setup_user(authenticate=True, verified=True)
+        issuer_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:issuerAdmin')
         test_issuer = self.setup_issuer(owner=issuer_user)
         test_badgeclass = self.setup_badgeclass(
             issuer=test_issuer, name='Badge Class 1', description='test')

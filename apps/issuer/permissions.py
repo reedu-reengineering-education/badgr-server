@@ -118,6 +118,23 @@ class IsEditor(permissions.BasePermission):
             return request.user.has_perm('issuer.is_editor', issuer)
 
 
+class IsEditorButOwnerForDelete(permissions.BasePermission):
+    """
+    Request.user is authorized to perform safe operations if they are staff or
+    perform unsafe operations if they are owner or editor of an issuer.
+    ---
+    model: Issuer
+    """
+
+    def has_object_permission(self, request, view, issuer):
+        if request.method in SAFE_METHODS:
+            return request.user.has_perm('issuer.is_staff', issuer)
+        elif request.method == 'DELETE':
+            return request.user.has_perm('issuer.is_owner', issuer)
+        else:
+            return request.user.has_perm('issuer.is_editor', issuer)
+
+
 class IsStaff(permissions.BasePermission):
     """
     Request user is authorized to perform operations if they are owner or on staff
@@ -249,6 +266,7 @@ class BadgrOAuthTokenHasEntityScope(permissions.BasePermission):
             entity_id = obj.entity_id
 
         valid_scopes = self._get_valid_scopes(request, view)
+        valid_scopes = [s for s in valid_scopes if '*' in s]
         valid_scopes = set([self._resolve_wildcard(scope, entity_id) for scope in valid_scopes])
         token_scopes = set(token.scope.split())
 

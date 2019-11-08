@@ -306,6 +306,15 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         response = self.client.delete('/v1/issuer/issuers/{slug}'.format(slug=test_issuer.entity_id), {})
         self.assertEqual(response.status_code, 204)
 
+    def test_editor_cannot_delete_issuer(self):
+        test_user = self.setup_user(authenticate=True)
+        test_owner = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_owner)
+        IssuerStaff.objects.create(user=test_user, issuer=test_issuer, role=IssuerStaff.ROLE_EDITOR)
+
+        response = self.client.delete('/v1/issuer/issuers/{slug}'.format(slug=test_issuer.entity_id), {})
+        self.assertEqual(response.status_code, 404)
+
     def test_delete_issuer_with_unissued_badgeclass_successfully(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -483,7 +492,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
 
 class IssuersChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_issuers(self):
-        issuer_user = self.setup_user(authenticate=True, verified=True)
+        issuer_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:issuerAdmin')
         test_issuer = self.setup_issuer(owner=issuer_user)
         test_issuer2 = self.setup_issuer(owner=issuer_user)
         test_issuer3 = self.setup_issuer(owner=issuer_user)
