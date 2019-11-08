@@ -483,7 +483,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
 
 class IssuersChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_issuers(self):
-        issuer_user = self.setup_user(authenticate=True, verified=True)
+        issuer_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:issuerAdmin')
         test_issuer = self.setup_issuer(owner=issuer_user)
         test_issuer2 = self.setup_issuer(owner=issuer_user)
         test_issuer3 = self.setup_issuer(owner=issuer_user)

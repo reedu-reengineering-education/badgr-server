@@ -249,6 +249,7 @@ class BadgrOAuthTokenHasEntityScope(permissions.BasePermission):
             entity_id = obj.entity_id
 
         valid_scopes = self._get_valid_scopes(request, view)
+        valid_scopes = [s for s in valid_scopes if '*' in s]
         valid_scopes = set([self._resolve_wildcard(scope, entity_id) for scope in valid_scopes])
         token_scopes = set(token.scope.split())
 
