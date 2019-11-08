@@ -19,7 +19,7 @@ from entity.api import BaseEntityListView, BaseEntityDetailView, VersionedObject
     UncachedPaginatedViewMixin
 from entity.serializers import BaseSerializerV2, V2ErrorSerializer
 from issuer.models import Issuer, BadgeClass, BadgeInstance, IssuerStaff
-from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass, IsEditor,
+from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass, IsEditor, IsEditorButOwnerForDelete,
                                 IsIssuerAdmin, IsStaff, ApprovedIssuersOnly, BadgrOAuthTokenHasScope,
                                 BadgrOAuthTokenHasEntityScope, AuthorizationIsBadgrOAuthToken)
 from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
@@ -71,7 +71,7 @@ class IssuerDetail(BaseEntityDetailView):
     v2_serializer_class = IssuerSerializerV2
     permission_classes = [
         IsIssuerAdmin |
-        (AuthenticatedWithVerifiedIdentifier & IsEditor & BadgrOAuthTokenHasScope) |
+        (AuthenticatedWithVerifiedIdentifier & IsEditorButOwnerForDelete & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
     valid_scopes = ["rw:issuer", "rw:issuer:*", "rw:issuerAdmin"]
