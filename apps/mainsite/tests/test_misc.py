@@ -10,6 +10,7 @@ from operator import attrgetter
 
 from django.core import mail
 from django.core.cache import cache, CacheKeyWarning
+from django.core.files.storage import default_storage
 from django.core.management import call_command
 from django.test import override_settings, TransactionTestCase
 from django.utils import timezone
@@ -322,15 +323,8 @@ class TestBlacklist(BadgrTestCase):
 
 class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
     mime_types = ['image/png', 'image/svg+xml', 'image/jpeg']
-    test_uploaded_path = os.path.join(TOP_DIR, 'mediafiles', 'testfiles')
-    test_cached_dir = test_uploaded_path + "/cached"
+    test_uploaded_path = os.path.join('testfiles')
     test_url = 'http://example.com/123abc'
-
-    def setUp(self):
-        try:
-            shutil.rmtree(self.test_cached_dir)
-        except OSError as e:
-            print ("%s does not exist and was not deleted" % self.test_cached_dir)
 
     def mimic_hashed_file_name(self, name, ext=''):
         return hashlib.md5(name).hexdigest() + ext
@@ -347,14 +341,14 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
             status=200
         )
 
-        fetch_remote_file_to_storage(
+        status_code, storage_name = fetch_remote_file_to_storage(
             self.test_url,
             upload_to=self.test_uploaded_path,
             allowed_mime_types=self.mime_types
         )
 
-        test_dir_contents = os.listdir(self.test_cached_dir)
-        self.assertIn(expected_file_name, test_dir_contents)
+        self.assertTrue(storage_name.endswith(expected_extension))
+        self.assertTrue(default_storage.size(storage_name) > 0)
 
     @responses.activate
     def test_svg_with_extension(self):
@@ -368,14 +362,14 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
             status=200
         )
 
-        fetch_remote_file_to_storage(
+        status_code, storage_name = fetch_remote_file_to_storage(
             self.test_url,
             upload_to=self.test_uploaded_path,
             allowed_mime_types=self.mime_types
         )
 
-        test_dir_contents = os.listdir(self.test_cached_dir)
-        self.assertIn(expected_file_name, test_dir_contents)
+        self.assertTrue(storage_name.endswith(expected_extension))
+        self.assertTrue(default_storage.size(storage_name) > 0)
 
     @responses.activate
     def test_png_without_extension(self):
@@ -389,14 +383,14 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
                 status=200
             )
 
-        fetch_remote_file_to_storage(
+        status_code, storage_name = fetch_remote_file_to_storage(
             self.test_url,
             upload_to=self.test_uploaded_path,
             allowed_mime_types=self.mime_types
         )
 
-        test_dir_contents = os.listdir(self.test_cached_dir)
-        self.assertIn(expected_file_name, test_dir_contents)
+        self.assertTrue(storage_name.endswith(expected_extension))
+        self.assertTrue(default_storage.size(storage_name) > 0)
 
     @responses.activate
     def test_png_with_extension(self):
@@ -410,19 +404,18 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
                 status=200
             )
 
-        fetch_remote_file_to_storage(
+        status_code, storage_name = fetch_remote_file_to_storage(
             self.test_url,
             upload_to=self.test_uploaded_path,
             allowed_mime_types=self.mime_types
         )
 
-        test_dir_contents = os.listdir(self.test_cached_dir)
-        self.assertIn(expected_file_name, test_dir_contents)
+        self.assertTrue(storage_name.endswith(expected_extension))
+        self.assertTrue(default_storage.size(storage_name) > 0)
 
     @responses.activate
     def test_jpeg_without_extension(self):
         expected_extension = '.jpeg'
-        expected_file_name = self.mimic_hashed_file_name(self.test_url, expected_extension)
 
         responses.add(
             responses.GET,
@@ -431,14 +424,14 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
             status=200
         )
 
-        fetch_remote_file_to_storage(
+        status_code, storage_name = fetch_remote_file_to_storage(
             self.test_url,
             upload_to=self.test_uploaded_path,
             allowed_mime_types=self.mime_types
         )
 
-        test_dir_contents = os.listdir(self.test_cached_dir)
-        self.assertIn(expected_file_name, test_dir_contents)
+        self.assertTrue(storage_name.endswith(expected_extension))
+        self.assertTrue(default_storage.size(storage_name) > 0)
 
     @responses.activate
     def test_jpeg_with_extension(self):
@@ -452,11 +445,11 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
             status=200
         )
 
-        fetch_remote_file_to_storage(
+        status_code, storage_name = fetch_remote_file_to_storage(
             self.test_url,
             upload_to=self.test_uploaded_path,
             allowed_mime_types=self.mime_types
         )
 
-        test_dir_contents = os.listdir(self.test_cached_dir)
-        self.assertIn(expected_file_name, test_dir_contents)
+        self.assertTrue(storage_name.endswith(expected_extension))
+        self.assertTrue(default_storage.size(storage_name) > 0)
