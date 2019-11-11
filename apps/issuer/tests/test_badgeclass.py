@@ -9,7 +9,7 @@ from django.core.files.images import get_image_dimensions
 from django.core.urlresolvers import reverse
 from django.utils import timezone
 
-from issuer.models import BadgeClass
+from issuer.models import BadgeClass, IssuerStaff
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import OriginSetting
 
@@ -94,12 +94,67 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             test_owner = self.setup_user(authenticate=False)
             test_user = self.setup_user(authenticate=True)
             test_issuer = self.setup_issuer(owner=test_owner)
+            IssuerStaff.objects.create(issuer=test_issuer, user=test_user, role=IssuerStaff.ROLE_STAFF)
             self.issuer = test_issuer
             response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
                 data=example_badgeclass_props,
                 format="json"
             )
             self.assertEqual(response.status_code, 404)
+
+    def test_v2_post_put_badgeclasses_permissions(self):
+        test_owner = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_owner)
+        test_user = self.setup_user(authenticate=True, token_scope='rw:issuer')
+
+        badgeclass_data = {
+            'name': 'Test Badge',
+            'description': "A testing badge",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+            'issuer': test_issuer.entity_id,
+        }
+
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 400)
+
+        staff_record = IssuerStaff.objects.create(issuer=test_issuer, user=test_user, role=IssuerStaff.ROLE_STAFF)
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 400)
+
+        staff_record.role = IssuerStaff.ROLE_EDITOR
+        staff_record.save()
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 201)
+        entity_id = response.data['result'][0]['entityId']
+
+        badgeclass_data['name'] = 'Edited Badge'
+        staff_record.role = IssuerStaff.ROLE_STAFF
+        staff_record.save()
+        response = self.client.put('/v2/badgeclasses/{}'.format(entity_id), data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 404)
+
+        staff_record.role = IssuerStaff.ROLE_EDITOR
+        staff_record.save()
+        response = self.client.put('/v2/badgeclasses/{}'.format(entity_id), data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 200)
+
+    def test_v2_badgeclasses_reasonable_404_error(self):
+        test_owner = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_owner)
+        test_user = self.setup_user(authenticate=True, token_scope='rw:issuer')
+
+        badgeclass_data = {
+            'name': 'Test Badge',
+            'description': "A testing badge",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+            'issuer': 'abc123',
+        }
+
+        # Also test whether I can create a badgeclass for an issuer that does not exist.
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 400)
 
     def test_badgeclass_with_expires_in_days_v1(self):
         test_user = self.setup_user(authenticate=True)

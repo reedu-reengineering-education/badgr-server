@@ -13,6 +13,7 @@ from badgeuser.models import BadgeUser
 from badgeuser.serializers_v2 import BadgeUserEmailSerializerV2
 from entity.serializers import DetailSerializerV2, EntityRelatedFieldV2, BaseSerializerV2
 from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance, RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL, RECIPIENT_TYPE_TELEPHONE
+from issuer.permissions import IsEditor
 from issuer.utils import generate_sha256_hashstring
 from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
@@ -302,6 +303,11 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     def update(self, instance, validated_data):
         if 'cached_issuer' in validated_data:
             validated_data.pop('cached_issuer')  # issuer is not updatable
+
+        if not IsEditor().has_object_permission(self.context.get('request'), None, instance.issuer):
+            raise serializers.ValidationError(
+                {"issuer": "You do not have permission to edit badges on this issuer."})
+
         return super(BadgeClassSerializerV2, self).update(instance, validated_data)
 
     def create(self, validated_data):
@@ -314,6 +320,9 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         else:
             # issuer is required on create
             raise serializers.ValidationError({"issuer": "This field is required"})
+
+        if not IsEditor().has_object_permission(self.context.get('request'), None, validated_data['issuer']):
+            raise serializers.ValidationError({"issuer": "You do not have permission to edit badges on this issuer."})
 
         return super(BadgeClassSerializerV2, self).create(validated_data)
 
