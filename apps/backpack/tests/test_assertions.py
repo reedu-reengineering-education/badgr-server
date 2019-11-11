@@ -1073,6 +1073,10 @@ class TestInclusionFlags(BadgrTestCase, SetupIssuerHelper):
         self.assertEqual(result.status_code, 200)
         self.assertEqual(len(result.data.get('result')), 2)
 
+        result = self.client.get('/v1/earner/badges')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data), 2, "V1 Backpack defaults to true for these values")
+
         result = self.client.get('/v2/backpack/assertions')
         self.assertEqual(result.status_code, 200)
         self.assertEqual(len(result.data.get('result')), 1)
@@ -1089,6 +1093,10 @@ class TestInclusionFlags(BadgrTestCase, SetupIssuerHelper):
         result = self.client.get('/v2/backpack/assertions?include_expired=1')
         self.assertEqual(result.status_code, 200)
         self.assertEqual(len(result.data.get('result')), 2)
+
+        result = self.client.get('/v1/earner/badges')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data), 2, "V1 Backpack defaults to true for these values")
 
         result = self.client.get('/v2/backpack/assertions')
         self.assertEqual(result.status_code, 200)
@@ -1109,6 +1117,10 @@ class TestInclusionFlags(BadgrTestCase, SetupIssuerHelper):
         result = self.client.get('/v2/backpack/assertions?include_expired=1&include_revoked=1')
         self.assertEqual(result.status_code, 200)
         self.assertEqual(len(result.data.get('result')), 3)
+
+        result = self.client.get('/v1/earner/badges')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data), 3, "V1 Backpack defaults to true for these values")
 
         result = self.client.get('/v2/backpack/assertions?include_expired=1')
         self.assertEqual(result.status_code, 200)

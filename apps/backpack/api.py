@@ -29,11 +29,23 @@ class BackpackAssertionList(BaseEntityListView):
         'get': ['r:backpack', 'rw:backpack'],
         'post': ['rw:backpack'],
     }
+    include_defaults = {
+        'include_expired': {'v1': 'true', 'v2': 'false'},
+        'include_revoked': {'v1': 'true', 'v2': 'false'},
+        'include_pending': {'v1': 'false', 'v2': 'false'},
+    }
 
     def get_objects(self, request, **kwargs):
-        include_expired = request.query_params.get(u'include_expired', '').lower() in ['1', 'true']
-        include_revoked = request.query_params.get(u'include_revoked', '').lower() in ['1', 'true']
-        include_pending = request.query_params.get(u'include_pending', '').lower() in ['1', 'true']
+        version = kwargs.get('version', 'v1')
+        include_expired = request.query_params.get(
+            u'include_expired', self.include_defaults['include_expired'][version]
+        ).lower() in ['1', 'true']
+        include_revoked = request.query_params.get(
+            u'include_revoked', self.include_defaults['include_revoked'][version]
+        ).lower() in ['1', 'true']
+        include_pending = request.query_params.get(
+            u'include_pending', self.include_defaults['include_pending'][version]
+        ).lower() in ['1', 'true']
 
         def badge_filter(b):
             if ((b.acceptance == BadgeInstance.ACCEPTANCE_REJECTED) or
