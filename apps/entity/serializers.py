@@ -17,9 +17,11 @@ class EntityRelatedFieldV2(serializers.RelatedField):
             obj = self.get_queryset().get(**{self.rel_source: data})
             return obj
         except ObjectDoesNotExist:
-            self.fail('Invalid {rel_source} "{rel_value}" - object does not exist.', rel_source=self.rel_source, rel_value=data)
+            raise RestframeworkValidationError('Invalid {rel_source} "{rel_value}" - object does not exist.'.format(
+                rel_source=self.rel_source, rel_value=data))
         except (TypeError, ValueError):
-            self.fail('Incorrect type. Expected {rel_source} value, received {data_type}.', rel_source=self.rel_source, data_type=type(data).__name__)
+            raise RestframeworkValidationError('Incorrect type. Expected {rel_source} value, got {data_type}.'.format(
+                rel_source=self.rel_source, data_type=type(data).__name__))
 
     def to_representation(self, value):
         return getattr(value, self.rel_source)
