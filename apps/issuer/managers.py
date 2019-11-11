@@ -102,7 +102,7 @@ class BadgeClassManager(BaseOpenBadgeObjectManager):
         criteria_text = None
         criteria = badgeclass_obo.get('criteria', None)
         if isinstance(criteria, basestring):
-            criteria_text = criteria
+            criteria_url = criteria
         elif criteria.get('type', 'Criteria') == 'Criteria':
             criteria_url = criteria.get('id', None)
             criteria_text = criteria.get('narrative', None)
@@ -136,7 +136,7 @@ class BadgeClassManager(BaseOpenBadgeObjectManager):
         criteria_text = None
         criteria = badgeclass_obo.get('criteria', None)
         if isinstance(criteria, basestring):
-            criteria_text = criteria
+            criteria_url = criteria
         elif criteria.get('type', 'Criteria') == 'Criteria':
             criteria_url = criteria.get('id', None)
             criteria_text = criteria.get('narrative', None)
