@@ -3,24 +3,21 @@ import collections
 import datetime
 import dateutil.parser
 import json
+import os
+import responses
 
-from django.db import IntegrityError
 from openbadges.verifier.openbadges_context import (OPENBADGES_CONTEXT_V2_URI, OPENBADGES_CONTEXT_V1_URI,
                                                     OPENBADGES_CONTEXT_V2_DICT)
 from openbadges_bakery import bake, unbake
-import os
-import responses
-from issuer.utils import generate_sha256_hashstring
 
+from django.db import IntegrityError
 from django.urls import reverse
 
 from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import BadgeClass, Issuer, BadgeInstance
+from issuer.utils import generate_sha256_hashstring
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import first_node_match, OriginSetting
-
-from backpack.models import BackpackCollection, BackpackCollectionBadgeInstance
-from backpack.serializers_v1 import (CollectionSerializerV1)
 
 from .utils import setup_basic_0_5_0, setup_basic_1_0, setup_basic_1_0_bad_image, setup_resources, CURRENT_DIRECTORY
 
@@ -1075,7 +1072,7 @@ class TestInclusionFlags(BadgrTestCase, SetupIssuerHelper):
 
         result = self.client.get('/v1/earner/badges')
         self.assertEqual(result.status_code, 200)
-        self.assertEqual(len(result.data), 2, "V1 Backpack defaults to true for these values")
+        self.assertEqual(len(result.data), 1, "V1 Backpack defaults to false for these revoked")
 
         result = self.client.get('/v2/backpack/assertions')
         self.assertEqual(result.status_code, 200)
@@ -1120,7 +1117,7 @@ class TestInclusionFlags(BadgrTestCase, SetupIssuerHelper):
 
         result = self.client.get('/v1/earner/badges')
         self.assertEqual(result.status_code, 200)
-        self.assertEqual(len(result.data), 3, "V1 Backpack defaults to true for these values")
+        self.assertEqual(len(result.data), 2, "V1 Backpack defaults to true for expired but not revoked")
 
         result = self.client.get('/v2/backpack/assertions?include_expired=1')
         self.assertEqual(result.status_code, 200)
