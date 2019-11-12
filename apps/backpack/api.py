@@ -31,7 +31,7 @@ class BackpackAssertionList(BaseEntityListView):
     }
     include_defaults = {
         'include_expired': {'v1': 'true', 'v2': 'false'},
-        'include_revoked': {'v1': 'true', 'v2': 'false'},
+        'include_revoked': {'v1': 'false', 'v2': 'false'},
         'include_pending': {'v1': 'false', 'v2': 'false'},
     }
 
