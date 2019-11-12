@@ -68,9 +68,11 @@ class ScrubUploadedSvgImage(object):
             # strip malicious tags
             elements_to_strip = []
             for tag_name in self.MALICIOUS_SVG_TAGS:
-                elements_to_strip.extend( root.findall('{{{ns}}}{tag}'.format(ns=self.SVG_NAMESPACE, tag=tag_name)) )
+                elements_to_strip.extend(root.findall('.//{{{ns}}}{tag}'.format(ns=self.SVG_NAMESPACE, tag=tag_name)))
+
             for e in elements_to_strip:
-                root.remove(e)
+                parent = root.find(".//{tag}/..".format(tag=e.tag))
+                parent.remove(e)
 
             # strip malicious attributes
             for el in tree.iter():
@@ -78,7 +80,6 @@ class ScrubUploadedSvgImage(object):
                     if attrib_name in el.attrib:
                         del el.attrib[attrib_name]
 
-            # write out scrubbed svg
             buf = StringIO.StringIO()
             tree.write(buf)
             self.image = InMemoryUploadedFile(buf, 'image', self.image.name, 'image/svg+xml', buf.len, 'utf8')

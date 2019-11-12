@@ -264,8 +264,9 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             # make sure code was stripped
             bc = BadgeClass.objects.get(entity_id=response.data.get('slug'))
             image_content = bc.image.file.readlines()
-            self.assertNotIn('onload', image_content)
-            self.assertNotIn('<script>', image_content)
+            for ic in image_content:
+                self.assertNotIn('onload', ic)
+                self.assertNotIn('<script>', ic)
 
             # make sure we can issue the badge
             badgeinstance = bc.issue(recipient_id='fakerecipient@email.test')
