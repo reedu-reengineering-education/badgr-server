@@ -5,7 +5,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from resizeimage.resizeimage import resize_contain
+
 from xml.etree import cElementTree as ET
+from defusedxml.cElementTree import parse as safe_parse
 
 from mainsite.utils import verify_svg
 
@@ -61,8 +63,9 @@ class ScrubUploadedSvgImage(object):
     def save(self, *args, **kwargs):
         if self.image and verify_svg(self.image.file):
             self.image.file.seek(0)
+
             ET.register_namespace("", self.SVG_NAMESPACE)
-            tree = ET.parse(self.image.file)
+            tree = safe_parse(self.image.file)
             root = tree.getroot()
 
             # strip malicious tags
