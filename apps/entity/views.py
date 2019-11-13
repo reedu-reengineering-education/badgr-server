@@ -5,6 +5,7 @@ from django.db.models import ProtectedError
 from rest_framework import views, exceptions, status
 from rest_framework.response import Response
 
+from backpack.badge_connect_serializers import BCErrorSerializer
 from entity.serializers import V2ErrorSerializer
 from entity.authentication import CSRFPermissionDenied
 
@@ -69,3 +70,34 @@ def exception_handler(exc, context):
                                        validation_errors=validation_errors)
 
         return Response(serializer.data, status=response_code)
+    elif version == 'bcv1':
+        # Badge Connect errors
+        error = None
+        status_code = status.HTTP_400_BAD_REQUEST
+        status_text = 'BAD_REQUEST'
+
+        if isinstance(exc, exceptions.ParseError):
+            error = exc.detail
+
+        elif isinstance(exc, exceptions.ValidationError):
+            error = exc.detail
+            status_text = 'REQUEST_VALIDATION_ERROR'
+
+        elif isinstance(exc, exceptions.PermissionDenied):
+            status_code = status.HTTP_401_UNAUTHORIZED
+            status_text = 'PERMISSION_DENIED'
+
+        elif isinstance(exc, (exceptions.AuthenticationFailed, exceptions.NotAuthenticated)):
+            status_code = status.HTTP_401_UNAUTHORIZED
+            status_text = 'UNAUTHENTICATED'
+
+        elif isinstance(exc, exceptions.MethodNotAllowed):
+            status_code = status.HTTP_405_METHOD_NOT_ALLOWED
+            status_text = 'METHOD_NOT_ALLOWED'
+
+        serializer = BCErrorSerializer(instance={},
+                                       error=error,
+                                       status_text=status_text,
+                                       status_code=status_code)
+        return Response(serializer.data, status=status_code)
+                        

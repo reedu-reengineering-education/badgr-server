@@ -214,6 +214,14 @@ class ApplicationInfo(cachemodel.CacheModel):
     allowed_scopes = models.TextField(blank=False, validators=[DefinedScopesValidator()])
     trust_email_verification = models.BooleanField(default=False)
 
+    # Badge Connect Extra Data
+    logo_uri = models.URLField(blank=True, null=True)
+    terms_uri = models.URLField(blank=True, null=True)
+    policy_uri = models.URLField(blank=True, null=True)
+    software_id = models.CharField(max_length=254, blank=True, null=True, default=None)
+    software_version = models.CharField(max_length=254, blank=True, null=True, default=None)
+    issue_refresh_token = models.BooleanField(default=True)
+
     def get_visible_name(self):
         if self.name:
             return self.name

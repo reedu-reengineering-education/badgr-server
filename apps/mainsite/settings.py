@@ -358,7 +358,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'DEFAULT_VERSION': 'v1',
-    'ALLOWED_VERSIONS': ['v1','v2'],
+    'ALLOWED_VERSIONS': ['v1','v2', 'bcv1'],
     'EXCEPTION_HANDLER': 'entity.views.exception_handler',
     'PAGE_SIZE': 100,
 }
@@ -429,6 +429,11 @@ OAUTH2_PROVIDER = {
         'rw:issuer:*':  'Create and update badge classes, and award assertions for a single issuer',
         'rw:serverAdmin': 'Superuser trusted operations on most objects',
         'r:assertions': 'Batch receive assertions',
+
+        # Badge Connect API Scopes
+        'https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly': 'List assertions in a User\'s Backpack',
+        'https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.create': 'Add badges into a User\'s Backpack',
+        'https://purl.imsglobal.org/spec/ob/v2p1/scope/profile.readonly': 'See who you are',
     },
     'DEFAULT_SCOPES': ['r:profile'],
 
