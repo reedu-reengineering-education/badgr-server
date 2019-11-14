@@ -319,8 +319,9 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             # make sure code was stripped
             bc = BadgeClass.objects.get(entity_id=response.data.get('slug'))
             image_content = bc.image.file.readlines()
-            self.assertNotIn('onload', image_content)
-            self.assertNotIn('<script>', image_content)
+            for ic in image_content:
+                self.assertNotIn('onload', ic)
+                self.assertNotIn('<script>', ic)
 
             # make sure we can issue the badge
             badgeinstance = bc.issue(recipient_id='fakerecipient@email.test')
@@ -1051,7 +1052,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
 class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_badgeclasses(self):
-        issuer_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:issuerAdmin')
+        issuer_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:serverAdmin')
         test_issuer = self.setup_issuer(owner=issuer_user)
         test_badgeclass = self.setup_badgeclass(
             issuer=test_issuer, name='Badge Class 1', description='test')

@@ -137,6 +137,9 @@ class SetupIssuerHelper(object):
     def get_test_jpeg_with_no_extension_image_path(self):
         return os.path.join(self.get_testfiles_path(), 'test_jpeg_no_extension')
 
+    def get_hacked_svg_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'hacked-svg-with-embedded-script-tags.svg')
+
     def get_test_svg_image_path(self):
         return os.path.join(self.get_testfiles_path(), 'test_badgeclass.svg')
 

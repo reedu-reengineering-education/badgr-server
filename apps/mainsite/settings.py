@@ -429,7 +429,7 @@ OAUTH2_PROVIDER = {
 
         # private scopes used for integrations
         'rw:issuer:*':  'Create and update badge classes, and award assertions for a single issuer',
-        'rw:issuerAdmin': 'Superuser trusted operations on any issuer',
+        'rw:serverAdmin': 'Superuser trusted operations on most objects',
         'r:assertions': 'Batch receive assertions',
     },
     'DEFAULT_SCOPES': ['r:profile'],
@@ -443,7 +443,7 @@ OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = 'oauth2_provider.AccessToken'
 
 OAUTH2_TOKEN_SESSION_TIMEOUT_SECONDS = OAUTH2_PROVIDER['ACCESS_TOKEN_EXPIRE_SECONDS']
 
-API_DOCS_EXCLUDED_SCOPES = ['rw:issuer:*', 'r:assertions', '*']
+API_DOCS_EXCLUDED_SCOPES = ['rw:issuer:*', 'r:assertions', 'rw:serverAdmin', '*']
 
 
 BADGR_PUBLIC_BOT_USERAGENTS = [

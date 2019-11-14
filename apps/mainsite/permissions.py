@@ -1,3 +1,4 @@
+import oauth2_provider
 from rest_framework import permissions
 
 from badgeuser.models import CachedEmailAddress
@@ -28,3 +29,20 @@ class AuthenticatedWithVerifiedIdentifier(permissions.BasePermission):
 
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated() and request.user.verified
+
+
+class IsServerAdmin(permissions.BasePermission):
+    def check_permission(self, request):
+        token = request.auth
+
+        if token is None or not isinstance(token, oauth2_provider.models.AccessToken):
+            return False
+
+        token_scopes = set(token.scope.split())
+        return 'rw:serverAdmin' in token_scopes
+
+    def has_permission(self, request, view):
+        return self.check_permission(request)
+
+    def has_object_permission(self, request, view, obj):
+        return self.check_permission(request)
