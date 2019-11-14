@@ -1,10 +1,10 @@
 from allauth.tests import MockedResponse
 
 from .provider import KonyProvider
-from ..tests.base import BadgrSocialAuthTestCase, BadgrOAuthTestsMixin, SendsVerificationEmailMixin
+from ..tests.base import BadgrSocialAuthTestCase, BadgrOAuthTestsMixin, DoesNotSendVerificationEmailMixin
 
 
-class KonyProviderTests(SendsVerificationEmailMixin, BadgrOAuthTestsMixin, BadgrSocialAuthTestCase):
+class KonyProviderTests(DoesNotSendVerificationEmailMixin, BadgrOAuthTestsMixin, BadgrSocialAuthTestCase):
     provider_id = KonyProvider.id
 
     def get_mocked_response(self):

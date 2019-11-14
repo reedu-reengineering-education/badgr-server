@@ -3,41 +3,13 @@ from allauth.socialaccount.providers.facebook.provider import FacebookProvider
 from allauth.socialaccount.providers.linkedin_oauth2.provider import LinkedInOAuth2Provider
 from allauth.tests import MockedResponse
 
-from .base import BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase, SendsVerificationEmailMixin
+from .base import BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase, DoesNotSendVerificationEmailMixin, SendsVerificationEmailMixin
 
 
-class FacebookProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
-    provider_id = FacebookProvider.id
-
-    def get_mocked_response(self):
-        response = MockedResponse(200, """
-        {
-           "id": "630595557",
-           "name": "Raymond Penners",
-           "first_name": "Raymond",
-           "last_name": "Penners",
-           "email": "raymond.penners@example.com",
-           "link": "https://www.facebook.com/raymond.penners",
-           "username": "raymond.penners",
-           "birthday": "07/17/1973",
-           "work": [
-              {
-                 "employer": {
-                    "id": "204953799537777",
-                    "name": "IntenCT"
-                 }
-              }
-           ],
-           "timezone": 1,
-           "locale": "nl_NL",
-           "verified": true,
-           "updated_time": "2012-11-30T20:40:33+0000"
-        }""")
-        response.ok = True
-        return response
-
-
-# class LinkedInOAuth2ProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
+# class LinkedInOAuth2ProviderTests(DoesNotSendVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
+#     """
+#     Leaving LinkedIn commented out for now. Tests fail and are very hard to step through.
+#     """
 #     provider_id = LinkedInOAuth2Provider.id
 #
 #     def get_mocked_response(self):
@@ -69,7 +41,7 @@ class FacebookProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, 
 #         return response
 
 
-class AzureProviderTests(SendsVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
+class AzureProviderTests(DoesNotSendVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
     provider_id = AzureProvider.id
 
     def get_mocked_response(self):

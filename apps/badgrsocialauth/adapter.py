@@ -86,4 +86,3 @@ class BadgrSocialAccountAdapter(DefaultSocialAccountAdapter):
 
         except AuthenticationFailed as e:
             raise ImmediateHttpResponse(HttpResponseForbidden(e.detail))
-

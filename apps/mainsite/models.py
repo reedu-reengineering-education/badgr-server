@@ -99,9 +99,10 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
     email_confirmation_redirect = models.URLField()
     signup_redirect = models.URLField()
     forgot_password_redirect = models.URLField()
-    ui_login_redirect = models.URLField(null=True)
+    ui_login_redirect = models.URLField(null=True, default='default_redirect')
     ui_signup_success_redirect = models.URLField(null=True)
     ui_connect_success_redirect = models.URLField(null=True)
+    ui_signup_failure_redirect = models.URLField(null=True)
     public_pages_redirect = models.URLField(null=True)
     oauth_authorization_redirect = models.URLField(null=True)
     use_auth_code_exchange = models.BooleanField(default=False)
@@ -111,6 +112,9 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
 
     def __unicode__(self):
         return self.cors
+
+    def default_redirect(self):
+        return self.signup_redirect
 
     def get_path(self, path='/', use_https=None):
         if use_https is None:

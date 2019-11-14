@@ -110,6 +110,15 @@ class SendsVerificationEmailMixin(object):
         self.assertEqual(len(mail.outbox), before_count + 1)
 
 
+class DoesNotSendVerificationEmailMixin(object):
+    def test_verification_email(self):
+        # Expect this provider to send a verification email on first login
+        before_count = len(mail.outbox)
+        response = self.login(self.get_mocked_response())
+        self.assertEqual(response.status_code, 302)  # sanity
+        self.assertEqual(len(mail.outbox), before_count)
+
+
 @override_settings(UNSUBSCRIBE_SECRET_KEY='123a')
 class BadgrSocialAuthTestCase(BadgrTestCase):
     def setUp(self):

@@ -79,7 +79,7 @@ class BadgrSocialEmailExists(RedirectView):
     def get_redirect_url(self):
         badgr_app = BadgrApp.objects.get_current(self.request)
         if badgr_app is not None:
-            return set_url_query_params(badgr_app.ui_login_redirect,
+            return set_url_query_params(badgr_app.ui_signup_failure_redirect,
                                         authError='An account already exists with provided email address')
 
 
