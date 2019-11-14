@@ -1,6 +1,7 @@
 import urllib
 import urlparse
 
+from allauth.account.adapter import get_adapter
 from allauth.socialaccount.providers.base import AuthProcess
 from django.contrib.auth import logout
 from django.core.exceptions import ValidationError
@@ -14,6 +15,7 @@ import requests
 
 import base64
 
+from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import CachedEmailAddress, BadgeUser
 from badgrsocialauth.models import Saml2Account, Saml2Configuration
 from badgrsocialauth.utils import (set_session_badgr_app, get_session_badgr_app,
@@ -59,7 +61,7 @@ class BadgrSocialLogin(RedirectView):
                 redirect_url = reverse('saml2login', args=[provider_name])
             else:
                 redirect_url = reverse('{}_login'.format(provider_name))
-        except NoReverseMatch:
+        except (NoReverseMatch, TypeError,):
             raise ValidationError('No {} provider found'.format(provider_name))
 
         authcode = self.request.GET.get('authCode', None)
@@ -188,7 +190,12 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config):
         accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
             user,
             scope='rw:backpack rw:profile rw:issuer')
-        params = dict(authToken=accesstoken.token)
+
+        if badgr_app.use_auth_code_exchange:
+            authcode = authcode_for_accesstoken(accesstoken)
+            params = dict(authCode=authcode)
+        else:
+            params = dict(authToken=accesstoken.token)
         return redirect(set_url_query_params(badgr_app.ui_login_redirect, **params))
 
     def new_account(email):

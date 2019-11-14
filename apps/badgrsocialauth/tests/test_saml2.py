@@ -54,7 +54,9 @@ class SAML2Tests(BadgrTestCase):
         email2 = "test234425@example.com"
         first_name = "firsty"
         last_name = "lastington"
-        badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com")
+        badgr_app = BadgrApp.objects.create(
+            ui_login_redirect="https://example.com", ui_signup_failure_redirect='https://example.com/fail'
+        )
 
         # email does not exist
         resp = auto_provision(None, "different425@example.com", first_name, last_name, badgr_app, self.config)
@@ -66,6 +68,7 @@ class SAML2Tests(BadgrTestCase):
             email=email,
             first_name=first_name,
             last_name=last_name,
+            send_confirmation=False
         )
         resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config)
         self.assertEqual(resp.status_code, 302)
@@ -80,7 +83,8 @@ class SAML2Tests(BadgrTestCase):
         BadgeUser.objects.create(
             email=email2,
             first_name=first_name,
-            last_name=last_name
+            last_name=last_name,
+            send_confirmation=False
         )
         cachedemail = CachedEmailAddress.objects.get(email=email2)
         cachedemail.verified = True
