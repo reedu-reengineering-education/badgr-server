@@ -1052,7 +1052,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
 class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_badgeclasses(self):
-        issuer_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:issuerAdmin')
+        issuer_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:serverAdmin')
         test_issuer = self.setup_issuer(owner=issuer_user)
         test_badgeclass = self.setup_badgeclass(
             issuer=test_issuer, name='Badge Class 1', description='test')

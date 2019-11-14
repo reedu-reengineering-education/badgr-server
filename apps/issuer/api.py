@@ -20,7 +20,7 @@ from entity.api import BaseEntityListView, BaseEntityDetailView, VersionedObject
 from entity.serializers import BaseSerializerV2, V2ErrorSerializer
 from issuer.models import Issuer, BadgeClass, BadgeInstance, IssuerStaff
 from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass, IsEditor, IsEditorButOwnerForDelete,
-                                IsIssuerAdmin, IsStaff, ApprovedIssuersOnly, BadgrOAuthTokenHasScope,
+                                IsStaff, ApprovedIssuersOnly, BadgrOAuthTokenHasScope,
                                 BadgrOAuthTokenHasEntityScope, AuthorizationIsBadgrOAuthToken)
 from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
                                    BadgeInstanceSerializerV1)
@@ -28,7 +28,7 @@ from issuer.serializers_v2 import IssuerSerializerV2, BadgeClassSerializerV2, Ba
     IssuerAccessTokenSerializerV2
 from apispec_drf.decorators import apispec_get_operation, apispec_put_operation, \
     apispec_delete_operation, apispec_list_operation, apispec_post_operation
-from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier, IsServerAdmin
 from mainsite.serializers import CursorPaginatedListSerializer
 from mainsite.models import AccessTokenProxy
 
@@ -70,11 +70,11 @@ class IssuerDetail(BaseEntityDetailView):
     v1_serializer_class = IssuerSerializerV1
     v2_serializer_class = IssuerSerializerV2
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & IsEditorButOwnerForDelete & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
-    valid_scopes = ["rw:issuer", "rw:issuer:*", "rw:issuerAdmin"]
+    valid_scopes = ["rw:issuer", "rw:issuer:*", "rw:serverAdmin"]
 
     @apispec_get_operation('Issuer',
         summary="Get a single Issuer",
@@ -105,7 +105,7 @@ class AllBadgeClassesList(BaseEntityListView):
     """
     model = BadgeClass
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & IsEditor & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
@@ -138,7 +138,7 @@ class IssuerBadgeClassList(VersionedObjectMixin, BaseEntityListView):
     """
     model = Issuer  # used by get_object()
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & IsEditor & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
@@ -181,7 +181,7 @@ class BadgeClassDetail(BaseEntityDetailView):
     """
     model = BadgeClass
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & MayEditBadgeClass & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
@@ -230,7 +230,7 @@ class BadgeClassDetail(BaseEntityDetailView):
 class BatchAssertionsIssue(VersionedObjectMixin, BaseEntityView):
     model = BadgeClass  # used by .get_object()
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & MayIssueBadgeClass & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
@@ -296,7 +296,7 @@ class BatchAssertionsIssue(VersionedObjectMixin, BaseEntityView):
 class BatchAssertionsRevoke(VersionedObjectMixin, BaseEntityView):
     model = BadgeInstance
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & MayEditBadgeClass & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
@@ -371,7 +371,7 @@ class BadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, BaseEn
     """
     model = BadgeClass  # used by get_object()
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & MayIssueBadgeClass & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
@@ -436,7 +436,7 @@ class IssuerBadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, 
     """
     model = Issuer  # used by get_object()
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & IsStaff & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
@@ -506,7 +506,7 @@ class BadgeInstanceDetail(BaseEntityDetailView):
     """
     model = BadgeInstance
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & MayEditBadgeClass & BadgrOAuthTokenHasScope) |
         BadgrOAuthTokenHasEntityScope
     ]
@@ -639,7 +639,7 @@ class PaginatedAssertionsSinceSerializer(CursorPaginatedListSerializer):
 
 class AssertionsChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
-    valid_scopes = ["r:assertions", "rw:issuerAdmin"]
+    valid_scopes = ["r:assertions", "rw:serverAdmin"]
 
     def get_queryset(self, request, since=None):
         user = request.user
@@ -693,7 +693,7 @@ class PaginatedBadgeClassesSinceSerializer(CursorPaginatedListSerializer):
 
 class BadgeClassesChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
-    valid_scopes = ["r:issuer", "rw:issuerAdmin"]
+    valid_scopes = ["r:issuer", "rw:serverAdmin"]
 
     def get_queryset(self, request, since=None):
         user = request.user
@@ -745,7 +745,7 @@ class PaginatedIssuersSinceSerializer(CursorPaginatedListSerializer):
 
 class IssuersChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
-    valid_scopes = ["r:issuer", "rw:issuerAdmin"]
+    valid_scopes = ["r:issuer", "rw:serverAdmin"]
 
     def get_queryset(self, request, since=None):
         user = request.user
