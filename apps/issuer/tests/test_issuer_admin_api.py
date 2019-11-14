@@ -19,14 +19,14 @@ class IssuerAdminTests(BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationH
     def setUp(self):
         super(IssuerAdminTests, self).setUp()
 
-        self.client_app_user = self.setup_user(email='clientApp@example.com', token_scope='rw:userAdmin')
+        self.client_app_user = self.setup_user(email='clientApp@example.com', token_scope='rw:serverAdmin')
         self.app = self.setup_oauth2_application(
             client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
-            user=self.client_app_user, allowed_scopes='rw:issuerAdmin'
+            user=self.client_app_user, allowed_scopes='rw:serverAdmin'
         )
 
         self.t = AccessTokenProxy.objects.create(
-            user=self.client_app_user, scope='rw:issuerAdmin', expires=timezone.now() + timezone.timedelta(hours=1),
+            user=self.client_app_user, scope='rw:serverAdmin', expires=timezone.now() + timezone.timedelta(hours=1),
             token='123', application=self.app
         )
 

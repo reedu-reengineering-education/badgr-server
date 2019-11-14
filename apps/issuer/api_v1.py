@@ -11,11 +11,11 @@ import badgrlog
 from badgeuser.models import CachedEmailAddress
 from entity.api import VersionedObjectMixin
 from issuer.models import Issuer, IssuerStaff
-from issuer.permissions import IsIssuerAdmin, IsOwnerOrStaff, BadgrOAuthTokenHasEntityScope
+from issuer.permissions import IsOwnerOrStaff, BadgrOAuthTokenHasEntityScope
 from issuer.serializers_v1 import BadgeClassSerializerV1, IssuerRoleActionSerializerV1, IssuerStaffSerializerV1
 from issuer.utils import get_badgeclass_by_identifier
 from apispec_drf.decorators import apispec_list_operation, apispec_operation
-from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier, IsServerAdmin
 
 
 logger = badgrlog.BadgrLogger()
@@ -72,7 +72,7 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
     queryset = Issuer.objects.all()
     model = Issuer
     permission_classes = [
-        IsIssuerAdmin |
+        IsServerAdmin |
         (AuthenticatedWithVerifiedIdentifier & IsOwnerOrStaff) |
         BadgrOAuthTokenHasEntityScope
     ]
