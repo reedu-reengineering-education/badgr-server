@@ -12,6 +12,8 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.exceptions import AuthenticationFailed
 import requests
 
+import base64
+
 from badgeuser.models import CachedEmailAddress, BadgeUser
 from badgrsocialauth.models import Saml2Account, Saml2Configuration
 from badgrsocialauth.utils import (set_session_badgr_app, get_session_badgr_app,
@@ -94,7 +96,8 @@ class BadgrSocialAccountVerifyEmail(RedirectView):
             verification_email = ''
 
         if badgr_app is not None:
-            return urlparse.urljoin(badgr_app.ui_signup_success_redirect.rstrip('/') + '/', verification_email)
+            base_64_email = base64.urlsafe_b64encode(verification_email)
+            return urlparse.urljoin(badgr_app.ui_signup_success_redirect.rstrip('/') + '/', base_64_email)
 
 
 class BadgrAccountConnected(RedirectView):

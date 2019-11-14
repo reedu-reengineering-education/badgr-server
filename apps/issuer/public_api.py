@@ -500,17 +500,22 @@ class OEmbedAPIEndpoint(APIView):
         ret = set_url_query_params(ret, embedVersion=2)
         return ret
 
-    def get_max_constrained_heigth_and_width(self, request):
-        clamp = 800
-        width = int(request.query_params.get('maxwidth', clamp))
-        height = int(request.query_params.get('maxheight', clamp))
-        constrained_value = width if width == height else min(height, width)
-        return constrained_value if constrained_value < clamp else clamp
+    def get_max_constrained_height(self, request):
+        min_height = 420
+        height = int(request.query_params.get('maxwidth', min_height))
+        return max(min_height, height)
+
+    def get_max_constrained_width(self, request):
+        max_width = 800
+        min_width = 320
+        width = int(request.query_params.get('maxwidth', max_width))
+        return max(min_width, min(width, max_width))
 
     def get(self, request, **kwargs):
         try:
             url = request.query_params.get('url')
-            constrained_height_width = self.get_max_constrained_heigth_and_width(request)
+            constrained_height = self.get_max_constrained_height(request)
+            constrained_width = self.get_max_constrained_width(request)
             response_format = request.query_params.get('format', 'json')
         except (TypeError, ValueError):
             raise ValidationError("Cannot parse OEmbed request parameters.")
@@ -536,14 +541,16 @@ class OEmbedAPIEndpoint(APIView):
             'provider_name': badgrapp.name,
             'provider_url': badgrapp.ui_login_redirect,
             'thumbnail_url': badgeinstance.image_url(),
-            'thumnail_width': 400,  # TODO: get real data; respect maxwidth
-            'thumbnail_height': 400,  # TODO: get real data; respect maxheight
-            'width': constrained_height_width,
-            'height': constrained_height_width
+            'thumnail_width': 200,  # TODO: get real data; respect maxwidth
+            'thumbnail_height': 200,  # TODO: get real data; respect maxheight
+            'width': constrained_width,
+            'height': constrained_height
         }
 
-        data['html'] = """<iframe src="{src}" frameborder="0" width="100%" height="auto"></iframe>""".format(
-            src=self.get_badgrapp_redirect(badgeinstance)
+        data['html'] = """<iframe src="{src}" frameborder="0" width="{width}px" height="{height}px"></iframe>""".format(
+            src=self.get_badgrapp_redirect(badgeinstance),
+            width=constrained_width,
+            height=constrained_height
         )
 
         return Response(data, status=status.HTTP_200_OK)
