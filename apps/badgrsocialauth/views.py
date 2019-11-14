@@ -197,6 +197,7 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config):
             first_name=first_name,
             last_name=last_name,
             request=request,
+            send_confirmation=False
         )
         # Auto verify emails
         cached_email = CachedEmailAddress.objects.get(email=email)
@@ -217,7 +218,7 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config):
             return login(new_account(email))
         # Email exists and is already verified
         return redirect("{url}?authError={message}".format(
-            url=badgr_app.ui_login_redirect,
+            url=badgr_app.ui_signup_failure_redirect,
             message=urllib.quote("Authentication Error")))
     except CachedEmailAddress.DoesNotExist:
         # Email does not exist, auto-provision account and log in
