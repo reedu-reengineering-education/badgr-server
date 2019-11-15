@@ -83,8 +83,15 @@ class BadgrSocialEmailExists(RedirectView):
     def get_redirect_url(self):
         badgr_app = BadgrApp.objects.get_current(self.request)
         if badgr_app is not None:
-            return set_url_query_params(badgr_app.ui_signup_failure_redirect,
-                                        authError='An account already exists with provided email address')
+            verification_email = self.request.session.get('verification_email', '')
+            provider = self.request.session.get('socialaccount_sociallogin', {}).get('account', {}).get('provider', '')
+            return set_url_query_params(
+                badgr_app.ui_signup_failure_redirect,
+                authError='An account already exists with provided email address',
+                email=base64.urlsafe_b64encode(verification_email),
+                socialAuthSlug=provider
+            )
+
 
 
 class BadgrSocialAccountVerifyEmail(RedirectView):

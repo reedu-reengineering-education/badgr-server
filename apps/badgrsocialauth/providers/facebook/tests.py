@@ -1,5 +1,8 @@
+import base64
+import urlparse
 from allauth.tests import MockedResponse
 
+from badgeuser.models import BadgeUser
 from badgrsocialauth.providers.tests.base import BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase
 from badgrsocialauth.providers.tests.test_third_party import DoesNotSendVerificationEmailMixin
 
@@ -40,3 +43,15 @@ class VerifiedFacebookProviderTests(DoesNotSendVerificationEmailMixin, BadgrOAut
         user = self.setup_user(token_scope="rw:profile")
         response = self.client.get('/v1/user/socialaccounts/connect?provider=facebook')
         self.assertEqual(response.status_code, 200)
+
+    def test_cannot_add_to_account_when_email_already_verified(self):
+        user = self.setup_user(authenticate=False, email='raymond.penners@example.com')
+        response = self.login(self.get_mocked_response())
+        self.assertEqual(BadgeUser.objects.all().count(), 1, "There is still only one user.")
+        response = self.client.get(response._headers['location'][1])
+        self.assertEqual(response.status_code, 302)
+        url = urlparse.urlparse(response._headers['location'][1])
+        query = dict(urlparse.parse_qsl(url[4]))
+        self.assertEqual(base64.urlsafe_b64decode(query['email']), 'raymond.penners@example.com')
+        self.assertEqual(query['socialAuthSlug'], 'facebook')
+        self.assertEqual(url.path, "/fail")
