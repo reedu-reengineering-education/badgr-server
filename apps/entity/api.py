@@ -77,7 +77,7 @@ class BaseEntityListView(BaseEntityView):
         """
         POST a new entity to be owned by the authenticated user
         """
-        if not request.user.is_authenticated():
+        if not request.user or request.user.is_anonymous():
             raise NotAuthenticated()
 
         context = self.get_context_data(**kwargs)

@@ -122,6 +122,12 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
         scheme = 'https://' if use_https else 'http://'
         return '{}{}{}'.format(scheme, self.cors, path)
 
+    @property
+    def oauth_application_client_id(self):
+        if self.oauth_application is None:
+            return None
+        return self.oauth_application.client_id
+
 
 @deconstructible
 class DefinedScopesValidator(object):
