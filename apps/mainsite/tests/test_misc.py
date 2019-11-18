@@ -326,6 +326,17 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
     test_uploaded_path = os.path.join('testfiles')
     test_url = 'http://example.com/123abc'
 
+    def tearDown(self):
+        dir = os.path.join('{base_url}/{upload_to}/cached/'.format(
+            base_url= default_storage.location,
+            upload_to=self.test_uploaded_path
+        ))
+
+        try:
+            shutil.rmtree(dir)
+        except OSError as e:
+            print ("%s does not exist and was not deleted" % 'me')
+
     def mimic_hashed_file_name(self, name, ext=''):
         return hashlib.md5(name).hexdigest() + ext
 
@@ -337,7 +348,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
         responses.add(
             responses.GET,
             self.test_url,
-            body=open(self.get_test_svg_with_no_extension_image_path()).read(),
+            body=open(self.get_hacked_svg_image_path()).read(),
             status=200
         )
 
@@ -353,7 +364,6 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
     @responses.activate
     def test_svg_with_extension(self):
         expected_extension = '.svg'
-        expected_file_name = self.mimic_hashed_file_name(self.test_url, expected_extension)
 
         responses.add(
             responses.GET,
@@ -370,6 +380,35 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
 
         self.assertTrue(storage_name.endswith(expected_extension))
         self.assertTrue(default_storage.size(storage_name) > 0)
+
+    @responses.activate
+    def test_scrubs_hacked_svg(self):
+        hacked_svg = open(self.get_hacked_svg_image_path()).read()
+
+        responses.add(
+            responses.GET,
+            self.test_url,
+            body=hacked_svg,
+            status=200
+        )
+
+        status_code, storage_name = fetch_remote_file_to_storage(
+            self.test_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        saved_svg_path = os.path.join('{base_url}/{file_name}'.format(
+            base_url= default_storage.location,
+            file_name=storage_name)
+        )
+            
+        saved_svg = open(saved_svg_path).read()[0]
+
+        self.assertNotIn('onload', saved_svg)
+        self.assertNotIn('<script>', saved_svg)
+
+
 
     @responses.activate
     def test_png_without_extension(self):
