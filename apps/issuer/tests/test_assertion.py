@@ -1403,3 +1403,17 @@ class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
             test_badgeclass.entity_id
         ), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 201, "The badge should award, given an expired prior award.")
+
+    def test_badgeclass_and_issuer_not_in_assertion_cache_record(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(
+            'test3@example.com', expires_at=timezone.now() - timezone.timedelta(days=1)
+        )
+        _ = assertion.badgeclass
+        self.assertTrue(hasattr(assertion, '_badgeclass_cache'))
+
+        cached_assertion = BadgeInstance.cached.get(entity_id=assertion.entity_id)
+        self.assertFalse(hasattr(cached_assertion, '_badgeclass_cache'))
+        self.assertFalse(hasattr(cached_assertion, '_issuer_cache'))
