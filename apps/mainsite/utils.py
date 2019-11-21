@@ -10,8 +10,6 @@ import re
 import urllib
 import urlparse
 import uuid
-
-import os
 import puremagic
 import requests
 from django.apps import apps
@@ -107,11 +105,47 @@ def verify_svg(fileobj):
     return tag == '{http://www.w3.org/2000/svg}svg'
 
 
+def scrubSvgElementTree(svg_elem):
+    """
+    Takes an element (https://docs.python.org/2/library/xml.etree.elementtree.html#element-objects)
+    from an element tree then scrubs malicious tags and attributes.
+    :return: (svg_elem)
+    """
+    MALICIOUS_SVG_TAGS = [
+        "script"
+    ]
+    MALICIOUS_SVG_ATTRIBUTES = [
+        "onload"
+    ]
+    SVG_NAMESPACE = "http://www.w3.org/2000/svg"
+
+    ET.register_namespace("", SVG_NAMESPACE)
+
+    # find malicious tags and attributes
+    elements_to_strip = []
+    for tag_name in MALICIOUS_SVG_TAGS:
+        elements_to_strip.extend(svg_elem.findall('.//{{{ns}}}{tag}'.format(ns=SVG_NAMESPACE, tag=tag_name)))
+
+    # strip malicious tags
+    for e in elements_to_strip:
+        parent = svg_elem.find(".//{tag}/..".format(tag=e.tag))
+        parent.remove(e)
+
+    # strip malicious attributes
+    for el in svg_elem.iter():
+        for attrib_name in MALICIOUS_SVG_ATTRIBUTES:
+            if attrib_name in el.attrib:
+                del el.attrib[attrib_name]
+
+    return svg_elem
+
 def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()):
     """
     Fetches a remote url, and stores it in DefaultStorage
     :return: (status_code, new_storage_name)
     """
+
+    SVG_MIME_TYPE = 'image/svg+xml'
 
     if not allowed_mime_types:
         raise SuspiciousFileOperation("allowed mime types must be passed in")
@@ -124,6 +158,7 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
         magic_strings = puremagic.magic_string(r.content)
         derived_mime_type = None
         derived_ext = None
+        stripped_svg_string = None
 
         for magic_string in magic_strings:
             if getattr(magic_string, 'mime_type', None) in allowed_mime_types:
@@ -132,8 +167,13 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
                 break
 
         if not derived_mime_type and re.search(b'<svg', r.content[:1024]) and r.content.strip()[-6:] == b'</svg>':
-            derived_mime_type = 'image/svg+xml'
+            derived_mime_type = SVG_MIME_TYPE
             derived_ext = '.svg'
+
+        if derived_mime_type == SVG_MIME_TYPE:
+            stripped_svg_element = ET.fromstring(r.content)
+            scrubSvgElementTree(stripped_svg_element)
+            stripped_svg_string = ET.tostring(stripped_svg_element)
 
         if derived_mime_type not in allowed_mime_types:
             raise SuspiciousFileOperation("{} is not an allowed mime type for upload".format(derived_mime_type))
@@ -146,8 +186,10 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
             filename=hashlib.md5(remote_url).hexdigest(),
             ext=derived_ext)
 
+        string_to_write_to_file = stripped_svg_string or r.content
+
         if not store.exists(storage_name):
-            buf = StringIO.StringIO(r.content)
+            buf = StringIO.StringIO(string_to_write_to_file)
             store.save(storage_name, buf)
         return r.status_code, storage_name
     return r.status_code, None
