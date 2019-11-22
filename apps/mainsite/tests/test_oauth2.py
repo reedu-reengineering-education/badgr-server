@@ -15,6 +15,10 @@ from mainsite.utils import backoff_cache_key
 
 
 class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
+    def setUp(self):
+        cache.clear()
+        super(OAuth2TokenTests, self).setUp()
+
     def test_client_credentials_can_get_token(self):
         client_id = "test"
         client_secret = "secret"

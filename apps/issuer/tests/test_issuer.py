@@ -7,6 +7,7 @@ from urllib import quote_plus
 import os
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.core.cache import cache
 from django.core.files.images import get_image_dimensions
 from django.test import override_settings
 from django.urls import reverse
@@ -27,6 +28,10 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         'url': 'http://example.com',
         'email': 'contact@example.org'
     }
+
+    def setUp(self):
+        cache.clear()
+        super(IssuerTests, self).setUp()
 
     def test_cant_create_issuer_if_unauthenticated(self):
         response = self.client.post('/v1/issuer/issuers', self.example_issuer_props)
@@ -102,7 +107,6 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
             'url': 'http://example.com/1',
             'email': 'example1@example.org'
         }
-
 
         issuer_email_1 = CachedEmailAddress.objects.create(
             user=test_user, email=original_issuer_props['email'], verified=True)

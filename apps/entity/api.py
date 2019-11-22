@@ -154,8 +154,6 @@ class BaseEntityDetailView(BaseEntityView, VersionedObjectMixin):
         PUT a new version of an entity
         """
         obj = self.get_object(request, **kwargs)
-        if not self.has_object_permissions(request, obj):
-            return Response(status=HTTP_404_NOT_FOUND)
 
         if data is None:
             data = request.data
