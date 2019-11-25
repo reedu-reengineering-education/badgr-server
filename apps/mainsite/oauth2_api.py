@@ -153,6 +153,7 @@ class TokenView(OAuth2ProviderTokenView):
     validator_class = BadgrRequestValidator
 
     def post(self, request, *args, **kwargs):
+        _max_number_of_backoffs = 12
         _backoff_period = getattr(settings, 'TOKEN_BACKOFF_PERIOD_SECONDS', 2)
         _max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour
 
@@ -168,7 +169,10 @@ class TokenView(OAuth2ProviderTokenView):
                 backoff_count = backoff.get('count', 1)
                 if backoff_until > timezone.now():
                     backoff_count += 1
-                    backoff_seconds = min(_max_backoff, _backoff_period ** backoff_count)
+                    backoff_seconds = min(
+                        _max_backoff,
+                        _backoff_period ** min(_max_number_of_backoffs, backoff_count)
+                    )
                     backoff_until = timezone.now() + datetime.timedelta(seconds=backoff_seconds)
                     cache.set(backoff_cache_key(username, client_ip), dict(until=backoff_until, count=backoff_count), timeout=None)
                     # return the same error as a failed login attempt
