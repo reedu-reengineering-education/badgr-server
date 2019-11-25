@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from resizeimage.resizeimage import resize_contain
 
-from xml.etree import cElementTree as ET
 from defusedxml.cElementTree import parse as safe_parse
 
 from mainsite.utils import verify_svg, scrubSvgElementTree

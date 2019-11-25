@@ -139,6 +139,7 @@ def scrubSvgElementTree(svg_elem):
 
     return svg_elem
 
+
 def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()):
     """
     Fetches a remote url, and stores it in DefaultStorage
