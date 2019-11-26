@@ -5,13 +5,15 @@ from __future__ import unicode_literals
 
 import StringIO
 import base64
+import datetime
 import hashlib
+import json
 import re
 import urllib
 import urlparse
 import uuid
+from xml.etree import cElementTree as ET
 
-import os
 import puremagic
 import requests
 from django.apps import apps
@@ -20,7 +22,9 @@ from django.core.cache import cache
 from django.core.exceptions import SuspiciousFileOperation
 from django.core.files.storage import DefaultStorage
 from django.core.urlresolvers import get_callable
-from xml.etree import cElementTree as ET
+from django.http import HttpResponse
+from django.utils import timezone
+from rest_framework.status import HTTP_401_UNAUTHORIZED
 
 
 class ObjectView(object):
@@ -151,6 +155,75 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
             store.save(storage_name, buf)
         return r.status_code, storage_name
     return r.status_code, None
+
+def clamped_backoff_in_seconds(backoff_count):
+    max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour
+    backoff_period = getattr(settings, 'TOKEN_BACKOFF_PERIOD_SECONDS', 2)
+    max_number_of_backoffs = 12
+
+    return min(
+        max_backoff,
+        backoff_period ** min(max_number_of_backoffs, backoff_count)
+    )
+
+def iterate_backoff_count(backoff):
+    if backoff is None:
+        backoff = {'count': 0}
+    backoff['count'] += 1
+    backoff['until'] = timezone.now() + datetime.timedelta(seconds=clamped_backoff_in_seconds(backoff['count']))
+    return backoff
+
+
+def throttleable(f):
+
+    def wrapper(*args, **kw):
+        username = args[0].request.POST.get('username')
+        client_ip = client_ip_from_request(args[0].request)
+        backoff = cache.get(backoff_cache_key(username, client_ip))
+
+        if backoff is not None:
+            backoff_until = backoff.get('until', None)
+            # backoff_count = backoff.get('count', 1)
+            if backoff_until > timezone.now():
+
+                cache.set(
+                    backoff_cache_key(username, client_ip),
+                    iterate_backoff_count(backoff),
+                    timeout=None
+                )
+
+                return HttpResponse(json.dumps({
+                    "error_description": "Too many login attempts. Please wait and try again.",
+                    "error": "login attempts throttled",
+                    "expires": clamped_backoff_in_seconds(backoff.get('count')),
+                }), status=HTTP_401_UNAUTHORIZED)
+
+        try:
+            result = f(*args, **kw)  # execute the decorated function
+
+            if 200 <= result.status_code < 300:
+                cache.set(
+                    backoff_cache_key(username, client_ip),
+                    None
+                )  # clear any existing backoff
+            else:
+                cache.set(
+                    backoff_cache_key(username, client_ip),
+                    iterate_backoff_count(backoff),
+                    timeout=None
+                )
+        except Exception, e:
+            cache.set(
+                backoff_cache_key(username, client_ip),
+                iterate_backoff_count(backoff),
+                timeout=None
+            )
+            raise e
+
+        return result
+
+    return wrapper
+
 
 
 def generate_entity_uri():
