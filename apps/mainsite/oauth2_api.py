@@ -1,12 +1,9 @@
 # encoding: utf-8
 from __future__ import unicode_literals
 
-import datetime
 import json
 import re
 
-from django.conf import settings
-from django.core.cache import cache
 from django.http import HttpResponse
 from django.utils import timezone
 from oauth2_provider.exceptions import OAuthToolkitError
@@ -18,14 +15,14 @@ from oauth2_provider.views.mixins import OAuthLibMixin
 from oauthlib.oauth2.rfc6749.utils import scope_to_list
 from rest_framework import serializers
 from rest_framework.response import Response
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_200_OK
+from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK
 from rest_framework.views import APIView
 
 import badgrlog
 from badgeuser.authcode import accesstoken_for_authcode
 from mainsite.models import ApplicationInfo
 from mainsite.oauth_validator import BadgrRequestValidator, BadgrOauthServer
-from mainsite.utils import backoff_cache_key, client_ip_from_request
+from mainsite.utils import client_ip_from_request, throttleable
 
 badgrlogger = badgrlog.BadgrLogger()
 
@@ -152,35 +149,10 @@ class TokenView(OAuth2ProviderTokenView):
     server_class = BadgrOauthServer
     validator_class = BadgrRequestValidator
 
+    @throttleable
     def post(self, request, *args, **kwargs):
-        _max_number_of_backoffs = 12
-        _backoff_period = getattr(settings, 'TOKEN_BACKOFF_PERIOD_SECONDS', 2)
-        _max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour
-
         grant_type = request.POST.get('grant_type', 'password')
         username = request.POST.get('username')
-        client_ip = client_ip_from_request(request)
-
-        if grant_type == 'password' and _backoff_period is not None:
-            # check for existing backoff for password attempts
-            backoff = cache.get(backoff_cache_key(username, client_ip))
-            if backoff is not None:
-                backoff_until = backoff.get('until', None)
-                backoff_count = backoff.get('count', 1)
-                if backoff_until > timezone.now():
-                    backoff_count += 1
-                    backoff_seconds = min(
-                        _max_backoff,
-                        _backoff_period ** min(_max_number_of_backoffs, backoff_count)
-                    )
-                    backoff_until = timezone.now() + datetime.timedelta(seconds=backoff_seconds)
-                    cache.set(backoff_cache_key(username, client_ip), dict(until=backoff_until, count=backoff_count), timeout=None)
-                    # return the same error as a failed login attempt
-                    return HttpResponse(json.dumps({
-                        "error_description": "Too many login attempts. Please wait and try again.",
-                        "error": "login attempts throttled",
-                        "expires": backoff_seconds,
-                    }), status=HTTP_401_UNAUTHORIZED)
 
         # pre-validate scopes requested
         client_id = request.POST.get('client_id', None)
@@ -209,21 +181,7 @@ class TokenView(OAuth2ProviderTokenView):
         response = super(TokenView, self).post(request, *args, **kwargs)
 
         if grant_type == "password" and response.status_code == 401:
-            # failed password login attempt
-            username = request.POST.get('username', None)
             badgrlogger.event(badgrlog.FailedLoginAttempt(request, username, endpoint='/o/token'))
-
-            if _backoff_period is not None:
-                # update backoff for failed logins
-                backoff = cache.get(backoff_cache_key(username, client_ip))
-                if backoff is None:
-                    backoff = {'count': 0}
-                backoff['count'] += 1
-                backoff['until'] = timezone.now() + datetime.timedelta(seconds=_backoff_period ** backoff['count'])
-                cache.set(backoff_cache_key(username, client_ip), backoff, timeout=None)
-        elif response.status_code == 200:
-            # successful login
-            cache.set(backoff_cache_key(username, client_ip), None)  # clear any existing backoff
 
         return response
 

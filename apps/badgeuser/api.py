@@ -40,7 +40,7 @@ from entity.api import BaseEntityDetailView, BaseEntityListView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
 from mainsite.models import BadgrApp, AccessTokenProxy
-from mainsite.utils import backoff_cache_key, OriginSetting, set_url_query_params
+from mainsite.utils import backoff_cache_key, OriginSetting, set_url_query_params, throttleable
 
 RATE_LIMIT_DELTA = datetime.timedelta(minutes=5)
 
@@ -63,6 +63,7 @@ class BadgeUserDetail(BaseEntityDetailView):
                             description="Make an account",
                             tags=['BadgeUsers']
                             )
+    @throttleable
     def post(self, request, **kwargs):
         """
         Signup for a new account
