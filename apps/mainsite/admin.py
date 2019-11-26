@@ -54,7 +54,9 @@ class BadgrAppAdmin(ModelAdmin):
             'fields': ('name', 'cors', 'oauth_authorization_redirect', 'use_auth_code_exchange', 'oauth_application'),
         }),
         ('signup', {
-            'fields': ('signup_redirect', 'email_confirmation_redirect', 'forgot_password_redirect', 'ui_login_redirect', 'ui_signup_success_redirect', 'ui_connect_success_redirect')
+            'fields': ('signup_redirect', 'email_confirmation_redirect', 'forgot_password_redirect',
+                       'ui_login_redirect', 'ui_signup_success_redirect', 'ui_signup_failure_redirect',
+                       'ui_connect_success_redirect')
         }),
         ('public', {
             'fields': ('public_pages_redirect',)

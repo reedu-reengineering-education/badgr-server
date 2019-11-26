@@ -152,6 +152,9 @@ class ApprovedIssuersOnly(permissions.BasePermission):
             return request.user.has_perm('issuer.add_issuer')
         return True
 
+    def has_permission(self, request, view):
+        return self.has_object_permission(request, view, None)
+
 
 class IsIssuerEditor(IsEditor):
     """

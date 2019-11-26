@@ -184,8 +184,8 @@ class OriginalJsonSerializerMixin(serializers.Serializer):
 
 
 class CursorPaginatedListSerializer(serializers.ListSerializer):
-    def __init__(self, queryset, request, *args, **kwargs):
-        self.paginator = BadgrCursorPagination(ordering='updated_at')
+    def __init__(self, queryset, request, ordering='updated_at', *args, **kwargs):
+        self.paginator = BadgrCursorPagination(ordering=ordering)
         self.page = self.paginator.paginate_queryset(queryset, request)
         super(CursorPaginatedListSerializer, self).__init__(data=self.page, *args, **kwargs)
 

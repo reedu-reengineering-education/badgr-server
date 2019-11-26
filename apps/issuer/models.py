@@ -890,6 +890,10 @@ class BadgeInstance(BaseAuditedModel,
             self.save()
 
     def publish(self):
+        if hasattr(self, '_issuer_cache'):
+            del self._issuer_cache
+        if hasattr(self, '_badgeclass_cache'):
+            del self._badgeclass_cache
         super(BadgeInstance, self).publish()
         self.badgeclass.publish()
         if self.cached_recipient_profile:

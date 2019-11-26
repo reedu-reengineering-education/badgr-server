@@ -566,8 +566,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
         for field_name in updateable_fields:
             if field_name in validated_data:
                 setattr(instance, field_name, validated_data.get(field_name))
-        instance.save()
-        instance.rebake()
+        instance.rebake(save=True)
 
         return instance
 

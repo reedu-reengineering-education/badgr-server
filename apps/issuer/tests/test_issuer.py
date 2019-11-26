@@ -6,7 +6,10 @@ from urllib import quote_plus
 
 import os
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
+from django.core.cache import cache
 from django.core.files.images import get_image_dimensions
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from oauth2_provider.models import Application
@@ -25,6 +28,10 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         'url': 'http://example.com',
         'email': 'contact@example.org'
     }
+
+    def setUp(self):
+        cache.clear()
+        super(IssuerTests, self).setUp()
 
     def test_cant_create_issuer_if_unauthenticated(self):
         response = self.client.post('/v1/issuer/issuers', self.example_issuer_props)
@@ -100,7 +107,6 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
             'url': 'http://example.com/1',
             'email': 'example1@example.org'
         }
-
 
         issuer_email_1 = CachedEmailAddress.objects.create(
             user=test_user, email=original_issuer_props['email'], verified=True)
@@ -517,3 +523,34 @@ class IssuersChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get('/v2/issuers/changed?since={}'.format(quote_plus(timestamp)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 1)
+
+
+@override_settings(BADGR_APPROVED_ISSUERS_ONLY=True)
+class ApprovedIssuersOnlyTests(SetupIssuerHelper, BadgrTestCase):
+    example_issuer_props = {
+        'name': 'Awesome Issuer',
+        'description': 'An issuer of awe-inspiring credentials',
+        'url': 'http://example.com',
+        'email': 'contact@example.org'
+    }
+
+    def test_unapproved_user_cannot_create_issuer(self):
+        test_user = self.setup_user(authenticate=True)
+        issuer_email = CachedEmailAddress.objects.create(
+            user=test_user, email=self.example_issuer_props['email'], verified=True)
+
+        response = self.client.post('/v2/issuers', self.example_issuer_props)
+        self.assertEqual(response.status_code, 404)
+
+    def test_approved_user_can_create_issuer(self):
+        test_user = self.setup_user(authenticate=True)
+        issuer_email = CachedEmailAddress.objects.create(
+            user=test_user, email=self.example_issuer_props['email'], verified=True)
+
+        permission = Permission.objects.get_by_natural_key('add_issuer', 'issuer', 'issuer')
+        group = Group.objects.create(name='test issuers')
+        group.permissions.add(permission)
+        group.user_set.add(test_user)
+
+        response = self.client.post('/v2/issuers', self.example_issuer_props)
+        self.assertEqual(response.status_code, 201)
