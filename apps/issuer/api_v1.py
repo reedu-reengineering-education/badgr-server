@@ -1,6 +1,7 @@
 # encoding: utf-8
 from __future__ import unicode_literals
 
+from apispec_drf.decorators import apispec_list_operation, apispec_operation
 from django.contrib.auth import get_user_model
 from rest_framework import status, authentication
 from rest_framework.exceptions import ValidationError, PermissionDenied, NotFound
@@ -14,9 +15,8 @@ from issuer.models import Issuer, IssuerStaff
 from issuer.permissions import IsOwnerOrStaff, BadgrOAuthTokenHasEntityScope
 from issuer.serializers_v1 import BadgeClassSerializerV1, IssuerRoleActionSerializerV1, IssuerStaffSerializerV1
 from issuer.utils import get_badgeclass_by_identifier
-from apispec_drf.decorators import apispec_list_operation, apispec_operation
 from mainsite.permissions import AuthenticatedWithVerifiedIdentifier, IsServerAdmin
-
+from mainsite.utils import throttleable
 
 logger = badgrlog.BadgrLogger()
 
@@ -105,6 +105,7 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
         tags=['Issuers'],
         summary="Add or remove a user from a role on an issuer. Limited to Owner users only"
     )
+    @throttleable
     def post(self, request, **kwargs):
         """
         ---
