@@ -12,9 +12,10 @@ import re
 import urllib
 import urlparse
 import uuid
+from xml.etree import cElementTree as ET
+
 import puremagic
 import requests
-
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
@@ -83,6 +84,7 @@ class OriginSettingsObject(object):
         return getattr(settings, 'HTTP_ORIGIN', OriginSettingsObject.DefaultOrigin)
 
 OriginSetting = OriginSettingsObject()
+
 
 """
 Cache Utilities
@@ -200,6 +202,7 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
         return r.status_code, storage_name
     return r.status_code, None
 
+
 def clamped_backoff_in_seconds(backoff_count):
     max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour
     backoff_period = getattr(settings, 'TOKEN_BACKOFF_PERIOD_SECONDS', 2)
@@ -209,6 +212,7 @@ def clamped_backoff_in_seconds(backoff_count):
         max_backoff,
         backoff_period ** min(max_number_of_backoffs, backoff_count)
     )
+
 
 def iterate_backoff_count(backoff):
     if backoff is None:
@@ -267,7 +271,6 @@ def throttleable(f):
         return result
 
     return wrapper
-
 
 
 def generate_entity_uri():
