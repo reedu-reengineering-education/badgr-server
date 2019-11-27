@@ -9,13 +9,13 @@ import datetime
 import hashlib
 import json
 import re
+import puremagic
+import requests
 import urllib
 import urlparse
 import uuid
 from xml.etree import cElementTree as ET
 
-import puremagic
-import requests
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
@@ -24,7 +24,7 @@ from django.core.files.storage import DefaultStorage
 from django.core.urlresolvers import get_callable
 from django.http import HttpResponse
 from django.utils import timezone
-from rest_framework.status import HTTP_401_UNAUTHORIZED
+from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 
 class ObjectView(object):
@@ -244,7 +244,7 @@ def throttleable(f):
                     "error_description": "Too many login attempts. Please wait and try again.",
                     "error": "login attempts throttled",
                     "expires": clamped_backoff_in_seconds(backoff.get('count')),
-                }), status=HTTP_401_UNAUTHORIZED)
+                }), status=HTTP_429_TOO_MANY_REQUESTS)
 
         try:
             result = f(*args, **kw)  # execute the decorated function
