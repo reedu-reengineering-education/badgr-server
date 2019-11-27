@@ -10,6 +10,9 @@ from rest_framework.authentication import BaseAuthentication
 class BadgrOAuth2Authentication(BaseAuthentication):
     www_authenticate_realm = "api"
 
+    def authenticate_header(self, request):
+        return 'Bearer realm="%s"' % self.www_authenticate_realm
+
     def authenticate(self, request):
         """
         Returns two-tuple of (user, token) if authentication succeeds,
