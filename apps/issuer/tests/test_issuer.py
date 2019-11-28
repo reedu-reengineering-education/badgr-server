@@ -163,6 +163,20 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)  # Assert that there is now one editor
 
+    def test_add_user_to_issuer_editors_set_by_email_with_issueradmin_scope(self):
+        test_user = self.setup_user(authenticate=True, token_scope='rw:serverAdmin')
+        test_owner = self.setup_user(authenticate=False)
+        issuer = self.setup_issuer(owner=test_owner)
+        other_user = self.setup_user(authenticate=False)
+
+        response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=issuer.entity_id), {
+            'action': 'add',
+            'email': other_user.primary_email,
+            'role': 'editor'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)  # Assert that there is now one editor
+
     def test_cannot_add_user_by_unverified_email(self):
         test_user = self.setup_user(authenticate=True)
         self.client.force_authenticate(user=test_user)
@@ -282,7 +296,6 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(second_response.status_code, 200)
         staff = test_issuer.staff.all()
         self.assertEqual(test_issuer.editors.count(), 2)
-
 
     def test_cannot_modify_or_remove_self(self):
         """

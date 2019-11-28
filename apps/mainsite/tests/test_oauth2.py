@@ -218,7 +218,7 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
 
         post_data['password'] = password
         response = self.client.post('/o/token', data=post_data)
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 429)
         backoff_data = cache.get(backoff_key)
         self.assertEqual(backoff_data['count'], 2, "Count increases even if sent too soon even if password is right")
         self.assertGreaterEqual(backoff_data['until'], backoff_time + timezone.timedelta(seconds=2),

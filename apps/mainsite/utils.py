@@ -225,19 +225,20 @@ def iterate_backoff_count(backoff):
 def throttleable(f):
 
     def wrapper(*args, **kw):
-        username = args[0].request.POST.get('username')
-        client_ip = client_ip_from_request(args[0].request)
+        max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour
+        request = args[0].request
+        username = request.POST.get('username')
+        client_ip = client_ip_from_request(request)
         backoff = cache.get(backoff_cache_key(username, client_ip))
 
-        if backoff is not None:
+        if backoff is not None and not _request_authenticated_with_admin_scope(request):
             backoff_until = backoff.get('until', None)
-            # backoff_count = backoff.get('count', 1)
             if backoff_until > timezone.now():
 
                 cache.set(
                     backoff_cache_key(username, client_ip),
                     iterate_backoff_count(backoff),
-                    timeout=None
+                    timeout=max_backoff
                 )
 
                 return HttpResponse(json.dumps({
@@ -258,13 +259,13 @@ def throttleable(f):
                 cache.set(
                     backoff_cache_key(username, client_ip),
                     iterate_backoff_count(backoff),
-                    timeout=None
+                    timeout=max_backoff
                 )
         except Exception, e:
             cache.set(
                 backoff_cache_key(username, client_ip),
                 iterate_backoff_count(backoff),
-                timeout=None
+                timeout=max_backoff
             )
             raise e
 
@@ -318,3 +319,15 @@ def set_url_query_params(url, **kwargs):
     query.update(kwargs)
     url_parts[4] = urllib.urlencode(query)
     return urlparse.urlunparse(url_parts)
+
+
+def _request_authenticated_with_admin_scope(request):
+    """
+    Given a request object that may or may not have an associated auth token, return true if rw:issuerAdmin in scope
+    :param request:
+    :return: bool
+    """
+    token = getattr(request, 'auth', None)
+    if token is None:
+        return False
+    return 'rw:serverAdmin' in getattr(token, 'scope', '')
