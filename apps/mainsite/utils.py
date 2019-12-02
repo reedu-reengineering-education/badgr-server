@@ -225,13 +225,13 @@ def iterate_backoff_count(backoff):
 def throttleable(f):
 
     def wrapper(*args, **kw):
-        max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour
+        max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour. Set to 0 to disable.
         request = args[0].request
         username = request.POST.get('username')
         client_ip = client_ip_from_request(request)
         backoff = cache.get(backoff_cache_key(username, client_ip))
 
-        if backoff is not None and not _request_authenticated_with_admin_scope(request):
+        if backoff is not None and max_backoff != 0 and not _request_authenticated_with_admin_scope(request):
             backoff_until = backoff.get('until', None)
             if backoff_until > timezone.now():
 

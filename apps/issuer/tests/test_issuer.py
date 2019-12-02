@@ -21,6 +21,7 @@ from mainsite.tests import SetupOAuth2ApplicationHelper
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 
 
+@override_settings(TOKEN_BACKOFF_MAXIMUM_SECONDS=0)  # disable token backoff
 class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase):
     example_issuer_props = {
         'name': 'Awesome Issuer',
@@ -538,7 +539,6 @@ class IssuersChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(len(response.data['result']), 1)
 
 
-@override_settings(BADGR_APPROVED_ISSUERS_ONLY=True)
 class ApprovedIssuersOnlyTests(SetupIssuerHelper, BadgrTestCase):
     example_issuer_props = {
         'name': 'Awesome Issuer',
@@ -547,6 +547,7 @@ class ApprovedIssuersOnlyTests(SetupIssuerHelper, BadgrTestCase):
         'email': 'contact@example.org'
     }
 
+    @override_settings(BADGR_APPROVED_ISSUERS_ONLY=True)
     def test_unapproved_user_cannot_create_issuer(self):
         test_user = self.setup_user(authenticate=True)
         issuer_email = CachedEmailAddress.objects.create(
@@ -555,6 +556,7 @@ class ApprovedIssuersOnlyTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.post('/v2/issuers', self.example_issuer_props)
         self.assertEqual(response.status_code, 404)
 
+    @override_settings(BADGR_APPROVED_ISSUERS_ONLY=True)
     def test_approved_user_can_create_issuer(self):
         test_user = self.setup_user(authenticate=True)
         issuer_email = CachedEmailAddress.objects.create(

@@ -109,7 +109,7 @@ TEMPLATES = [
                 'django.template.loaders.filesystem.Loader',
             ),
         },
-        
+
     },
 ]
 
@@ -472,6 +472,7 @@ BADGERANK_NOTIFY_URL = 'https://api.badgerank.org/v1/badgeclass/submit'
 
 # Feature options
 GDPR_COMPLIANCE_NOTIFY_ON_FIRST_AWARD = True  # Notify recipients of first award on server even if issuer didn't opt to.
+BADGR_APPROVED_ISSUERS_ONLY = False
 
 # Email footer operator information
 PRIVACY_POLICY_URL = None
