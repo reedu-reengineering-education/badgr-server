@@ -20,7 +20,7 @@ class TwitterShareProvider(ShareProvider):
         if isinstance(obj, BadgeInstance):
             text = "I earned a badge from {issuer}! {url}".format(
                 issuer=obj.cached_issuer.name,
-                url=obj.share_url
+                url=obj.get_share_url(**kwargs)
             )
         else:
             text = obj.share_url
@@ -35,7 +35,7 @@ class FacebookShareProvider(ShareProvider):
 
     def share_url(self, badge_instance, **kwargs):
         return "https://www.facebook.com/sharer/sharer.php?u={url}".format(
-            url=urllib.quote(badge_instance.share_url)
+            url=urllib.quote(badge_instance.get_share_url(**kwargs))
         )
 
 
@@ -45,7 +45,7 @@ class PinterestShareProvider(ShareProvider):
 
     def share_url(self, badge_instance, **kwargs):
         return "http://www.pinterest.com/pin/create/button/?url={url}&media={image}&description={summary}".format(
-            url=urllib.quote(badge_instance.share_url),
+            url=urllib.quote(badge_instance.get_share_url(**kwargs)),
             image=badge_instance.image_url(),
             summary=badge_instance.cached_badgeclass.name
         )
@@ -65,14 +65,14 @@ class LinkedinShareProvider(ShareProvider):
             url = self.feed_share_url(instance, **kwargs)
         return url
 
-    def feed_share_url(self, badge_instance, title=None, summary=None):
+    def feed_share_url(self, badge_instance, title=None, summary=None, **kwargs):
         if title is None:
             title = "I earned a badge from Badgr!"
         if summary is None:
             summary = badge_instance.cached_badgeclass.name
             summary = summary.encode('utf8')  # Unicode is forbidden in URLs, urllib does not handle Unicode
         return "https://www.linkedin.com/shareArticle?mini=true&url={url}&title={title}&summary={summary}".format(
-            url=urllib.quote(badge_instance.share_url),
+            url=urllib.quote(badge_instance.get_share_url(**kwargs)),
             title=urllib.quote(title),
             summary=urllib.quote(summary),
         )
@@ -84,7 +84,7 @@ class LinkedinShareProvider(ShareProvider):
         return "https://www.linkedin.com/profile/add?_ed={certIssuerId}&pfCertificationName={name}&pfCertificationUrl={url}".format(
             certIssuerId=cert_issuer_id,
             name=urllib.quote(badge_instance.cached_badgeclass.name),
-            url=urllib.quote(badge_instance.share_url)
+            url=urllib.quote(badge_instance.share_url(**kwargs))
         )
 
 
@@ -98,12 +98,12 @@ class SharingManager(object):
     }
 
     @classmethod
-    def share_url(cls, provider, badge_instance, **kwargs):
+    def share_url(cls, provider, badge_instance, include_identifier=False, **kwargs):
         manager_cls = SharingManager.ManagerProviders.get(provider.lower(), None)
         if manager_cls is None:
             raise NotImplementedError(u"Provider not supported: {}".format(provider))
         manager = manager_cls(provider)
-        url = manager.share_url(badge_instance, **kwargs)
+        url = manager.share_url(badge_instance, include_identifier=include_identifier)
         return url
 
     @classmethod

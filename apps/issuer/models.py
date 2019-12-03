@@ -2,6 +2,8 @@ from __future__ import unicode_literals
 
 import StringIO
 import datetime
+import urllib
+
 import dateutil
 import re
 import uuid
@@ -775,6 +777,12 @@ class BadgeInstance(BaseAuditedModel,
             return default_storage.url(self.image.name)
         else:
             return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
+
+    def get_share_url(self, include_identifier=False):
+        url = self.share_url
+        if include_identifier:
+            url = '%s?identifier__%s=%s' % (url, self.recipient_type, urllib.quote(self.recipient_identifier))
+        return url
 
     @property
     def share_url(self):
