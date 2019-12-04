@@ -25,8 +25,18 @@ class SocialAccountV2APITests(BadgrTestCase, SetupUserHelper):
         response = self.client.get('/v2/socialaccounts')
         self.assertEqual(response.status_code, 200)
         account_id = response.data.get('result')[0]['id']
+        self.assertEqual(response.data['result'][0]['url'], 'https://twitter.com/pennersr')
+        self.assertEqual(response.data['result'][0]['firstName'], None)
+        self.assertEqual(response.data['result'][0]['lastName'], None)
+        self.assertEqual(response.data['result'][0]['primaryEmail'], None)
+
         response = self.client.get('/v2/socialaccounts/{}'.format(account_id))
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['result'][0]['url'], 'https://twitter.com/pennersr')
+        self.assertEqual(response.data['result'][0]['firstName'], None)
+        self.assertEqual(response.data['result'][0]['lastName'], None)
+        self.assertEqual(response.data['result'][0]['primaryEmail'], None)
+
         response = self.client.delete('/v2/socialaccounts/{}'.format(account_id))
         self.assertEqual(response.status_code, 204)
         self.assertEqual(SocialAccount.objects.count(), 0)

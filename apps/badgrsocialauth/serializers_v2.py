@@ -22,7 +22,12 @@ class BadgrSocialAccountSerializerV2(BaseSerializerV2):
         if not email and 'userPrincipalName' in instance.extra_data:
             email = instance.extra_data['userPrincipalName']
 
-        representation.update({
+        if self.parent is None:
+            result = representation['result'][0]
+        else:
+            result = representation
+
+        result.update({
             'firstName': common_fields.get('first_name', None),
             'lastName': common_fields.get('last_name', None),
             'primaryEmail': email,
