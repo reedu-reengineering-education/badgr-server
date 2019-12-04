@@ -213,15 +213,9 @@ class AccessTokenProxyManager(models.Manager):
         try:
             pk = int(id)
         except ValueError as e:
-            pass
-        else:
-            try:
-                obj = self.get(pk=pk)
-            except self.model.DoesNotExist:
-                pass
-            else:
-                return obj
-        raise self.model.DoesNotExist
+            raise self.model.DoesNotExist()
+
+        return self.get(pk=pk)
 
 
 class AccessTokenProxy(AccessToken):

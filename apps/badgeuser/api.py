@@ -553,7 +553,11 @@ class AccessTokenDetail(BaseEntityDetailView):
     valid_scopes = ['rw:profile']
 
     def get_object(self, request, **kwargs):
-        self.object = AccessTokenProxy.objects.get_from_entity_id(kwargs.get('entity_id'))
+        try:
+            self.object = AccessTokenProxy.objects.get_from_entity_id(kwargs.get('entity_id'))
+        except AccessTokenProxy.DoesNotExist:
+            raise Http404
+
         if not self.has_object_permissions(request, self.object):
             raise Http404
         return self.object
