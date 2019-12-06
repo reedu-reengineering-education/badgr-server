@@ -1,7 +1,7 @@
 import requests
 from allauth.socialaccount.models import SocialToken, SocialAccount
 from django.contrib import messages
-from django.contrib.admin import AdminSite, ModelAdmin, StackedInline
+from django.contrib.admin import AdminSite, ModelAdmin, StackedInline, TabularInline
 from django.http import HttpResponseRedirect
 from django.shortcuts import reverse
 from django.utils.module_loading import autodiscover_modules
@@ -137,10 +137,25 @@ badgr_admin.register(Application, ApplicationInfoAdmin)
 # badgr_admin.register(RefreshToken, RefreshTokenAdmin)
 
 
+class SecuredRefreshTokenInline(TabularInline):
+    fields = ('obscured_token', 'user', 'revoked',)
+    raw_id_fields = ('user', 'application',)
+    readonly_fields = ('user', 'application', 'revoked', 'obscured_token',)
+    model = RefreshToken
+    extra = 0
+
+    def obscured_token(self, obj):
+        if obj.token:
+            return "{}***".format(obj.token[:4])
+    obscured_token.allow_tags = True
+
+
 class SecuredAccessTokenAdmin(AccessTokenAdmin):
     list_display = ("obscured_token", "user", "application", "expires")
-    raw_id_fields = ('user','application')
-    fields = ('obscured_token','user','application','expires','scope',)
+    raw_id_fields = ('user', 'application')
+    fields = ('obscured_token', 'user', 'application', 'expires', 'scope',)
     readonly_fields = ('obscured_token',)
+    inlines = [
+        SecuredRefreshTokenInline
+    ]
 badgr_admin.register(AccessTokenProxy, SecuredAccessTokenAdmin)
-

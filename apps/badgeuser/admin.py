@@ -10,7 +10,6 @@ from .models import (BadgeUser, EmailAddressVariant, TermsVersion, TermsAgreemen
                      UserRecipientIdentifier)
 
 
-
 class ExternalToolInline(TabularInline):
     model = ExternalToolUserActivation
     fk_name = 'user'
