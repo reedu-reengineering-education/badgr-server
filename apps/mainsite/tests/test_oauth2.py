@@ -187,7 +187,7 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         cache.clear()
         password = 'secret'
         user = self.setup_user(authenticate=False, password=password, email='testemail233@example.test')
-        backoff_key = backoff_cache_key(user.email, None)
+        backoff_key = backoff_cache_key(user.email, '127.0.0.1')
         application = Application.objects.create(
             client_id='public',
             client_secret='',
