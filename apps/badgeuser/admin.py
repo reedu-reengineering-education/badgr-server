@@ -42,14 +42,15 @@ class UserRecipientIdentifierInline(TabularInline):
 
 
 class BadgeUserAdmin(DjangoObjectActions, ModelAdmin):
-    readonly_fields = ('entity_id', 'date_joined', 'last_login', 'username', 'entity_id', 'agreed_terms_version', 'login_backoff')
+    readonly_fields = ('entity_id', 'date_joined', 'last_login', 'username', 'entity_id', 'agreed_terms_version',
+                       'login_backoff', 'has_usable_password',)
     list_display = ('email', 'first_name', 'last_name', 'is_active', 'is_staff', 'entity_id', 'date_joined')
     list_filter = ('is_active', 'is_staff', 'is_superuser', 'date_joined', 'last_login')
     search_fields = ('email', 'first_name', 'last_name', 'username', 'entity_id')
     fieldsets = (
         ('Metadata', {'fields': ('entity_id', 'username', 'date_joined',), 'classes': ('collapse',)}),
         (None, {'fields': ('email', 'first_name', 'last_name', 'badgrapp', 'agreed_terms_version', 'marketing_opt_in')}),
-        ('Access', {'fields': ('is_active', 'is_staff', 'is_superuser', 'password', 'login_backoff')}),
+        ('Access', {'fields': ('is_active', 'is_staff', 'is_superuser', 'has_usable_password', 'password', 'login_backoff')}),
         ('Permissions', {'fields': ('groups', 'user_permissions')}),
     )
     inlines = [
