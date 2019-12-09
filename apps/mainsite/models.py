@@ -128,6 +128,12 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
             return None
         return self.oauth_application.client_id
 
+    @oauth_application_client_id.setter
+    def oauth_application_client_id(self, value):
+        # Allows setting of OAuth Application foreign key by client_id. Raises Application.DoesNotExist when not found
+        # This does not save the record, so .save() must be called as appropriate.
+        self.oauth_application = Application.objects.get(client_id=value)
+
 
 @deconstructible
 class DefinedScopesValidator(object):
