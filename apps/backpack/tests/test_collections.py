@@ -95,6 +95,18 @@ class TestCollections(BadgrTestCase):
 
         self.assertEqual(response.data['badges'], [])
 
+        response = self.client.get('/v2/backpack/collections/{}'.format(self.collection.entity_id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['result'][0]['shareHash'], '')
+
+        self.collection.published = True
+        self.collection.save()
+
+        response = self.client.get('/v2/backpack/collections/{}'.format(self.collection.entity_id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['result'][0]['shareHash'], self.collection.share_hash)
+
+
     def test_can_define_collection(self):
         """
         Authorized user can create a new collection via API.
