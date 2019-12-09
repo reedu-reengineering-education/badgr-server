@@ -627,6 +627,8 @@ class VerifyBadgeAPIEndpoint(JSONComponentView):
                     original_json.get(badge_instance_obo.get('id', ''), None)
                 )
 
+                badge_instance.rebake(save=True)
+
                 BadgeClass.objects.update_from_ob2(
                     badge_instance.issuer,
                     badgeclass_obo,
