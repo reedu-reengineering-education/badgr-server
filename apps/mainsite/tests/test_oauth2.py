@@ -2,6 +2,7 @@ import base64
 import urllib
 
 from django.core.cache import cache
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from oauth2_provider.models import Application
@@ -183,6 +184,7 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.post('/v2/badgeclasses', badgeclass_data)
         self.assertEqual(response.status_code, 401)
 
+    @override_settings(TOKEN_BACKOFF_MAXIMUM_SECONDS=3600, TOKEN_BACKOFF_PERIOD_SECONDS=2)
     def test_can_reset_failed_login_backoff(self):
         cache.clear()
         password = 'secret'
