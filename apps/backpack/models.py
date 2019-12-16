@@ -142,6 +142,7 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
             ('id', add_obi_version_ifneeded(self.share_url, obi_version)),
             ('name', self.name),
             ('description', self.description),
+            ('entityId', self.entity_id),
             ('owner', OrderedDict([
                 ('firstName', self.cached_creator.first_name),
                 ('lastName', self.cached_creator.last_name),

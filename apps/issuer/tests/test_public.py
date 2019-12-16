@@ -142,6 +142,31 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
                 self.assertTrue(response.get('content-type').startswith('text/html'))
                 self.assertContains(response, '<meta property="og:url" content="{}">'.format(test_collection.share_url), html=True)
 
+    def test_public_collection_json(self):
+        test_user_email = 'test.user@email.test'
+
+        test_user = self.setup_user(authenticate=False, email=test_user_email)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(recipient_id=test_user_email)
+        assertion.pending  # prepopulate cache
+
+        # create a shared collection
+        test_collection = BackpackCollection.objects.create(created_by=test_user, name='Test Collection',
+                                                            description="testing")
+        BackpackCollectionBadgeInstance.objects.create(collection=test_collection, badgeinstance=assertion,
+                                                       badgeuser=test_user)  # add assertion to collection
+        test_collection.published = True
+        test_collection.save()
+        self.assertIsNotNone(test_collection.share_url)
+
+        response = self.client.get(
+            '/public/collections/{}'.format(test_collection.share_hash), header={'Accept': 'application/json'}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['entityId'], test_collection.entity_id)
+
+
     def test_get_assertion_html_redirects_to_frontend(self):
         badgr_app = BadgrApp(cors='frontend.ui',
                              public_pages_redirect='http://frontend.ui/public')
