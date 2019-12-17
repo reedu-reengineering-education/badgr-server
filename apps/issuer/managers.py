@@ -176,21 +176,6 @@ class BadgeInstanceEvidenceManager(models.Manager):
             original_json=json.dumps(evidence_obo)
         )
 
-    def update_from_ob2(self, badgeinstance, evidence_obo):
-        if isinstance(evidence_obo, six.string_types):
-            return self.update(
-                badgeinstance=badgeinstance,
-                evidence_url=evidence_obo,
-                narrative=None,
-                original_json=''
-            )
-        return self.update(
-            badgeinstance=badgeinstance,
-            evidence_url=evidence_obo.get('id', None),
-            narrative=evidence_obo.get('narrative', None),
-            original_json=json.dumps(evidence_obo)
-        )
-
 
 def _fetch_image_and_get_file(url, upload_to=''):
     status_code, storage_name = fetch_remote_file_to_storage(url, upload_to=upload_to,
@@ -214,7 +199,7 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         if 'issuedOn' in assertion_obo:
             issued_on = dateutil.parser.parse(assertion_obo.get('issuedOn'))
 
-        updated = self.update_or_create(
+        updated, created = self.update_or_create(
             source_url=assertion_obo.get('id'),
             defaults=dict(
                 recipient_identifier=recipient_identifier,
@@ -229,15 +214,14 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
                 issued_on=issued_on
             )
         )
-
         evidence = list_of(assertion_obo.get('evidence', None))
-        if evidence:
-            from issuer.models import BadgeInstanceEvidence
-            for evidence_item in evidence:
-                # if we have come this far we all already using ob2
-                BadgeInstanceEvidence.objects.update_from_ob2(badgeclass, evidence_item)
+        for item in evidence:
+            # TODO: refactor BadgeInstance.evidence_items setter to accept 'id' property directly.
+            if item.get('id'):
+                item['evidence_url'] = item['id']
+        updated.evidence_items = evidence
 
-        return updated
+        return updated, created
 
 
     @transaction.atomic

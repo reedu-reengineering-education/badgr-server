@@ -345,3 +345,8 @@ class OEmbedTests(SetupIssuerHelper, BadgrTestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'oembed')
+
+
+class PublicReverificationTests(BadgrTestCase):
+    def test_can_reverify_basic(self):
+        pass
