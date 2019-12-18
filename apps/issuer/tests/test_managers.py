@@ -114,7 +114,7 @@ class BadgeInstanceAndEvidenceManagerTests(SetupIssuerHelper, BadgrTestCase):
         )
         self.assertEqual(BadgeInstanceEvidence.objects.count(), 1)
         evidence_item = BadgeInstanceEvidence.objects.first()
-        self.assertEqual(evidence_item.badgeinstance, badgeinstance)
+        self.assertEqual(evidence_item.badgeinstance_id, badgeinstance.pk)
         self.assertEqual(evidence_item.evidence_url, assertion_ob2['evidence'])
         self.assertIsNone(evidence_item.narrative)
 

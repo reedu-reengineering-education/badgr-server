@@ -1175,7 +1175,7 @@ class BadgeInstance(BaseAuditedModel,
     @evidence_items.setter
     def evidence_items(self, value):
         def _key(narrative, url):
-            return u'{}-{}'.format(narrative, url)
+            return u'{}-{}'.format(narrative or '', url or '')
         existing_evidence_idx = {_key(e.narrative, e.evidence_url): e for e in self.evidence_items}
         new_evidence_idx = {_key(v.get('narrative', None), v.get('evidence_url', None)): v for v in value}
 
