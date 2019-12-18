@@ -87,6 +87,9 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
         if self.published:
             return OriginSetting.HTTP+reverse('collection_json', kwargs={'entity_id': self.share_hash})
 
+    def get_share_url(self, **kwargs):
+        return self.share_url
+
     @property
     def badge_items(self):
         return self.cached_badgeinstances()
