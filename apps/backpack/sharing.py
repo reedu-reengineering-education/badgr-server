@@ -61,8 +61,10 @@ class LinkedinShareProvider(ShareProvider):
         # if hasattr(instance, 'cached_badgeclass'):
         #     url = self.certification_share_url(instance, **kwargs)
 
-        if not url:
+        if not url and isinstance(instance, BadgeInstance):
             url = self.feed_share_url(instance, **kwargs)
+        elif not url:
+            return self.collection_share_url(instance, **kwargs)
         return url
 
     def feed_share_url(self, badge_instance, title=None, summary=None, **kwargs):
@@ -73,6 +75,15 @@ class LinkedinShareProvider(ShareProvider):
             summary = summary.encode('utf8')  # Unicode is forbidden in URLs, urllib does not handle Unicode
         return "https://www.linkedin.com/shareArticle?mini=true&url={url}&title={title}&summary={summary}".format(
             url=urllib.quote(badge_instance.get_share_url(**kwargs)),
+            title=urllib.quote(title),
+            summary=urllib.quote(summary),
+        )
+
+    def collection_share_url(self, collection, **kwargs):
+        title = collection.name
+        summary = collection.description
+        return "https://www.linkedin.com/shareArticle?mini=true&url={url}&title={title}&summary={summary}".format(
+            url=urllib.quote(collection.get_share_url(**kwargs)),
             title=urllib.quote(title),
             summary=urllib.quote(summary),
         )
