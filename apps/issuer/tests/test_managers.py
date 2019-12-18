@@ -89,14 +89,32 @@ class BadgeInstanceAndEvidenceManagerTests(SetupIssuerHelper, BadgrTestCase):
         badgeinstance, _ = BadgeInstance.objects.get_or_create_from_ob2(
             badgeclass, assertion_ob2, recipient_identifier='test@example.com'
         )
-
         self.assertTrue(badgeinstance.badgeclass, badgeclass)
 
+        # Add evidence item that didn't exist at initial import
         assertion_ob2['evidence'] = {'id': 'https://example.com/evidence/1'}
         updated, _ = BadgeInstance.objects.update_from_ob2(
             badgeclass, assertion_ob2, recipient_identifier=badgeinstance.recipient_identifier
         )
-
         self.assertEqual(updated.pk, badgeinstance.pk)
         self.assertEqual(BadgeInstanceEvidence.objects.count(), 1)
         self.assertEqual(updated.cached_evidence().count(), 1)
+
+        # That evidence item has now been deleted, make sure we stay up to date there.
+        del assertion_ob2['evidence']
+        updated, _ = BadgeInstance.objects.update_from_ob2(
+            badgeclass, assertion_ob2, recipient_identifier=badgeinstance.recipient_identifier
+        )
+        self.assertEqual(BadgeInstanceEvidence.objects.count(), 0)
+
+        # An evidence url gets added as a string in Open Badges 1.x style
+        assertion_ob2['evidence'] = 'https://example.com/evidence/2'
+        updated, _ = BadgeInstance.objects.update_from_ob2(
+            badgeclass, assertion_ob2, recipient_identifier=badgeinstance.recipient_identifier
+        )
+        self.assertEqual(BadgeInstanceEvidence.objects.count(), 1)
+        evidence_item = BadgeInstanceEvidence.objects.first()
+        self.assertEqual(evidence_item.badgeinstance, badgeinstance)
+        self.assertEqual(evidence_item.evidence_url, assertion_ob2['evidence'])
+        self.assertIsNone(evidence_item.narrative)
+

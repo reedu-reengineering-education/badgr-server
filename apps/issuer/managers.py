@@ -215,11 +215,13 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
             )
         )
         evidence = list_of(assertion_obo.get('evidence', None))
+        evidence_items = []
         for item in evidence:
-            # TODO: refactor BadgeInstance.evidence_items setter to accept 'id' property directly.
-            if item.get('id'):
-                item['evidence_url'] = item['id']
-        updated.evidence_items = evidence
+            if isinstance(item, six.string_types):
+                evidence_items.append({'evidence_url': item})  # convert string/url type evidence to consistent format
+            elif hasattr(item, 'get'):
+                evidence_items.append({'evidence_url': item.get('id'), 'narrative': item.get('narrative')})
+        updated.evidence_items = evidence_items
 
         return updated, created
 
