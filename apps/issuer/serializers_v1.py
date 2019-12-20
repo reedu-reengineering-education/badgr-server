@@ -381,19 +381,21 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
         submitted_items = validated_data.get('evidence_items')
         if submitted_items:
             evidence_items.extend(submitted_items)
-
-        return self.context.get('badgeclass').issue(
-            recipient_id=validated_data.get('recipient_identifier'),
-            narrative=validated_data.get('narrative'),
-            evidence=evidence_items,
-            notify=validated_data.get('create_notification'),
-            created_by=self.context.get('request').user,
-            allow_uppercase=validated_data.get('allow_uppercase'),
-            recipient_type=validated_data.get('recipient_type', RECIPIENT_TYPE_EMAIL),
-            badgr_app=BadgrApp.objects.get_current(self.context.get('request')),
-            expires_at=validated_data.get('expires_at', None),
-            extensions=validated_data.get('extension_items', None)
-        )
+        try:
+            return self.context.get('badgeclass').issue(
+                recipient_id=validated_data.get('recipient_identifier'),
+                narrative=validated_data.get('narrative'),
+                evidence=evidence_items,
+                notify=validated_data.get('create_notification'),
+                created_by=self.context.get('request').user,
+                allow_uppercase=validated_data.get('allow_uppercase'),
+                recipient_type=validated_data.get('recipient_type', RECIPIENT_TYPE_EMAIL),
+                badgr_app=BadgrApp.objects.get_current(self.context.get('request')),
+                expires_at=validated_data.get('expires_at', None),
+                extensions=validated_data.get('extension_items', None)
+            )
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message)
 
     def update(self, instance, validated_data):
         updateable_fields = [

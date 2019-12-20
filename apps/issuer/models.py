@@ -620,7 +620,6 @@ class BadgeClass(ResizeUploadedImage,
             **kwargs
         )
 
-
     def get_json(self, obi_version=CURRENT_OBI_VERSION, include_extra=True, use_canonical_id=False):
         obi_version, context_iri = get_obi_context(obi_version)
         json = OrderedDict({'@context': context_iri})
@@ -848,7 +847,7 @@ class BadgeInstance(BaseAuditedModel,
             # First check if recipient is in the blacklist
             if blacklist.api_query_is_in_blacklist(self.recipient_type, self.recipient_identifier):
                 logger.event(badgrlog.BlacklistAssertionNotCreatedEvent(self))
-                return
+                raise ValidationError("You may not award this badge to this recipient.")
 
             self.salt = uuid.uuid4().hex
             self.created_at = datetime.datetime.now()
