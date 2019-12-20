@@ -80,6 +80,23 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
     def test_can_create_badgeclass(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_image_path())
 
+    def test_cannot_create_badgeclass_only_with_invalid_image_data_uri(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.issuer = test_issuer
+        badgeclass_props = {
+            'name': 'Badge of Slugs',
+            'description': "Recognizes slimy learners with a penchant for lettuce",
+            'image': 'http://placekitten.com/400/400',
+            'criteriaNarrative': 'Eat lettuce. Grow big.'
+        }
+
+        response = self.client.post(
+            '/v2/issuers/{}/badgeclasses'.format(test_issuer.entity_id),
+            badgeclass_props, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_staff_cannot_create_badgeclass(self):
         with open(self.get_test_image_path(), 'r') as badge_image:
 

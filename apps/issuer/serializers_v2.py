@@ -311,6 +311,8 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         return super(BadgeClassSerializerV2, self).update(instance, validated_data)
 
     def create(self, validated_data):
+        if 'image' not in validated_data:
+            raise serializers.ValidationError({'image': 'Valid image file or data URI required.'})
         if 'cached_issuer' in validated_data:
             # included issuer in request
             validated_data['issuer'] = validated_data.pop('cached_issuer')
