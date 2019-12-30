@@ -69,7 +69,9 @@ class LinkedinShareProvider(ShareProvider):
 
     def feed_share_url(self, badge_instance, title=None, summary=None, **kwargs):
         if title is None:
-            title = "I earned a badge from Badgr!"
+            title = "I earned a badge from {issuer}!".format(
+                issuer=badge_instance.issuer.name)
+
         if summary is None:
             summary = badge_instance.cached_badgeclass.name
             summary = summary.encode('utf8')  # Unicode is forbidden in URLs, urllib does not handle Unicode
