@@ -10,6 +10,7 @@ from operator import attrgetter
 
 from django.core import mail
 from django.core.cache import cache, CacheKeyWarning
+from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.management import call_command
 from django.test import override_settings, TransactionTestCase
@@ -274,13 +275,14 @@ class TestBlacklist(BadgrTestCase):
     def test_blacklist_assertion_to_recipient_in_blacklist(self):
         id_type, id_value = self.Inputs[0]
         with mock.patch('mainsite.blacklist.api_query_is_in_blacklist', new=lambda a, b: True):
-            BadgeInstance.objects.create(
-                recipient_identifier="test@example.com",
-                badgeclass=self.badge_class,
-                issuer=self.issuer,
-                image="uploads/badges/local_badgeinstance_174e70bf-b7a8-4b71-8125-c34d1a994a7c.png",
-                acceptance=BadgeInstance.ACCEPTANCE_ACCEPTED
-            )
+            with self.assertRaises(ValidationError):
+                BadgeInstance.objects.create(
+                    recipient_identifier="test@example.com",
+                    badgeclass=self.badge_class,
+                    issuer=self.issuer,
+                    image="uploads/badges/local_badgeinstance_174e70bf-b7a8-4b71-8125-c34d1a994a7c.png",
+                    acceptance=BadgeInstance.ACCEPTANCE_ACCEPTED
+                )
         self.assertIsNone(BadgeInstance.objects.first())
 
     @override_settings(
