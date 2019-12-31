@@ -99,7 +99,7 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
     email_confirmation_redirect = models.URLField()
     signup_redirect = models.URLField()
     forgot_password_redirect = models.URLField()
-    ui_login_redirect = models.URLField(null=True, default='default_redirect')
+    ui_login_redirect = models.URLField(null=True)
     ui_signup_success_redirect = models.URLField(null=True)
     ui_connect_success_redirect = models.URLField(null=True)
     ui_signup_failure_redirect = models.URLField(null=True)
@@ -110,11 +110,13 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
 
     objects = BadgrAppManager()
 
+    PROPS_FOR_DEFAULT = [
+        'forgot_password_redirect', 'ui_login_redirect', 'ui_signup_success_redirect', 'ui_connect_success_redirect',
+        'ui_signup_failure_redirect', 'oauth_authorization_redirect', 'email_confirmation_redirect'
+    ]
+
     def __unicode__(self):
         return self.cors
-
-    def default_redirect(self):
-        return self.signup_redirect
 
     def get_path(self, path='/', use_https=None):
         if use_https is None:
@@ -136,6 +138,12 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
             self.oauth_application = None
         else:
             self.oauth_application = Application.objects.get(client_id=value)
+
+    def save(self, *args, **kwargs):
+        for prop in self.PROPS_FOR_DEFAULT:
+            if not getattr(self, prop):
+                setattr(self, prop, self.signup_redirect)
+        return super(BadgrApp, self).save(*args, **kwargs)
 
 
 @deconstructible
