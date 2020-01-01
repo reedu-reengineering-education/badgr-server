@@ -36,8 +36,8 @@ from mainsite.mixins import ResizeUploadedImage, ScrubUploadedSvgImage
 from mainsite.models import BadgrApp, EmailBlacklist
 from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri
-from .utils import generate_sha256_hashstring, CURRENT_OBI_VERSION, get_obi_context, add_obi_version_ifneeded, \
-    UNVERSIONED_BAKED_VERSION
+from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_sha256_hashstring, get_obi_context,
+                    parse_original_datetime, UNVERSIONED_BAKED_VERSION)
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
@@ -1148,12 +1148,15 @@ class BadgeInstance(BaseAuditedModel,
         return self.get_json()
 
     def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'uid', 'recipient', 'badge', 'issuedOn', 'image', 'evidence', 'narrative', 'revoked', 'revocationReason', 'verify', 'verification')):
-        return super(BadgeInstance, self).get_filtered_json(excluded_fields=excluded_fields)
+        filtered = super(BadgeInstance, self).get_filtered_json(excluded_fields=excluded_fields)
+        # Ensure that the expires date string is in the expected ISO-85601 UTC format
+        if filtered is not None and filtered.get('expires', None) and not filtered.get('expires').endswith('Z'):
+            filtered['expires'] = parse_original_datetime(filtered['expires'])
+        return filtered
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_evidence(self):
         return self.badgeinstanceevidence_set.all()
-
 
     @property
     def evidence_url(self):

@@ -1,10 +1,13 @@
 from __future__ import unicode_literals
+import aniso8601
 import hashlib
+import pytz
 import re
 
 from django.apps import apps
 from django.conf import settings
 from django.core.urlresolvers import resolve, Resolver404
+from django.utils import timezone
 
 from mainsite.utils import OriginSetting
 
@@ -107,3 +110,27 @@ def get_badgeclass_by_identifier(identifier):
 
     # nothing found
     return None
+
+
+def parse_original_datetime(t, tzinfo=pytz.utc):
+    try:
+        return timezone.datetime.fromtimestamp(float(t), pytz.utc).isoformat()
+    except (TypeError, ValueError):
+        try:
+            dt = aniso8601.parse_datetime(t)
+            if not timezone.is_aware(dt):
+                dt = pytz.utc.localize(dt)
+            elif timezone.is_aware(dt) and dt.tzinfo != tzinfo:
+                result = dt.astimezone(tzinfo).isoformat()
+            result = dt.isoformat()
+        except (ValueError, TypeError):
+            dt = timezone.datetime.strptime(t, '%Y-%m-%d')
+            if not timezone.is_aware(dt):
+                dt = pytz.utc.localize(dt)
+            elif timezone.is_aware(dt) and dt.tzinfo != tzinfo:
+                result = dt.astimezone(tzinfo).isoformat()
+            result = dt.isoformat()
+
+    if result and result.endswith('00:00'):
+        return result[:-6] + 'Z'
+    return result
