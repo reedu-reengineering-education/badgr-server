@@ -6,6 +6,9 @@ from django.core.validators import RegexValidator
 from rest_framework.exceptions import ValidationError
 
 from mainsite.utils import verify_svg
+
+from issuer.helpers import OpenBadgesContextCache
+
 import openbadges.verifier
 
 
@@ -59,7 +62,7 @@ class BadgeExtensionValidator(object):
 
     def __call__(self, value):
         if len(value) > 0:
-            result = openbadges.verifier.validate_extensions(value.copy())
+            result = openbadges.verifier.validate_extensions(value.copy(), cache_backend=OpenBadgesContextCache())
             report = result.get('report', {})
             if not report.get('valid', False):
                 messages = report.get('messages', [])

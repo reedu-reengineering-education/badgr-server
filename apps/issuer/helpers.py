@@ -9,10 +9,13 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
+
+import requests_cache
 from requests_cache.backends import BaseCache
 
 import logging
 from issuer.models import Issuer, BadgeClass, BadgeInstance
+from issuer.utils import OBI_VERSION_CONTEXT_IRIS
 from mainsite.utils import first_node_match
 import json
 
@@ -87,6 +90,43 @@ class DjangoCacheDict(MutableMapping):
     def clear(self):
         self._id = uuid.uuid4().hexdigest()
         self.keymap_cache_key = self._keymap_cache_key+"_"+self._id
+
+
+class OpenBadgesContextCache(BaseCache):
+    OPEN_BADGES_CONTEXT_V2_URI = OBI_VERSION_CONTEXT_IRIS.get('2_0')
+    OPEN_BADGE_CONTEXT_CACHE_KEY = 'OPEN_BADGE_CONTEXT_CACHE_KEY'
+    FORTY_EIGHT_HOURS_IN_SECONDS = 60 * 60 * 24 * 2
+
+    def __init__(self, *args, **kwargs):
+        super(OpenBadgesContextCache, self).__init__(*args, **kwargs)
+
+        cached_context = self._get_cached_content()
+
+        if cached_context:
+            self._intialize_instance_attributes(cached_context)
+        else:
+            self._set_cached_content()
+            self._intialize_instance_attributes(self._get_cached_content())
+
+    def _get_cached_content(self):
+        return cache.get(self.OPEN_BADGE_CONTEXT_CACHE_KEY, None)
+
+    def _set_cached_content(self):
+        self.session = requests_cache.CachedSession(backend='memory', expire_after=300)
+        response = self.session.get(self.OPEN_BADGES_CONTEXT_V2_URI, headers={'Accept': 'application/ld+json, application/json'})
+        if response.status_code == 200:
+            cache.set(
+                self.OPEN_BADGE_CONTEXT_CACHE_KEY,
+                {
+                    'keys_map': self.session.cache.keys_map.copy(),
+                    'response': self.session.cache.responses.copy()
+                },
+                timeout=self.FORTY_EIGHT_HOURS_IN_SECONDS
+            )
+
+    def _intialize_instance_attributes(self, cached):
+        self.keys_map = cached.get('keys_map', None)
+        self.responses = cached.get('response', None)
 
 
 class DjangoCacheRequestsCacheBackend(BaseCache):
