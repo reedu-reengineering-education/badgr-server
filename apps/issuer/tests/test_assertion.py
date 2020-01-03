@@ -19,6 +19,7 @@ from oauth2_provider.models import Application
 
 from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import BadgeInstance, IssuerStaff, Issuer
+from issuer.utils import parse_original_datetime
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationHelper
 from mainsite.utils import OriginSetting
 from rest_framework import serializers
@@ -1096,6 +1097,24 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(test_assertion2.jsonld_id + '?identifier__telephone=%2B15035555555', url)
         url = test_assertion3.get_share_url(include_identifier=True)
         self.assertEqual(test_assertion3.jsonld_id + '?identifier__url=test.example.com/foo%3Fbar%3D1', url)
+
+    def test_parse_original_datetime(self):
+        result = parse_original_datetime('2018-12-23')
+        self.assertEqual(result, '2018-12-23T00:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00')
+        self.assertEqual(result, '2018-12-23T00:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00Z')
+        self.assertEqual(result, '2018-12-23T00:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00-05:00')
+        self.assertEqual(result, '2018-12-23T05:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00+05:00')
+        self.assertEqual(result, '2018-12-22T19:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00+00:00')
+        self.assertEqual(result, '2018-12-23T00:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00+12:34')
+        self.assertEqual(result, '2018-12-22T11:26:00Z')
+        result = parse_original_datetime('2018-12-23T13:37:00+12:34')
+        self.assertEqual(result, '2018-12-23T01:03:00Z')
 
 
 class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
