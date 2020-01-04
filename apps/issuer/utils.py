@@ -114,19 +114,22 @@ def get_badgeclass_by_identifier(identifier):
 
 def parse_original_datetime(t, tzinfo=pytz.utc):
     try:
-        dt = aniso8601.parse_datetime(t)
-        if not timezone.is_aware(dt):
-            dt = pytz.utc.localize(dt)
-        elif timezone.is_aware(dt) and dt.tzinfo != tzinfo:
-            dt = dt.astimezone(tzinfo)
-        result = dt.isoformat()
+        result = timezone.datetime.fromtimestamp(float(t), pytz.utc).isoformat()
     except (ValueError, TypeError):
-        dt = timezone.datetime.strptime(t, '%Y-%m-%d')
-        if not timezone.is_aware(dt):
-            dt = pytz.utc.localize(dt)
-        elif timezone.is_aware(dt) and dt.tzinfo != tzinfo:
-            dt = dt.astimezone(tzinfo).isoformat()
-        result = dt.isoformat()
+        try:
+            dt = aniso8601.parse_datetime(t)
+            if not timezone.is_aware(dt):
+                dt = pytz.utc.localize(dt)
+            elif timezone.is_aware(dt) and dt.tzinfo != tzinfo:
+                dt = dt.astimezone(tzinfo)
+            result = dt.isoformat()
+        except (ValueError, TypeError):
+            dt = timezone.datetime.strptime(t, '%Y-%m-%d')
+            if not timezone.is_aware(dt):
+                dt = pytz.utc.localize(dt)
+            elif timezone.is_aware(dt) and dt.tzinfo != tzinfo:
+                dt = dt.astimezone(tzinfo).isoformat()
+            result = dt.isoformat()
 
     if result and result.endswith('00:00'):
         return result[:-6] + 'Z'
