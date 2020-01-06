@@ -96,6 +96,7 @@ class BadgrAppManager(Manager):
 class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheModel):
     name = models.CharField(max_length=254)
     cors = models.CharField(max_length=254, unique=True)
+    is_default = models.BooleanField(default=False)
     email_confirmation_redirect = models.URLField()
     signup_redirect = models.URLField()
     forgot_password_redirect = models.URLField()
@@ -140,6 +141,9 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
             self.oauth_application = Application.objects.get(client_id=value)
 
     def save(self, *args, **kwargs):
+        if self.is_default:
+            # Set all other BadgrApp instances as no longer the default.
+            self.objects.filter(is_default=True).exclude(id=self.pk).update(is_default=False)
         for prop in self.PROPS_FOR_DEFAULT:
             if not getattr(self, prop):
                 setattr(self, prop, self.signup_redirect)

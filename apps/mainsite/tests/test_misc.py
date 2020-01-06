@@ -1,12 +1,15 @@
+import hashlib
+from hashlib import sha256
+import mock
+from operator import attrgetter
+import os
 import pytz
 import re
+import responses
+import shutil
 import urllib
 import urlparse
 import warnings
-
-import os
-from datetime import datetime, timedelta
-from operator import attrgetter
 
 from django.core import mail
 from django.core.cache import cache, CacheKeyWarning
@@ -15,23 +18,18 @@ from django.core.files.storage import default_storage
 from django.core.management import call_command
 from django.test import override_settings, TransactionTestCase
 from django.utils import timezone
+
+from rest_framework import serializers
 from oauth2_provider.models import AccessToken, Application
 
 from badgeuser.models import BadgeUser, CachedEmailAddress
+from issuer.models import BadgeClass, Issuer, BadgeInstance
 from mainsite.models import BadgrApp, AccessTokenProxy, AccessTokenScope
 from mainsite import TOP_DIR, blacklist
 from mainsite.serializers import DateTimeWithUtcZAtEndField
 from mainsite.tests import SetupIssuerHelper
 from mainsite.tests.base import BadgrTestCase
 from mainsite.utils import fetch_remote_file_to_storage
-import hashlib
-from hashlib import sha256
-from issuer.models import BadgeClass, Issuer, BadgeInstance
-import mock
-import responses
-from rest_framework import serializers
-
-import shutil
 
 
 class TestDateSerialization(BadgrTestCase):
@@ -45,9 +43,9 @@ class TestDateSerialization(BadgrTestCase):
             self.date_field = date_field
 
     def test_date_serialization(self):
-        utc_date = self.TestHolder(datetime(2019, 12, 6, 12, 0, tzinfo=pytz.utc))
-        la_date = self.TestHolder(pytz.timezone('America/Los_Angeles').localize(datetime(2019, 12, 6, 12, 0))) # -8 hours
-        ny_date = self.TestHolder(pytz.timezone('America/New_York').localize(datetime(2019, 12, 6, 12, 0))) # -5 hours
+        utc_date = self.TestHolder(timezone.datetime(2019, 12, 6, 12, 0, tzinfo=pytz.utc))
+        la_date = self.TestHolder(pytz.timezone('America/Los_Angeles').localize(timezone.datetime(2019, 12, 6, 12, 0))) # -8 hours
+        ny_date = self.TestHolder(pytz.timezone('America/New_York').localize(timezone.datetime(2019, 12, 6, 12, 0))) # -5 hours
 
         utc_serializer = self.TestSerializer(utc_date)
         la_serializer = self.TestSerializer(la_date)
@@ -71,7 +69,7 @@ class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
         token = AccessToken.objects.create(
             application=app,
             scope=scope_string,
-            expires=timezone.now() + timedelta(hours=1))
+            expires=timezone.now() + timezone.timedelta(hours=1))
         qs = AccessTokenScope.objects.filter(token=token).order_by('scope')
         self.assertQuerysetEqual(qs, scopes, attrgetter('scope'))
 
@@ -83,7 +81,7 @@ class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
         proxy_token = AccessTokenProxy.objects.create(
             application=app,
             scope=scope_string,
-            expires=timezone.now() + timedelta(hours=1))
+            expires=timezone.now() + timezone.timedelta(hours=1))
         qs = AccessTokenScope.objects.filter(token=proxy_token).order_by('scope')
         self.assertQuerysetEqual(qs, scopes, attrgetter('scope'))
 
