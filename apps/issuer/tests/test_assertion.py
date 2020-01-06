@@ -1099,6 +1099,8 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(test_assertion3.jsonld_id + '?identifier__url=test.example.com/foo%3Fbar%3D1', url)
 
     def test_parse_original_datetime(self):
+        result = parse_original_datetime('1577232000')
+        self.assertEqual(result, '2019-12-25T00:00:00Z')
         result = parse_original_datetime('2018-12-23')
         self.assertEqual(result, '2018-12-23T00:00:00Z')
         result = parse_original_datetime('2018-12-23T00:00:00')
