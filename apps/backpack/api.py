@@ -289,6 +289,7 @@ class ShareBackpackAssertion(BaseEntityDetailView):
     model = BadgeInstance
     permission_classes = (permissions.AllowAny,)  # this is AllowAny to support tracking sharing links in emails
     http_method_names = ('get',)
+    allow_any_unauthenticated_access = True
 
     def get(self, request, **kwargs):
         """

@@ -190,7 +190,7 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
 
         for headers in redirect_accepts:
-            with self.assertNumQueries(1):
+            with self.assertNumQueries(2):
                 response = self.client.get('/public/assertions/{}'.format(assertion.entity_id), **headers)
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response.get('Location'), 'http://frontend.ui/public/assertions/{}'.format(assertion.entity_id))
