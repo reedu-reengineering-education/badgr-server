@@ -199,20 +199,17 @@ class CachingTestCase(TransactionTestCase):
 @override_settings(
     CELERY_ALWAYS_EAGER=True,
     SESSION_ENGINE='django.contrib.sessions.backends.cache',
-    HTTP_ORIGIN="http://localhost:8000",
-    BADGR_APP_ID=1,
+    HTTP_ORIGIN="http://localhost:8000"
 )
 class BadgrTestCase(SetupUserHelper, APITransactionTestCase, CachingTestCase):
     def setUp(self):
         super(BadgrTestCase, self).setUp()
 
-        from django.conf import settings
-        badgr_app_id = getattr(settings, 'BADGR_APP_ID')
         try:
-            self.badgr_app = BadgrApp.objects.get(pk=badgr_app_id)
+            self.badgr_app = BadgrApp.objects.get(is_default=True)
         except BadgrApp.DoesNotExist:
             self.badgr_app = BadgrApp.objects.create(
+                is_default=True,
                 name='test cors',
-                cors='localhost:8000')
-
-        self.assertEquals(self.badgr_app.pk, badgr_app_id)
+                cors='localhost:8000'
+            )

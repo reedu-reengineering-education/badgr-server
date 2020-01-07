@@ -57,21 +57,16 @@ def info_view(request):
 
 
 def email_unsubscribe_response(request, message, error=False):
-    badgr_app_pk = request.GET.get('a', getattr(settings, 'BADGR_APP_ID', None))
-    try:
-        badgr_app = BadgrApp.objects.get(pk=badgr_app_pk)
-    except BadgrApp.DoesNotExist:
-        pass
+    badgr_app_pk = request.GET.get('a', None)
 
-    if badgr_app:
-        query_param = 'infoMessage' if error else 'authError'
-        redirect_url = "{url}?{query_param}={message}".format(
-            url=badgr_app.ui_login_redirect,
-            query_param=query_param,
-            message=message)
-        return HttpResponseRedirect(redirect_to=redirect_url)
-    else:
-        return HttpResponse(message)
+    badgr_app = BadgrApp.objects.get_by_id_or_default(badgr_app_pk)
+
+    query_param = 'infoMessage' if error else 'authError'
+    redirect_url = "{url}?{query_param}={message}".format(
+        url=badgr_app.ui_login_redirect,
+        query_param=query_param,
+        message=message)
+    return HttpResponseRedirect(redirect_to=redirect_url)
 
 
 def email_unsubscribe(request, *args, **kwargs):
