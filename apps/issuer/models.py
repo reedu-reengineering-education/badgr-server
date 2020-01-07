@@ -166,7 +166,7 @@ class Issuer(ResizeUploadedImage,
     slug = models.CharField(max_length=255, blank=True, null=True, default=None)
     #slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
 
-    badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None)
+    badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None, on_delete=models.SET_NULL)
 
     name = models.CharField(max_length=1024)
     image = models.FileField(upload_to='uploads/issuers', blank=True, null=True)
