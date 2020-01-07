@@ -1150,7 +1150,7 @@ class BadgeInstance(BaseAuditedModel,
     def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'uid', 'recipient', 'badge', 'issuedOn', 'image', 'evidence', 'narrative', 'revoked', 'revocationReason', 'verify', 'verification')):
         filtered = super(BadgeInstance, self).get_filtered_json(excluded_fields=excluded_fields)
         # Ensure that the expires date string is in the expected ISO-85601 UTC format
-        if filtered is not None and filtered.get('expires', None) and not filtered.get('expires').endswith('Z'):
+        if filtered is not None and filtered.get('expires', None) and not str(filtered.get('expires')).endswith('Z'):
             filtered['expires'] = parse_original_datetime(filtered['expires'])
         return filtered
 
