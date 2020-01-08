@@ -134,3 +134,10 @@ def parse_original_datetime(t, tzinfo=pytz.utc):
     if result and result.endswith('00:00'):
         return result[:-6] + 'Z'
     return result
+
+
+def request_authenticated_with_server_admin_token(request):
+    try:
+        return 'rw:serverAdmin' in set(request.auth.scope.split())
+    except AttributeError:
+        return False

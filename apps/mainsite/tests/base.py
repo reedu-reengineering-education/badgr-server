@@ -175,8 +175,6 @@ class SetupIssuerHelper(object):
             yield self.setup_badgeclass(**kwargs)
 
 
-
-
 @override_settings(
     CACHES={
         'default': {

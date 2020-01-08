@@ -14,7 +14,7 @@ from badgeuser.serializers_v2 import BadgeUserEmailSerializerV2
 from entity.serializers import DetailSerializerV2, EntityRelatedFieldV2, BaseSerializerV2
 from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance, RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL, RECIPIENT_TYPE_TELEPHONE
 from issuer.permissions import IsEditor
-from issuer.utils import generate_sha256_hashstring
+from issuer.utils import generate_sha256_hashstring, request_authenticated_with_server_admin_token
 from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
 from mainsite.serializers import (CachedUrlHyperlinkedRelatedField, DateTimeWithUtcZAtEndField, StripTagsCharField, MarkdownCharField,
@@ -69,7 +69,7 @@ class IssuerStaffSerializerV2(DetailSerializerV2):
 class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     openBadgeId = serializers.URLField(source='jsonld_id', read_only=True)
     createdAt = DateTimeWithUtcZAtEndField(source='created_at', read_only=True)
-    createdBy = EntityRelatedFieldV2(source='cached_creator', read_only=True)
+    createdBy = EntityRelatedFieldV2(source='cached_creator', queryset=BadgeUser.cached, required=False)
     name = StripTagsCharField(max_length=1024)
     image = ValidImageField(required=False)
     email = serializers.EmailField(max_length=255, required=True)
@@ -77,7 +77,9 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     url = serializers.URLField(max_length=1024, required=True)
     staff = IssuerStaffSerializerV2(many=True, source='staff_items', required=False)
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
-    badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
+    badgrDomain = serializers.SlugRelatedField(
+        required=False, source='badgrapp', slug_field='cors', queryset=BadgrApp.objects
+    )
 
     class Meta(DetailSerializerV2.Meta):
         model = Issuer
@@ -144,11 +146,30 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
             image.name = 'issuer_logo_' + str(uuid.uuid4()) + img_ext
         return image
 
-    def create(self, validated_data):
-        user = validated_data['created_by']
-        potential_email = validated_data['email']
+    def validate_badgrDomain(self, val):
+        if not request_authenticated_with_server_admin_token(self.context.get('request')):
+            return None
+        return val
 
-        if not user.is_email_verified(potential_email):
+    def validate_createdBy(self, val):
+        if not request_authenticated_with_server_admin_token(self.context.get('request')):
+            return None
+        return val
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+
+        # If a Server Admin declares another user as creator, set it to that other user. Otherwise, use request.user
+        user = validated_data.pop('cached_creator', None)
+        if user:
+            validated_data['created_by'] = user
+
+        potential_email = validated_data['email']
+        if validated_data.get('badgrapp') is None:
+            validated_data['badgrapp'] = BadgrApp.objects.get_current(request)
+
+        # Server admins are exempt from email verification requirement. They will enforce it themselves.
+        if not request_authenticated_with_server_admin_token(request) and not validated_data['created_by'].is_email_verified(potential_email):
             raise serializers.ValidationError(
                 "Issuer email must be one of your verified addresses. Add this email to your profile and try again.")
 
@@ -158,10 +179,12 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         # update staff after issuer is created
         new_issuer.staff_items = staff
 
-        # set badgrapp
-        new_issuer.badgrapp = BadgrApp.objects.get_current(self.context.get('request', None))
-
         return new_issuer
+
+    def update(self, instance, validated_data):
+        validated_data.pop('cached_creator', None)
+
+        return super(IssuerSerializerV2, self).update(instance, validated_data)
 
 
 class AlignmentItemSerializerV2(BaseSerializerV2, OriginalJsonSerializerMixin):

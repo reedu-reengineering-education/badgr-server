@@ -42,7 +42,10 @@ class IssuerList(BaseEntityListView):
     model = Issuer
     v1_serializer_class = IssuerSerializerV1
     v2_serializer_class = IssuerSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsEditor, ApprovedIssuersOnly, BadgrOAuthTokenHasScope)
+    permission_classes = [
+        IsServerAdmin |
+        (AuthenticatedWithVerifiedIdentifier & BadgrOAuthTokenHasScope & ApprovedIssuersOnly)
+    ]
     valid_scopes = ["rw:issuer"]
 
     create_event = badgrlog.IssuerCreatedEvent
