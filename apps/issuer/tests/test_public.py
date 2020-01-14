@@ -169,9 +169,12 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
 
     def test_get_assertion_html_redirects_to_frontend(self):
         badgr_app = BadgrApp(
-            cors='frontend.ui', is_default=True, public_pages_redirect='http://frontend.ui/public'
+            cors='frontend.ui', is_default=True, signup_redirect='http://frontend.ui/signup', public_pages_redirect='http://frontend.ui/public'
         )
         badgr_app.save()
+
+        badgr_app_two = BadgrApp(cors='stuff.com', is_default=False, signup_redirect='http://stuff.com/signup', public_pages_redirect='http://stuff.com/public')
+        badgr_app_two.save()
 
         redirect_accepts = [
             {'HTTP_ACCEPT': 'application/xml,application/xhtml+xml,text/html;q=0.9, text/plain;q=0.8,image/png,*/*;q=0.5'},  # safari/chrome
@@ -185,6 +188,8 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
 
         test_user = self.setup_user(authenticate=False)
         test_issuer = self.setup_issuer(owner=test_user)
+        test_issuer.badgrapp = badgr_app_two
+        test_issuer.save()
         test_issuer.cached_badgrapp  # publish badgrapp to cache
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
@@ -193,7 +198,7 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
             with self.assertNumQueries(2):
                 response = self.client.get('/public/assertions/{}'.format(assertion.entity_id), **headers)
                 self.assertEqual(response.status_code, 302)
-                self.assertEqual(response.get('Location'), 'http://frontend.ui/public/assertions/{}'.format(assertion.entity_id))
+                self.assertEqual(response.get('Location'), 'http://stuff.com/public/assertions/{}'.format(assertion.entity_id))
 
         for headers in json_accepts:
             with self.assertNumQueries(1):

@@ -96,7 +96,7 @@ class BadgrAppManager(Manager):
     def get_by_id_or_default(self, badgrapp_id=None):
         if badgrapp_id:
             try:
-                self.get(id=badgrapp_id)
+                return self.get(id=badgrapp_id)
             except (self.model.DoesNotExist, ValueError,):
                 pass
         try:
