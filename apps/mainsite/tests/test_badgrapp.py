@@ -41,7 +41,8 @@ class TestBadgrApp(SetupUserHelper, APITransactionTestCase, CachingTestCase):
             signup_redirect='https://two.example.com/start'
         )
 
-        self.assertEqual(BadgrApp.objects.get_current(None), ba_one)
+        self.assertEqual(BadgrApp.objects.get_current(None).id, ba_one.id)
+        self.assertEqual(BadgrApp.objects.get_by_id_or_default(ba_two.id).id, ba_two.id)
 
     def test_get_current_autocreates_first_app(self):
         self.assertEqual(BadgrApp.objects.count(), 0)
