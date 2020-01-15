@@ -968,6 +968,8 @@ class BadgeInstance(BaseAuditedModel,
             # TODO: Report email non-delivery somewhere.
 
         if badgr_app is None:
+            badgr_app = self.cached_issuer.cached_badgrapp
+        if badgr_app is None:
             badgr_app = BadgrApp.objects.get_current(None)
 
         try:
