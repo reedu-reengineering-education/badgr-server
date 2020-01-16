@@ -101,12 +101,12 @@ class BadgrAppManager(Manager):
                 pass
         try:
             return self.get(is_default=True)
-        except self.model.DoesNotExist:
+        except (self.model.DoesNotExist, self.model.MultipleObjectsReturned,):
             badgrapp = None
             legacy_default_setting = getattr(settings, 'BADGR_APP_ID', None)
             if legacy_default_setting is not None:
                 try:
-                    badgrapp = self.model.get(id=legacy_default_setting)
+                    badgrapp = self.get(id=legacy_default_setting)
                 except self.model.DoesNotExist:
                     pass
             else:
