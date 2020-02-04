@@ -219,7 +219,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = ['email']
 
-    badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None)
+    badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None, on_delete=models.SET_NULL)
 
     marketing_opt_in = models.BooleanField(default=False)
 

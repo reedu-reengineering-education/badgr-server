@@ -36,7 +36,7 @@ class SAML2Tests(BadgrTestCase):
         email.save()
         Saml2Account.objects.create(config=self.config, user=new_user, uuid=email)
         badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com")
-        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config)
+        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
@@ -45,7 +45,7 @@ class SAML2Tests(BadgrTestCase):
         first_name = "firsty"
         last_name = "lastington"
         badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com")
-        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config)
+        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
@@ -54,12 +54,15 @@ class SAML2Tests(BadgrTestCase):
         email2 = "test234425@example.com"
         first_name = "firsty"
         last_name = "lastington"
+        idp_name = self.config.slug
         badgr_app = BadgrApp.objects.create(
             ui_login_redirect="https://example.com", ui_signup_failure_redirect='https://example.com/fail'
         )
 
         # email does not exist
-        resp = auto_provision(None, "different425@example.com", first_name, last_name, badgr_app, self.config)
+        resp = auto_provision(
+            None, "different425@example.com", first_name, last_name, badgr_app, self.config, self.config.slug
+        )
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
@@ -70,12 +73,12 @@ class SAML2Tests(BadgrTestCase):
             last_name=last_name,
             send_confirmation=False
         )
-        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config)
+        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
         # Can auto provision again
-        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config)
+        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
@@ -89,7 +92,7 @@ class SAML2Tests(BadgrTestCase):
         cachedemail = CachedEmailAddress.objects.get(email=email2)
         cachedemail.verified = True
         cachedemail.save()
-        resp = auto_provision(None, email2, first_name, last_name, badgr_app, self.config)
+        resp = auto_provision(None, email2, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(badgr_app.ui_login_redirect, resp.url)
-
+        self.assertIn("authError", resp.url)
+        self.assertIn(self.config.slug, resp.url)

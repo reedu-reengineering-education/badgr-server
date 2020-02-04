@@ -10,7 +10,7 @@ from oauth2_provider.models import Application
 
 from badgeuser.models import  TermsVersion
 from issuer.models import Issuer, BadgeClass, IssuerStaff
-from mainsite.models import ApplicationInfo, AccessTokenProxy
+from mainsite.models import ApplicationInfo, AccessTokenProxy, BadgrApp
 from mainsite.tests import SetupOAuth2ApplicationHelper
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 
@@ -19,7 +19,7 @@ class IssuerAdminTests(BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationH
     def setUp(self):
         super(IssuerAdminTests, self).setUp()
 
-        self.client_app_user = self.setup_user(email='clientApp@example.com', token_scope='rw:serverAdmin')
+        self.client_app_user = self.setup_user(first_name='app', email='app@example.com', token_scope='rw:serverAdmin')
         self.app = self.setup_oauth2_application(
             client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
             user=self.client_app_user, allowed_scopes='rw:serverAdmin'
@@ -36,6 +36,60 @@ class IssuerAdminTests(BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationH
 
         self.issuer_owner_user = self.setup_user(email='some_cool_user@example.com', verified=True)
         self.issuer = self.setup_issuer(owner=self.issuer_owner_user)
+
+    def test_can_post_and_put_issuer_with_badgrDomain(self):
+        badgrapp = BadgrApp.objects.create(
+            is_default=False,
+            name='test 2',
+            cors='example.com',
+            signup_redirect='https://example.com/signup'
+        )
+        owner_user = self.setup_user(first_name='owner', email='contact@example.org', authenticate=False)
+
+        issuer_data = {
+            'name': 'Awesome Issuer',
+            'description': 'An issuer of awe-inspiring credentials',
+            'url': 'http://example.com',
+            'email': 'contact@example.org',
+            'badgrDomain': 'example.com',
+            'createdBy': owner_user.entity_id
+        }
+        response = self.client.post('/v2/issuers', issuer_data)
+        self.assertEqual(response.status_code, 201)
+
+        issuer = Issuer.objects.get(entity_id=response.data['result'][0]['entityId'])
+        self.assertEqual(response.data['result'][0]['badgrDomain'], issuer_data['badgrDomain'])
+        self.assertEqual(issuer.badgrapp_id, badgrapp.id)
+        self.assertEqual(issuer.created_by_id, owner_user.id)
+
+        issuer_data['badgrDomain'] = 'localhost:8000'  # The other BadgrApp on the system
+        response = self.client.put('/v2/issuers/{}'.format(issuer.entity_id), issuer_data)
+        self.assertEqual(response.status_code, 200)
+        issuer = Issuer.objects.get(entity_id=response.data['result'][0]['entityId'])
+        self.assertEqual(response.data['result'][0]['badgrDomain'], issuer_data['badgrDomain'])
+        self.assertEqual(issuer.badgrapp_id, self.badgr_app.id)  # The BadgrApp has changed.
+
+    def test_cannot_post_issuer_with_invalid_badgrDomain(self):
+        issuer_data = {
+            'name': 'Awesome Issuer',
+            'description': 'An issuer of awe-inspiring credentials',
+            'url': 'http://example.com',
+            'email': 'contact@example.org',
+            'badgrDomain': 'example.com'  # does not exist
+        }
+        response = self.client.post('/v2/issuers', issuer_data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_cannot_post_issuer_with_invalid_createdBy(self):
+        issuer_data = {
+            'name': 'Awesome Issuer',
+            'description': 'An issuer of awe-inspiring credentials',
+            'url': 'http://example.com',
+            'email': 'contact@example.org',
+            'createdBy': 'DOESNOTEXISTMAN'
+        }
+        response = self.client.post('/v2/issuers', issuer_data)
+        self.assertEqual(response.status_code, 400)
 
     def test_can_get_issuer_detail(self):
         response = self.client.get('/v2/issuers/{}'.format(self.issuer.entity_id))
