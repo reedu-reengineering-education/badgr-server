@@ -1,25 +1,57 @@
 import base64
 import collections
 import datetime
-import dateutil.parser
 import json
 import os
-import responses
 
+import dateutil.parser
+import responses
+from django.db import IntegrityError
+from django.urls import reverse
 from openbadges.verifier.openbadges_context import (OPENBADGES_CONTEXT_V2_URI, OPENBADGES_CONTEXT_V1_URI,
                                                     OPENBADGES_CONTEXT_V2_DICT)
 from openbadges_bakery import bake, unbake
 
-from django.db import IntegrityError
-from django.urls import reverse
-
+from backpack.models import BackpackBadgeShare
 from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import BadgeClass, Issuer, BadgeInstance
-from issuer.utils import generate_sha256_hashstring
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import first_node_match, OriginSetting
-
 from .utils import setup_basic_0_5_0, setup_basic_1_0, setup_basic_1_0_bad_image, setup_resources, CURRENT_DIRECTORY
+
+
+class TestShareProviders(SetupIssuerHelper, BadgrTestCase):
+    # issuer name with ascii
+    issuer_name_with_ascii = base64.b64decode('w45zc8O8w6ly')
+    # name with ascii
+    badge_class_name_with_ascii = base64.b64decode('w45zc8O8w6lycyBDb3Jw')
+
+    def test_twitter_share_with_ascii_issuer(self):
+        provider = 'twitter'
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_with_ascii)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
+        share_url = share.get_share_url(provider, include_identifier=True)
+
+    def test_pintrest_share_with_ascii_summary(self):
+        provider = 'pinterest'
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_with_ascii)
+        test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
+        share_url = share.get_share_url(provider, include_identifier=True)
+
+    def test_linked_in_share_with_ascii_summary_and_issuer(self):
+        provider = 'linkedin'
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_with_ascii)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_with_ascii)
+        test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
+        share_url = share.get_share_url(provider, include_identifier=True)
 
 
 class TestBadgeUploads(BadgrTestCase):
