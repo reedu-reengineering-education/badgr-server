@@ -10,16 +10,17 @@ from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.urlresolvers import resolve, Resolver404, reverse
-from django.http import HttpResponseRedirect
 
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import CachedEmailAddress
-from badgrsocialauth.utils import get_session_badgr_app, set_session_badgr_app
+from badgrsocialauth.utils import set_session_badgr_app
 from mainsite.models import BadgrApp, EmailBlacklist, AccessTokenProxy
 from mainsite.utils import OriginSetting, set_url_query_params
 
 
 class BadgrAccountAdapter(DefaultAccountAdapter):
+
+    EMAIL_FROM_STRING = ''
 
     def send_mail(self, template_prefix, email, context):
         context['STATIC_URL'] = getattr(settings, 'STATIC_URL')
@@ -39,8 +40,22 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
             context['unsubscribe_url'] = getattr(settings, 'HTTP_ORIGIN') + EmailBlacklist.generate_email_signature(
                 email, badgrapp_pk)
 
+        self.EMAIL_FROM_STRING = self.set_email_string(context)
+
         msg = self.render_mail(template_prefix, email, context)
         msg.send()
+
+    def set_email_string(self, context):
+        from_elements = [context.get('site_name', '')]
+
+        default_from = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+        if default_from:
+            from_elements.append("<{}>".format(default_from))
+
+        return " ".join(from_elements)
+
+    def get_from_email(self):
+        return self.EMAIL_FROM_STRING
 
     def is_open_for_signup(self, request):
         return getattr(settings, 'OPEN_FOR_SIGNUP', True)
