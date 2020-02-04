@@ -21,11 +21,7 @@ from pathway.serializers import PathwaySerializer, PathwayElementSerializer
 from recipient.models import RecipientProfile, RecipientGroupMembership, RecipientGroup
 
 
-@override_settings(
-    BADGR_APP_ID=1
-)
 class PathwayApiTests(SetupIssuerHelper, BadgrTestCase):
-
     def setUp(self):
         cache.clear()
         super(PathwayApiTests, self).setUp()
@@ -248,8 +244,7 @@ class PathwayApiTests(SetupIssuerHelper, BadgrTestCase):
 
 
 @override_settings(
-    ISSUER_NOTIFY_DEFAULT=False,
-    BADGR_APP_ID=1
+    ISSUER_NOTIFY_DEFAULT=False
 )
 class PathwayCompletionTests(SetupIssuerHelper, BadgrTestCase):
     def setUp(self):

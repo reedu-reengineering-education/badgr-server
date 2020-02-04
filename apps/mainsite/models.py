@@ -21,7 +21,6 @@ from oauth2_provider.models import AccessToken, Application, RefreshToken
 from rest_framework.authtoken.models import Token
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
-DEFAULT_BADGRAPP_PK = getattr(settings, 'BADGR_APP_ID', None)
 
 
 class EmailBlacklist(models.Model):
@@ -32,7 +31,7 @@ class EmailBlacklist(models.Model):
         verbose_name_plural = 'Blacklisted emails'
 
     @staticmethod
-    def generate_email_signature(email, badgrapp_pk=DEFAULT_BADGRAPP_PK):
+    def generate_email_signature(email, badgrapp_pk=None):
         secret_key = settings.UNSUBSCRIBE_SECRET_KEY
 
         expiration = datetime.utcnow() + timedelta(days=7)  # In one week.
@@ -40,6 +39,9 @@ class EmailBlacklist(models.Model):
 
         email_encoded = base64.b64encode(email)
         hashed = hmac.new(secret_key, email_encoded + str(timestamp), sha1)
+
+        if badgrapp_pk is None:
+            badgrapp_pk = BadgrApp.objects.get_by_id_or_default().pk
 
         return reverse('unsubscribe', kwargs={
             'email_encoded': email_encoded,
@@ -56,7 +58,7 @@ class EmailBlacklist(models.Model):
 
 
 class BadgrAppManager(Manager):
-    def get_current(self, request=None, raise_exception=True):
+    def get_current(self, request=None, raise_exception=False):
         """
         A safe method for getting the current BadgrApp related to a request. It will always return a BadgrApp if
         the server is properly configured.
@@ -86,20 +88,55 @@ class BadgrAppManager(Manager):
                 return self.get(cors=url.netloc)
             except self.model.DoesNotExist:
                 pass
+        if raise_exception:
+            return self.get(is_default=True)
+        else:
+            return self.get_by_id_or_default()
 
-        badgr_app_id = getattr(settings, 'BADGR_APP_ID', None)
-        if raise_exception and not badgr_app_id:
-            raise ImproperlyConfigured("Must specify a BADGR_APP_ID")
-        return self.get(id=badgr_app_id)
+    def get_by_id_or_default(self, badgrapp_id=None):
+        if badgrapp_id:
+            try:
+                self.get(id=badgrapp_id)
+            except (self.model.DoesNotExist, ValueError,):
+                pass
+        try:
+            return self.get(is_default=True)
+        except self.model.DoesNotExist:
+            badgrapp = None
+            legacy_default_setting = getattr(settings, 'BADGR_APP_ID', None)
+            if legacy_default_setting is not None:
+                try:
+                    badgrapp = self.get(id=legacy_default_setting)
+                except self.model.DoesNotExist:
+                    pass
+            else:
+                badgrapp = self.first()
+
+            if badgrapp is not None:
+                badgrapp.is_default = True
+                badgrapp.save()
+                return badgrapp
+
+            # failsafe: return a new entry if there are none
+            return self.create(
+                cors='localhost:4200',
+                is_default=True,
+                signup_redirect='http://localhost:4200/signup'
+            )
+        except self.model.MultipleObjectsReturned:
+            badgrapp = self.filter(is_default=True).first()
+            badgrapp.save()  # trigger one-default-only setting
+            return badgrapp
 
 
 class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheModel):
     name = models.CharField(max_length=254)
     cors = models.CharField(max_length=254, unique=True)
+    is_default = models.BooleanField(default=False)
     email_confirmation_redirect = models.URLField()
     signup_redirect = models.URLField()
     forgot_password_redirect = models.URLField()
-    ui_login_redirect = models.URLField(null=True, default='default_redirect')
+    ui_login_redirect = models.URLField(null=True)
     ui_signup_success_redirect = models.URLField(null=True)
     ui_connect_success_redirect = models.URLField(null=True)
     ui_signup_failure_redirect = models.URLField(null=True)
@@ -110,11 +147,13 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
 
     objects = BadgrAppManager()
 
+    PROPS_FOR_DEFAULT = [
+        'forgot_password_redirect', 'ui_login_redirect', 'ui_signup_success_redirect', 'ui_connect_success_redirect',
+        'ui_signup_failure_redirect', 'oauth_authorization_redirect', 'email_confirmation_redirect'
+    ]
+
     def __unicode__(self):
         return self.cors
-
-    def default_redirect(self):
-        return self.signup_redirect
 
     def get_path(self, path='/', use_https=None):
         if use_https is None:
@@ -136,6 +175,19 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
             self.oauth_application = None
         else:
             self.oauth_application = Application.objects.get(client_id=value)
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            # Set all other BadgrApp instances as no longer the default.
+            self.__class__.objects.filter(is_default=True).exclude(id=self.pk).update(is_default=False)
+        else:
+            if not self.__class__.objects.filter(is_default=True).exists():
+                self.is_default = True
+
+        for prop in self.PROPS_FOR_DEFAULT:
+            if not getattr(self, prop):
+                setattr(self, prop, self.signup_redirect)
+        return super(BadgrApp, self).save(*args, **kwargs)
 
 
 @deconstructible

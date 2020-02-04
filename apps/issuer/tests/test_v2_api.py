@@ -41,7 +41,7 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
             user=client_a, scope="r:assertions", expires=timezone.now() + timedelta(hours=1),
             token='prettyplease1', application=app_a
         )
-        
+
         # Application B
         client_b = BadgeUser.objects.create(email="yes@example.com",
                                         first_name="Gimme Yes",

@@ -178,7 +178,9 @@ class OriginalJsonSerializerMixin(serializers.Serializer):
             # properties in original_json not natively supported
             extra_properties = instance.get_filtered_json()
             if extra_properties and len(extra_properties) > 0:
-                representation.update(extra_properties)
+                for k, v in extra_properties.items():
+                    if k not in representation or v is not None and representation.get(k, None) is None:
+                        representation[k] = v
 
         return representation
 

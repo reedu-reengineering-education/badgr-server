@@ -91,5 +91,5 @@ class SAML2Tests(BadgrTestCase):
         cachedemail.save()
         resp = auto_provision(None, email2, first_name, last_name, badgr_app, self.config)
         self.assertEqual(resp.status_code, 302)
-        self.assertIn("authError", resp.url)
+        self.assertEqual(badgr_app.ui_login_redirect, resp.url)
 

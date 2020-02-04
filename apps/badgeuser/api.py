@@ -200,10 +200,14 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
     v2_serializer_class = BaseSerializerV2
 
     def get(self, request, *args, **kwargs):
-        badgrapp_id = self.request.GET.get('a', getattr(settings, 'BADGR_APP_ID', 1))
-        try:
-            badgr_app = BadgrApp.objects.get(id=badgrapp_id)
-        except BadgrApp.DoesNotExist:
+        badgr_app = None
+        badgrapp_id = self.request.GET.get('a')
+        if badgrapp_id:
+            try:
+                badgr_app = BadgrApp.objects.get(id=badgrapp_id)
+            except BadgrApp.DoesNotExist:
+                pass
+        if badgr_app is None:
             badgr_app = BadgrApp.objects.get_current(request)
 
         redirect_url = badgr_app.forgot_password_redirect
@@ -369,17 +373,10 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
               required: true
         """
         token = request.query_params.get('token', '')
-        badgrapp_id = request.query_params.get(
-            'a', getattr(settings, 'BADGR_APP_ID', 1))
+        badgrapp_id = request.query_params.get('a')
 
         # Get BadgrApp instance
-        try:
-            badgrapp = BadgrApp.objects.get(id=badgrapp_id)
-        except BadgrApp.DoesNotExist:
-            logger.event(badgrlog.NoBadgrApp(request, badgrapp_id=badgrapp_id))
-            message = ("This Badgr server may be misconfigured; could not "
-                       "find a Badgr application associated to redirect to.")
-            return Response(message, status=HTTP_404_NOT_FOUND)
+        badgrapp = BadgrApp.objects.get_by_id_or_default(badgrapp_id)
 
         # Get EmailConfirmation instance
         emailconfirmation = EmailConfirmationHMAC.from_key(kwargs.get('confirm_id'))
@@ -474,10 +471,7 @@ class BadgeUserAccountConfirm(RedirectView):
 
     def error_redirect_url(self):
         if self.badgrapp is None:
-            try:
-                self.badgrapp = BadgrApp.objects.get(id=getattr(settings, 'BADGR_APP_ID', 1))
-            except BadgrApp.DoesNotExist:
-                return OriginSetting.HTTP
+            self.badgrapp = BadgrApp.objects.get_by_id_or_default()
 
         return set_url_query_params(
             self.badgrapp.ui_login_redirect.rstrip('/'),
@@ -497,13 +491,8 @@ class BadgeUserAccountConfirm(RedirectView):
         if not user_info:
             return self.error_redirect_url()
 
-        badgrapp_id = user_info.get('badgrapp_id')
-        if badgrapp_id is None:
-            badgrapp_id = getattr(settings, 'BADGR_APP_ID', 1)
-        try:
-            self.badgrapp = BadgrApp.objects.get(id=badgrapp_id)
-        except BadgrApp.DoesNotExist:
-            return self.error_redirect_url()
+        badgrapp_id = user_info.get('badgrapp_id', None)
+        self.badgrapp = BadgrApp.objects.get_by_id_or_default(badgrapp_id)
 
         try:
             email_address = CachedEmailAddress.cached.get(email=user_info.get('email'))

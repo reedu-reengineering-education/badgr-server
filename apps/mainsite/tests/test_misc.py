@@ -1,36 +1,35 @@
+import hashlib
+from hashlib import sha256
+import mock
+from operator import attrgetter
+import os
 import pytz
 import re
+import responses
+import shutil
 import urllib
 import urlparse
 import warnings
 
-import os
-from datetime import datetime, timedelta
-from operator import attrgetter
-
 from django.core import mail
 from django.core.cache import cache, CacheKeyWarning
+from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.management import call_command
 from django.test import override_settings, TransactionTestCase
 from django.utils import timezone
+
+from rest_framework import serializers
 from oauth2_provider.models import AccessToken, Application
 
 from badgeuser.models import BadgeUser, CachedEmailAddress
+from issuer.models import BadgeClass, Issuer, BadgeInstance
 from mainsite.models import BadgrApp, AccessTokenProxy, AccessTokenScope
 from mainsite import TOP_DIR, blacklist
 from mainsite.serializers import DateTimeWithUtcZAtEndField
 from mainsite.tests import SetupIssuerHelper
 from mainsite.tests.base import BadgrTestCase
 from mainsite.utils import fetch_remote_file_to_storage
-import hashlib
-from hashlib import sha256
-from issuer.models import BadgeClass, Issuer, BadgeInstance
-import mock
-import responses
-from rest_framework import serializers
-
-import shutil
 
 
 class TestDateSerialization(BadgrTestCase):
@@ -44,9 +43,9 @@ class TestDateSerialization(BadgrTestCase):
             self.date_field = date_field
 
     def test_date_serialization(self):
-        utc_date = self.TestHolder(datetime(2019, 12, 6, 12, 0, tzinfo=pytz.utc))
-        la_date = self.TestHolder(pytz.timezone('America/Los_Angeles').localize(datetime(2019, 12, 6, 12, 0))) # -8 hours
-        ny_date = self.TestHolder(pytz.timezone('America/New_York').localize(datetime(2019, 12, 6, 12, 0))) # -5 hours
+        utc_date = self.TestHolder(timezone.datetime(2019, 12, 6, 12, 0, tzinfo=pytz.utc))
+        la_date = self.TestHolder(pytz.timezone('America/Los_Angeles').localize(timezone.datetime(2019, 12, 6, 12, 0))) # -8 hours
+        ny_date = self.TestHolder(pytz.timezone('America/New_York').localize(timezone.datetime(2019, 12, 6, 12, 0))) # -5 hours
 
         utc_serializer = self.TestSerializer(utc_date)
         la_serializer = self.TestSerializer(la_date)
@@ -70,7 +69,7 @@ class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
         token = AccessToken.objects.create(
             application=app,
             scope=scope_string,
-            expires=timezone.now() + timedelta(hours=1))
+            expires=timezone.now() + timezone.timedelta(hours=1))
         qs = AccessTokenScope.objects.filter(token=token).order_by('scope')
         self.assertQuerysetEqual(qs, scopes, attrgetter('scope'))
 
@@ -82,7 +81,7 @@ class TestTokenDenorm(BadgrTestCase, SetupIssuerHelper):
         proxy_token = AccessTokenProxy.objects.create(
             application=app,
             scope=scope_string,
-            expires=timezone.now() + timedelta(hours=1))
+            expires=timezone.now() + timezone.timedelta(hours=1))
         qs = AccessTokenScope.objects.filter(token=proxy_token).order_by('scope')
         self.assertQuerysetEqual(qs, scopes, attrgetter('scope'))
 
@@ -131,47 +130,49 @@ class TestSignup(BadgrTestCase):
     def test_user_signup_email_confirmation_redirect(self):
         from django.conf import settings
         http_origin = getattr(settings, 'HTTP_ORIGIN')
-        badgr_app = BadgrApp(cors='frontend.ui',
-                             email_confirmation_redirect='http://frontend.ui/login/',
-                             forgot_password_redirect='http://frontend.ui/forgot-password/')
+        badgr_app = BadgrApp(
+            cors='frontend.ui',
+            email_confirmation_redirect='http://frontend.ui/login/',
+            forgot_password_redirect='http://frontend.ui/forgot-password/',
+            is_default=True
+        )
         badgr_app.save()
 
-        with self.settings(BADGR_APP_ID=badgr_app.id):
-            post_data = {
-                'first_name': 'Tester',
-                'last_name': 'McSteve',
-                'email': 'test12345@example.com',
-                'password': 'secr3t4nds3cur3'
-            }
-            response = self.client.post('/v1/user/profile', post_data)
-            self.assertEqual(response.status_code, 201)
+        post_data = {
+            'first_name': 'Tester',
+            'last_name': 'McSteve',
+            'email': 'test12345@example.com',
+            'password': 'secr3t4nds3cur3'
+        }
+        response = self.client.post('/v1/user/profile', post_data)
+        self.assertEqual(response.status_code, 201)
 
-            user = BadgeUser.objects.get(entity_id=response.data.get('slug'))
+        user = BadgeUser.objects.get(entity_id=response.data.get('slug'))
 
-            self.assertEqual(len(mail.outbox), 1)
-            url_match = re.search(r'{}(/v1/user/confirmemail.*)'.format(http_origin), mail.outbox[0].body)
-            self.assertIsNotNone(url_match)
-            confirm_url = url_match.group(1)
+        self.assertEqual(len(mail.outbox), 1)
+        url_match = re.search(r'{}(/v1/user/confirmemail.*)'.format(http_origin), mail.outbox[0].body)
+        self.assertIsNotNone(url_match)
+        confirm_url = url_match.group(1)
 
-            expected_redirect_url = '{badgrapp_redirect}{first_name}?authToken={auth}&email={email}'.format(
-                badgrapp_redirect=badgr_app.email_confirmation_redirect,
-                first_name=post_data['first_name'],
-                email=urllib.quote(post_data['email']),
-                auth=user.auth_token
-            )
+        expected_redirect_url = '{badgrapp_redirect}{first_name}?authToken={auth}&email={email}'.format(
+            badgrapp_redirect=badgr_app.email_confirmation_redirect,
+            first_name=post_data['first_name'],
+            email=urllib.quote(post_data['email']),
+            auth=user.auth_token
+        )
 
-            response = self.client.get(confirm_url, follow=False)
-            self.assertEqual(response.status_code, 302)
+        response = self.client.get(confirm_url, follow=False)
+        self.assertEqual(response.status_code, 302)
 
-            actual = urlparse.urlparse(response.get('location'))
-            expected = urlparse.urlparse(expected_redirect_url)
-            self.assertEqual(actual.netloc, expected.netloc)
-            self.assertEqual(actual.scheme, expected.scheme)
+        actual = urlparse.urlparse(response.get('location'))
+        expected = urlparse.urlparse(expected_redirect_url)
+        self.assertEqual(actual.netloc, expected.netloc)
+        self.assertEqual(actual.scheme, expected.scheme)
 
-            actual_query = urlparse.parse_qs(actual.query)
-            expected_query = urlparse.parse_qs(expected.query)
-            self.assertEqual(actual_query.get('email'), expected_query.get('email'))
-            self.assertIsNotNone(actual_query.get('authToken'))
+        actual_query = urlparse.parse_qs(actual.query)
+        expected_query = urlparse.parse_qs(expected.query)
+        self.assertEqual(actual_query.get('email'), expected_query.get('email'))
+        self.assertIsNotNone(actual_query.get('authToken'))
 
 
 @override_settings(
@@ -274,13 +275,14 @@ class TestBlacklist(BadgrTestCase):
     def test_blacklist_assertion_to_recipient_in_blacklist(self):
         id_type, id_value = self.Inputs[0]
         with mock.patch('mainsite.blacklist.api_query_is_in_blacklist', new=lambda a, b: True):
-            BadgeInstance.objects.create(
-                recipient_identifier="test@example.com",
-                badgeclass=self.badge_class,
-                issuer=self.issuer,
-                image="uploads/badges/local_badgeinstance_174e70bf-b7a8-4b71-8125-c34d1a994a7c.png",
-                acceptance=BadgeInstance.ACCEPTANCE_ACCEPTED
-            )
+            with self.assertRaises(ValidationError):
+                BadgeInstance.objects.create(
+                    recipient_identifier="test@example.com",
+                    badgeclass=self.badge_class,
+                    issuer=self.issuer,
+                    image="uploads/badges/local_badgeinstance_174e70bf-b7a8-4b71-8125-c34d1a994a7c.png",
+                    acceptance=BadgeInstance.ACCEPTANCE_ACCEPTED
+                )
         self.assertIsNone(BadgeInstance.objects.first())
 
     @override_settings(
@@ -328,7 +330,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
 
     def tearDown(self):
         dir = os.path.join('{base_url}/{upload_to}/cached/'.format(
-            base_url= default_storage.location,
+            base_url=default_storage.location,
             upload_to=self.test_uploaded_path
         ))
 
@@ -339,6 +341,17 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
 
     def mimic_hashed_file_name(self, name, ext=''):
         return hashlib.md5(name).hexdigest() + ext
+
+    @responses.activate
+    def test_remote_url_is_data_uri(self):
+        data_uri_as_url = open(self.get_test_image_data_uri()).read()
+        status_code, storage_name = fetch_remote_file_to_storage(
+            data_uri_as_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        self.assertEqual(status_code, 200)
 
     @responses.activate
     def test_svg_without_extension(self):

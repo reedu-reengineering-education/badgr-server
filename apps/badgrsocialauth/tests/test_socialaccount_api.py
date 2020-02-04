@@ -11,16 +11,16 @@ from badgrsocialauth.providers.twitter.tests import MOCK_TWITTER_PROFILE_RESPONS
 
 
 class SocialAccountV2APITests(BadgrTestCase, SetupUserHelper):
-    def test_can_get_socialaccounts_list_view(self):
+    def setUp(self):
+        super(SocialAccountV2APITests, self).setUp()
         site = Site.objects.first()
-        user = self.setup_user(authenticate=True)
-        socialapplication = SocialApp.objects.create(
+        self.socialapplication = SocialApp.objects.create(
             provider='twitter', name='Twitter OAuth2', client_id='fake', secret='also fake'
         )
-        socialapplication.sites.add(site)
-        socialaccount = SocialAccount.objects.create(
-            user=user, provider='twitter', uid='123', extra_data=json.loads(MOCK_TWITTER_PROFILE_RESPONSE)
-        )
+        self.socialapplication.sites.add(site)
+
+    def _basic_api_requests(self):
+        # have a user already authenticated on the self.client with preferred method.
 
         response = self.client.get('/v2/socialaccounts')
         self.assertEqual(response.status_code, 200)
@@ -40,3 +40,36 @@ class SocialAccountV2APITests(BadgrTestCase, SetupUserHelper):
         response = self.client.delete('/v2/socialaccounts/{}'.format(account_id))
         self.assertEqual(response.status_code, 204)
         self.assertEqual(SocialAccount.objects.count(), 0)
+
+    def test_can_get_socialaccounts_list_view_and_detail_operations(self):
+        user = self.setup_user(authenticate=True)
+
+        socialaccount = SocialAccount.objects.create(
+            user=user, provider='twitter', uid='123', extra_data=json.loads(MOCK_TWITTER_PROFILE_RESPONSE)
+        )
+
+        self._basic_api_requests()
+
+    def test_socialaccount_basic_operations_with_oauth_token_scope(self):
+        user = self.setup_user(authenticate=True, token_scope='rw:profile')
+
+        socialaccount = SocialAccount.objects.create(
+            user=user, provider='twitter', uid='123', extra_data=json.loads(MOCK_TWITTER_PROFILE_RESPONSE)
+        )
+
+        self._basic_api_requests()
+
+    def test_socialaccount_fails_on_invalid_scope(self):
+        user = self.setup_user(authenticate=True, token_scope='rw:issuer')
+
+        response = self.client.get('/v2/socialaccounts')
+        self.assertEqual(response.status_code, 404)
+
+        socialaccount = SocialAccount.objects.create(
+            user=user, provider='twitter', uid='123', extra_data=json.loads(MOCK_TWITTER_PROFILE_RESPONSE)
+        )
+        response = self.client.get('/v2/socialaccounts/{}'.format(socialaccount.id))
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.delete('/v2/socialaccounts/{}'.format(socialaccount.id))
+        self.assertEqual(response.status_code, 404)
