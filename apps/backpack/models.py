@@ -160,8 +160,10 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
 
     @property
     def cached_badgrapp(self):
-        id = self.cached_creator.badgrapp_id if self.cached_creator.badgrapp_id else getattr(settings, 'BADGR_APP_ID', 1)
-        return BadgrApp.cached.get(id=id)
+        creator = self.cached_creator
+        if creator and creator.badgrapp_id:
+            return BadgrApp.objects.get(pk=creator.badgrapp_id)
+        return BadgrApp.objects.get_current(None)
 
 
 class BackpackCollectionBadgeInstance(cachemodel.CacheModel):

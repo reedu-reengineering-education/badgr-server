@@ -18,8 +18,9 @@ class TwitterShareProvider(ShareProvider):
 
     def share_url(self, obj, **kwargs):
         if isinstance(obj, BadgeInstance):
+            encoded_issuer_name = obj.cached_issuer.name.encode('utf-8')
             text = "I earned a badge from {issuer}! {url}".format(
-                issuer=obj.cached_issuer.name,
+                issuer=encoded_issuer_name,
                 url=obj.get_share_url(**kwargs)
             )
         else:

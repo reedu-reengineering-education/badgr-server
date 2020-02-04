@@ -152,18 +152,33 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
     Fetches a remote url, and stores it in DefaultStorage
     :return: (status_code, new_storage_name)
     """
-
     SVG_MIME_TYPE = 'image/svg+xml'
 
     if not allowed_mime_types:
         raise SuspiciousFileOperation("allowed mime types must be passed in")
 
+    magic_strings = None
+    content = None
+    status_code = None
+
+    if _is_data_uri(remote_url):
+        # data:[<MIME-type>][;charset=<encoding>][;base64],<data>
+        # finds the end of the substring 'base64' adds one more to get the comma as well.
+        base64_image_from_data_uri = remote_url[(re.search('base64', remote_url).end())+1:]
+        content = decoded_test = base64.b64decode(base64_image_from_data_uri)
+        magic_strings = puremagic.magic_string(decoded_test)
+        status_code = 200
+
     store = DefaultStorage()
-    r = requests.get(remote_url, stream=True)
 
-    if r.status_code == 200:
+    if magic_strings is None:
+        r = requests.get(remote_url, stream=True)
+        if r.status_code == 200:
+            magic_strings = puremagic.magic_string(r.content)
+            content = r.content
+            status_code = r.status_code
 
-        magic_strings = puremagic.magic_string(r.content)
+    if magic_strings and content:
         derived_mime_type = None
         derived_ext = None
         stripped_svg_string = None
@@ -174,12 +189,12 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
                 derived_ext = getattr(magic_string, 'extension', None)
                 break
 
-        if not derived_mime_type and re.search(b'<svg', r.content[:1024]) and r.content.strip()[-6:] == b'</svg>':
+        if not derived_mime_type and re.search(b'<svg', content[:1024]) and content.strip()[-6:] == b'</svg>':
             derived_mime_type = SVG_MIME_TYPE
             derived_ext = '.svg'
 
         if derived_mime_type == SVG_MIME_TYPE:
-            stripped_svg_element = ET.fromstring(r.content)
+            stripped_svg_element = ET.fromstring(content)
             scrubSvgElementTree(stripped_svg_element)
             stripped_svg_string = ET.tostring(stripped_svg_element)
 
@@ -194,13 +209,17 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
             filename=hashlib.md5(remote_url).hexdigest(),
             ext=derived_ext)
 
-        string_to_write_to_file = stripped_svg_string or r.content
+        string_to_write_to_file = stripped_svg_string or content
 
         if not store.exists(storage_name):
             buf = StringIO.StringIO(string_to_write_to_file)
             store.save(storage_name, buf)
-        return r.status_code, storage_name
-    return r.status_code, None
+        return status_code, storage_name
+    return status_code, None
+
+
+def _is_data_uri(value):
+    return re.search('data:', value[:8])
 
 
 def clamped_backoff_in_seconds(backoff_count):

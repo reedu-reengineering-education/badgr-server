@@ -385,13 +385,12 @@ class UserEmailTests(BadgrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(starting_count+1, len(response.data))
 
-        with self.settings(BADGR_APP_ID=self.badgr_app.id):
-            # Mark email as verified
-            email = CachedEmailAddress.cached.get(email='new+email@newemail.com')
-            self.assertEqual(len(mail.outbox), 1)
-            verify_url = re.search("(?P<url>/v1/[^\s]+)", mail.outbox[0].body).group("url")
-            response = self.client.get(verify_url)
-            self.assertEqual(response.status_code, 302)
+        # Mark email as verified
+        email = CachedEmailAddress.cached.get(email='new+email@newemail.com')
+        self.assertEqual(len(mail.outbox), 1)
+        verify_url = re.search("(?P<url>/v1/[^\s]+)", mail.outbox[0].body).group("url")
+        response = self.client.get(verify_url)
+        self.assertEqual(response.status_code, 302)
 
         email = CachedEmailAddress.cached.get(email='new+email@newemail.com')
         self.assertTrue(email.verified)
@@ -543,40 +542,39 @@ class UserEmailTests(BadgrTestCase):
         self.assertEqual(response.status_code, 200, "Does not leak information about account emails")
         self.assertEqual(len(mail.outbox), 0)
 
-        with self.settings(BADGR_APP_ID=self.badgr_app.id):
-            # successfully send recovery email
-            response = self.client.post('/v1/user/forgot-password', {
-                'email': self.first_user_email
-            })
+        # successfully send recovery email
+        response = self.client.post('/v1/user/forgot-password', {
+            'email': self.first_user_email
+        })
 
-            backoff_key = backoff_cache_key(self.first_user_email, None)
-            backoff_data = {'count': 6, 'until': timezone.now() + timezone.timedelta(seconds=60)}
-            cache.set(backoff_key, backoff_data)
-            self.assertEqual(cache.get(backoff_key), backoff_data)
+        backoff_key = backoff_cache_key(self.first_user_email, None)
+        backoff_data = {'count': 6, 'until': timezone.now() + timezone.timedelta(seconds=60)}
+        cache.set(backoff_key, backoff_data)
+        self.assertEqual(cache.get(backoff_key), backoff_data)
 
-            self.assertEqual(response.status_code, 200)
-            # received email with recovery url
-            self.assertEqual(len(mail.outbox), 1)
-            matches = re.search(r'/v1/user/forgot-password\?token=([-0-9a-zA-Z]*)', mail.outbox[0].body)
-            self.assertIsNotNone(matches)
-            token = matches.group(1)
-            new_password = 'new-password-ee'
+        self.assertEqual(response.status_code, 200)
+        # received email with recovery url
+        self.assertEqual(len(mail.outbox), 1)
+        matches = re.search(r'/v1/user/forgot-password\?token=([-0-9a-zA-Z]*)', mail.outbox[0].body)
+        self.assertIsNotNone(matches)
+        token = matches.group(1)
+        new_password = 'new-password-ee'
 
-            # able to use token received in email to reset password
-            response = self.client.put('/v1/user/forgot-password', {
-                'token': token,
-                'password': new_password
-            })
-            self.assertEqual(response.status_code, 200)
+        # able to use token received in email to reset password
+        response = self.client.put('/v1/user/forgot-password', {
+            'token': token,
+            'password': new_password
+        })
+        self.assertEqual(response.status_code, 200)
 
-            backoff_data = cache.get(backoff_key)
-            self.assertIsNone(backoff_data)
+        backoff_data = cache.get(backoff_key)
+        self.assertIsNone(backoff_data)
 
-            response = self.client.post('/api-auth/token', {
-                'username': self.first_user.username,
-                'password': new_password,
-            })
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post('/api-auth/token', {
+            'username': self.first_user.username,
+            'password': new_password,
+        })
+        self.assertEqual(response.status_code, 200)
 
     def test_lower_variant_autocreated_on_new_email(self):
         first_email = CachedEmailAddress(
@@ -892,13 +890,12 @@ class UserBadgeTests(BadgrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(starting_count+1, len(response.data))
 
-        with self.settings(BADGR_APP_ID=self.badgr_app.id):
-            # Mark email as verified
-            email = CachedEmailAddress.cached.get(email='new+email@newemail.com')
-            self.assertEqual(len(mail.outbox), outbox_count+1)
-            verify_url = re.search("(?P<url>/v1/[^\s]+)", mail.outbox[-1].body).group("url")
-            response = self.client.get(verify_url)
-            self.assertEqual(response.status_code, 302)
+        # Mark email as verified
+        email = CachedEmailAddress.cached.get(email='new+email@newemail.com')
+        self.assertEqual(len(mail.outbox), outbox_count+1)
+        verify_url = re.search("(?P<url>/v1/[^\s]+)", mail.outbox[-1].body).group("url")
+        response = self.client.get(verify_url)
+        self.assertEqual(response.status_code, 302)
 
         email = CachedEmailAddress.cached.get(email='new+email@newemail.com')
         self.assertTrue(email.verified)

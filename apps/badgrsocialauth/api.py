@@ -16,8 +16,6 @@ from badgrsocialauth.serializers_v2 import BadgrSocialAccountSerializerV2
 from entity.api import BaseEntityListView, BaseEntityDetailView
 from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
-from mainsite.models import AccessTokenProxy
-from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 from mainsite.utils import OriginSetting
 
 
@@ -25,7 +23,11 @@ class BadgrSocialAccountList(BaseEntityListView):
     model = SocialAccount
     v1_serializer_class = BadgrSocialAccountSerializerV1
     v2_serializer_class = BadgrSocialAccountSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedIdentifier,)
+    permission_classes = (BadgrOAuthTokenHasScope,)
+    valid_scopes = {
+        'get': ['r:profile', 'rw:profile'],
+        'post': ['rw:profile']
+    }
 
     def get_objects(self, request, **kwargs):
         obj = self.request.user.socialaccount_set.all()
@@ -36,7 +38,7 @@ class BadgrSocialAccountList(BaseEntityListView):
 
 
 class BadgrSocialAccountConnect(APIView):
-    permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope)
+    permission_classes = (BadgrOAuthTokenHasScope,)
     valid_scopes = ['rw:profile']
 
     def get(self, request, **kwargs):
@@ -65,7 +67,12 @@ class BadgrSocialAccountDetail(BaseEntityDetailView):
     model = SocialAccount
     v1_serializer_class = BadgrSocialAccountSerializerV1
     v2_serializer_class = BadgrSocialAccountSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedIdentifier, IsSocialAccountOwner)
+    permission_classes = (BadgrOAuthTokenHasScope, IsSocialAccountOwner)
+    valid_scopes = {
+        'get': ['r:profile', 'rw:profile'],
+        'post': ['rw:profile'],
+        'delete': ['rw:profile']
+    }
 
     def get_object(self, request, **kwargs):
         try:
