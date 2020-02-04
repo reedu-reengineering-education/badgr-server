@@ -230,10 +230,10 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config):
         if not existing_email.verified:
             # Email exists but is not verified, auto-provision account and log in
             return login(new_account(email))
+        Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
         # Email exists and is already verified
-        return redirect("{url}?authError={message}".format(
-            url=badgr_app.ui_signup_failure_redirect,
-            message=urllib.quote("Authentication Error")))
+        return redirect("{url}".format(
+            url=badgr_app.ui_login_redirect))
     except CachedEmailAddress.DoesNotExist:
         # Email does not exist, auto-provision account and log in
         return login(new_account(email))
