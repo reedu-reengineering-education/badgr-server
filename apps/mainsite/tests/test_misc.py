@@ -330,7 +330,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
 
     def tearDown(self):
         dir = os.path.join('{base_url}/{upload_to}/cached/'.format(
-            base_url= default_storage.location,
+            base_url=default_storage.location,
             upload_to=self.test_uploaded_path
         ))
 
@@ -341,6 +341,17 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
 
     def mimic_hashed_file_name(self, name, ext=''):
         return hashlib.md5(name).hexdigest() + ext
+
+    @responses.activate
+    def test_remote_url_is_data_uri(self):
+        data_uri_as_url = open(self.get_test_image_data_uri()).read()
+        status_code, storage_name = fetch_remote_file_to_storage(
+            data_uri_as_url,
+            upload_to=self.test_uploaded_path,
+            allowed_mime_types=self.mime_types
+        )
+
+        self.assertEqual(status_code, 200)
 
     @responses.activate
     def test_svg_without_extension(self):
