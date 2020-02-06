@@ -1,9 +1,9 @@
 """
 Utility functions and constants that might be used across the project.
 """
-from __future__ import unicode_literals
 
-import StringIO
+
+import io
 import base64
 import datetime
 import hashlib
@@ -11,8 +11,8 @@ import json
 import re
 import puremagic
 import requests
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 import uuid
 from xml.etree import cElementTree as ET
 
@@ -76,7 +76,7 @@ class OriginSettingsObject(object):
 
     @property
     def DEFAULT_HTTP_PROTOCOL(self):
-        parsed = urlparse.urlparse(self.HTTP)
+        parsed = urllib.parse.urlparse(self.HTTP)
         return parsed.scheme
 
     @property
@@ -92,7 +92,7 @@ Cache Utilities
 def filter_cache_key(key, key_prefix, version):
     generated_key = ':'.join([key_prefix, str(version), key])
     if len(generated_key) > 250:
-        return hashlib.md5(generated_key).hexdigest()
+        return hashlib.md5(generated_key.encode('utf-8')).hexdigest()
     return generated_key
 
 
@@ -206,13 +206,13 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
 
         storage_name = '{upload_to}/cached/{filename}{ext}'.format(
             upload_to=upload_to,
-            filename=hashlib.md5(remote_url).hexdigest(),
+            filename=hashlib.md5(remote_url.encode('utf-8')).hexdigest(),
             ext=derived_ext)
 
         string_to_write_to_file = stripped_svg_string or content
 
         if not store.exists(storage_name):
-            buf = StringIO.StringIO(string_to_write_to_file)
+            buf = io.BytesIO(string_to_write_to_file)
             store.save(storage_name, buf)
         return status_code, storage_name
     return status_code, None
@@ -280,7 +280,7 @@ def throttleable(f):
                     iterate_backoff_count(backoff),
                     timeout=max_backoff
                 )
-        except Exception, e:
+        except Exception as e:
             cache.set(
                 backoff_cache_key(username, client_ip),
                 iterate_backoff_count(backoff),
@@ -299,14 +299,14 @@ def generate_entity_uri():
     """
     entity_uuid = uuid.uuid4()
     b64_string = base64.urlsafe_b64encode(entity_uuid.bytes)
-    b64_trimmed = re.sub(r'=+$', '', b64_string)
+    b64_trimmed = re.sub(r'=+$', '', b64_string.decode())
     return b64_trimmed
 
 
 def first_node_match(graph, condition):
     """return the first dict in a list of dicts that matches condition dict"""
     for node in graph:
-        if all(item in node.items() for item in condition.items()):
+        if all(item in list(node.items()) for item in list(condition.items())):
             return node
 
 
@@ -333,11 +333,11 @@ def set_url_query_params(url, **kwargs):
     Given a url, possibly including query parameters, return a url with the given query parameters set, replaced on a
     per-key basis.
     """
-    url_parts = list(urlparse.urlparse(url))
-    query = dict(urlparse.parse_qsl(url_parts[4]))
+    url_parts = list(urllib.parse.urlparse(url))
+    query = dict(urllib.parse.parse_qsl(url_parts[4]))
     query.update(kwargs)
-    url_parts[4] = urllib.urlencode(query)
-    return urlparse.urlunparse(url_parts)
+    url_parts[4] = urllib.parse.urlencode(query)
+    return urllib.parse.urlunparse(url_parts)
 
 
 def _request_authenticated_with_admin_scope(request):

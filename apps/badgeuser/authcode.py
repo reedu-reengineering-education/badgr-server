@@ -1,5 +1,5 @@
 # encoding: utf-8
-from __future__ import unicode_literals
+
 
 import datetime
 import json
@@ -35,8 +35,8 @@ def encrypt_authcode(payload, expires_seconds=None, secret_key=None):
             raise ValueError("must specify a secret key")
 
     crypto = cryptography.fernet.Fernet(secret_key)
-    digest = crypto.encrypt(_marshall(payload, expires_seconds))
-    return digest
+    digest = crypto.encrypt(_marshall(payload, expires_seconds).encode('utf-8'))
+    return str(digest, 'utf-8')
 
 
 def decrypt_authcode(cipher, secret_key=None):

@@ -1,8 +1,8 @@
 import datetime
 import json
 import re
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 
 from allauth.account.adapter import get_adapter
 from allauth.account.models import EmailConfirmationHMAC
@@ -510,9 +510,9 @@ class BadgeUserAccountConfirm(RedirectView):
             user.set_password(user_info['plaintext_password'])
         user.save()
 
-        redirect_url = urlparse.urljoin(
+        redirect_url = urllib.parse.urljoin(
             self.badgrapp.email_confirmation_redirect.rstrip('/') + '/',
-            urllib.quote(user.first_name.encode('utf8'))
+            urllib.parse.quote(user.first_name.encode('utf8'))
         )
         redirect_url = set_url_query_params(redirect_url, email=email_address.email.encode('utf8'))
         return redirect_url

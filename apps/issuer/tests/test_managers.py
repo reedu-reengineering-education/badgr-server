@@ -1,5 +1,5 @@
 # encoding: utf-8
-from __future__ import unicode_literals
+
 
 from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V2_URI
 import os
@@ -43,8 +43,8 @@ def _generate_badgeclass_ob2(**kwargs):
 def _generate_assertion_ob2(**kwargs):
     data = {
         '@context': OPENBADGES_CONTEXT_V2_URI,
-        'id': u'https://example.com/assertion/1',
-        'type': u'Assertion',
+        'id': 'https://example.com/assertion/1',
+        'type': 'Assertion',
         'issuedOn': '2017-06-29T21:50:14+00:00',
         'recipient': {
             'type': 'email',
@@ -52,7 +52,7 @@ def _generate_assertion_ob2(**kwargs):
             'identity': 'test@example.com'
         },
         'verification': {
-            'type': u'HostedBadge'
+            'type': 'HostedBadge'
         },
         'badge': 'https://example.com/badgeclass/1',
     }
@@ -63,7 +63,7 @@ def _generate_assertion_ob2(**kwargs):
 def _register_image_mock(url):
     responses.add(
         responses.GET, url,
-        body=open(os.path.join(BACKPACK_TESTS_DIRECTORY, 'testfiles/unbaked_image.png')).read(),
+        body=open(os.path.join(BACKPACK_TESTS_DIRECTORY, 'testfiles/unbaked_image.png'), 'rb').read(),
         status=200, content_type='image/png'
     )
 

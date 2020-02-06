@@ -1,6 +1,6 @@
 import base64
 import re
-import urlparse
+import urllib.parse
 
 from datetime import datetime, timedelta
 from hashlib import sha1
@@ -37,8 +37,8 @@ class EmailBlacklist(models.Model):
         expiration = datetime.utcnow() + timedelta(days=7)  # In one week.
         timestamp = int((expiration - datetime(1970, 1, 1)).total_seconds())
 
-        email_encoded = base64.b64encode(email)
-        hashed = hmac.new(secret_key, email_encoded + str(timestamp), sha1)
+        email_encoded = base64.b64encode(email.encode('utf-8'))
+        hashed = hmac.new(secret_key.encode('utf-8'), email_encoded + str(timestamp).encode('utf-8'), sha1)
 
         if badgrapp_pk is None:
             badgrapp_pk = BadgrApp.objects.get_by_id_or_default().pk
@@ -83,7 +83,7 @@ class BadgrAppManager(Manager):
                 pass
 
         if origin:
-            url = urlparse.urlparse(origin)
+            url = urllib.parse.urlparse(origin)
             try:
                 return self.get(cors=url.netloc)
             except self.model.DoesNotExist:
@@ -152,7 +152,7 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
         'ui_signup_failure_redirect', 'oauth_authorization_redirect', 'email_confirmation_redirect'
     ]
 
-    def __unicode__(self):
+    def __str__(self):
         return self.cors
 
     def get_path(self, path='/', use_https=None):
@@ -269,7 +269,7 @@ class AccessTokenProxyManager(models.Manager):
         padding = len(entity_id) % 4
         if padding > 0:
             entity_id = '{}{}'.format(entity_id, (4 - padding) * '=')
-        decoded = base64.urlsafe_b64decode(entity_id.encode('utf-8'))
+        decoded = str(base64.urlsafe_b64decode(entity_id.encode('utf-8')), 'utf-8')
         id = re.sub(r'^{}'.format(self.model.fake_entity_id_prefix), '', decoded)
         try:
             pk = int(id)
@@ -296,7 +296,7 @@ class AccessTokenProxy(AccessToken):
     def entity_id(self):
         # fake an entityId for this non-entity
         digest = "{}{}".format(self.fake_entity_id_prefix, self.pk)
-        b64_string = base64.urlsafe_b64encode(digest)
+        b64_string = str(base64.urlsafe_b64encode(digest.encode('utf-8')), 'utf-8')
         b64_trimmed = re.sub(r'=+$', '', b64_string)
         return b64_trimmed
 
@@ -315,9 +315,6 @@ class AccessTokenProxy(AccessToken):
             return ApplicationInfo()
 
     def __str__(self):
-        return self.obscured_token
-
-    def __unicode__(self):
         return self.obscured_token
 
     @property
@@ -349,9 +346,6 @@ class LegacyTokenProxy(Token):
         verbose_name_plural = 'Legacy tokens'
 
     def __str__(self):
-        return self.obscured_token
-
-    def __unicode__(self):
         return self.obscured_token
 
     @property

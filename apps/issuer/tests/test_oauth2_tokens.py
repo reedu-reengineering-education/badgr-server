@@ -1,5 +1,5 @@
 # encoding: utf-8
-from __future__ import unicode_literals
+
 
 import json
 
@@ -84,11 +84,11 @@ class PublicAPITests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestC
         issuer_tokens = {r.get('issuer'): r.get('token') for r in result.get('result')}
         self.assertEqual(set(issuer_tokens.keys()), set(issuer_ids))
 
-        access_tokens = [AccessTokenProxy.objects.get(token=t) for t in issuer_tokens.values()]
+        access_tokens = [AccessTokenProxy.objects.get(token=t) for t in list(issuer_tokens.values())]
         self.assertEqual(len(access_tokens), len(issuer_tokens))
 
         # we should be able to use tokens to access the issuer
-        for issuer_id, issuer_token in issuer_tokens.items():
+        for issuer_id, issuer_token in list(issuer_tokens.items()):
             response = self.client.get(reverse('v2_api_issuer_detail', kwargs=dict(entity_id=issuer_id)),
                  format="json",
                  Authorization="Bearer {}".format(issuer_token)

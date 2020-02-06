@@ -1,5 +1,5 @@
 # encoding: utf-8
-from __future__ import unicode_literals
+
 
 from apispec_drf.decorators import apispec_list_operation, apispec_operation
 from django.contrib.auth import get_user_model

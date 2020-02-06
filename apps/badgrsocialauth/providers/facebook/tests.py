@@ -1,5 +1,5 @@
 import base64
-import urlparse
+import urllib.parse
 from allauth.tests import MockedResponse
 
 from badgeuser.models import BadgeUser
@@ -50,8 +50,8 @@ class VerifiedFacebookProviderTests(DoesNotSendVerificationEmailMixin, BadgrOAut
         self.assertEqual(BadgeUser.objects.all().count(), 1, "There is still only one user.")
         response = self.client.get(response._headers['location'][1])
         self.assertEqual(response.status_code, 302)
-        url = urlparse.urlparse(response._headers['location'][1])
-        query = dict(urlparse.parse_qsl(url[4]))
-        self.assertEqual(base64.urlsafe_b64decode(query['email']), 'raymond.penners@example.com')
+        url = urllib.parse.urlparse(response._headers['location'][1])
+        query = dict(urllib.parse.parse_qsl(url[4]))
+        self.assertEqual(base64.urlsafe_b64decode(query['email']), b'raymond.penners@example.com')
         self.assertEqual(query['socialAuthSlug'], 'facebook')
         self.assertEqual(url.path, "/fail")

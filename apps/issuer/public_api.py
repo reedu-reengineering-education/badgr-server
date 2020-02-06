@@ -1,8 +1,8 @@
 import os
 import re
-import StringIO
-import urllib
-import urlparse
+import io
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 
 import cairosvg
 import openbadges
@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 import badgrlog
-import utils
+from . import utils
 from backpack.models import BackpackCollection
 from entity.api import VersionedObjectMixin
 from mainsite.models import BadgrApp
@@ -185,15 +185,15 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
 
         image_type = request.query_params.get('type', 'original')
         if image_type not in ['original', 'png']:
-            raise ValidationError(u"invalid image type: {}".format(image_type))
+            raise ValidationError("invalid image type: {}".format(image_type))
 
         supported_fmts = {
             'square': (1, 1),
             'wide': (1.91, 1)
         }
         image_fmt = request.query_params.get('fmt', 'square').lower()
-        if image_fmt not in supported_fmts.keys():
-            raise ValidationError(u"invalid image format: {}".format(image_fmt))
+        if image_fmt not in list(supported_fmts.keys()):
+            raise ValidationError("invalid image format: {}".format(image_fmt))
 
         image_url = image_prop.url
         filename, ext = os.path.splitext(image_prop.name)
@@ -221,8 +221,8 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
         elif ext == '.svg':
             if not storage.exists(new_name):
                 with storage.open(image_prop.name, 'rb') as input_svg:
-                    svg_buf = StringIO.StringIO()
-                    out_buf = StringIO.StringIO()
+                    svg_buf = io.BytesIO()
+                    out_buf = io.BytesIO()
                     try:
                         cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
                     except IOError:
@@ -237,7 +237,7 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
         else:
             if not storage.exists(new_name):
                 with storage.open(image_prop.name, 'rb') as input_svg:
-                    out_buf = StringIO.StringIO()
+                    out_buf = io.BytesIO()
                     img = Image.open(input_svg)
 
                     img = _fit_to_height(img, supported_fmts[image_fmt])
@@ -378,7 +378,7 @@ class BadgeInstanceJson(JSONComponentView):
         oembed_link_url = '{}{}?format=json&url={}'.format(
             getattr(settings, 'HTTP_ORIGIN'),
             reverse('oembed_api_endpoint'),
-            urllib.quote(self.current_object.public_url)
+            urllib.parse.quote(self.current_object.public_url)
         )
 
         return dict(
@@ -410,7 +410,7 @@ class BackpackCollectionJson(JSONComponentView):
     entity_id_field_name = 'share_hash'
 
     def get_context_data(self, **kwargs):
-        chosen_assertion = sorted(self.current_object.cached_badgeinstances(), lambda a,b: cmp(a.issued_on, b.issued_on))[0]
+        chosen_assertion = sorted(self.current_object.cached_badgeinstances(), key=lambda b: b.issued_on)[0]
         image_url = "{}{}?type=png".format(
             OriginSetting.HTTP,
             reverse('badgeinstance_image', kwargs={'entity_id': chosen_assertion.entity_id})
@@ -453,7 +453,7 @@ class BakedBadgeInstanceImage(VersionedObjectMixin, APIView, SlugToEntityIdRedir
                 raise
 
         requested_version = request.query_params.get('v', utils.CURRENT_OBI_VERSION)
-        if requested_version not in utils.OBI_VERSION_CONTEXT_IRIS.keys():
+        if requested_version not in list(utils.OBI_VERSION_CONTEXT_IRIS.keys()):
             raise ValidationError("Invalid OpenBadges version")
 
         # self.log(assertion)
@@ -469,7 +469,7 @@ class OEmbedAPIEndpoint(APIView):
 
     @staticmethod
     def get_object(url):
-        request_url = urlparse.urlparse(url)
+        request_url = urllib.parse.urlparse(url)
 
         try:
             resolved = resolve(request_url.path)

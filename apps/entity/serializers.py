@@ -1,5 +1,5 @@
 # encoding: utf-8
-from __future__ import unicode_literals
+
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -106,7 +106,7 @@ class ListSerializerV2(serializers.ListSerializer, BaseSerializerV2):
         return_errors = {}
         try:
             for field_errors in base_errors_list:
-                for fe_key, fe_value in field_errors.items():
+                for fe_key, fe_value in list(field_errors.items()):
                     if return_errors.get(fe_key) is None:
                         return_errors[fe_key] = field_errors[fe_key]
                     else:
@@ -138,7 +138,7 @@ class DetailSerializerV2(BaseSerializerV2):
             return new_instance
 
     def update(self, instance, validated_data):
-        for field_name, value in validated_data.items():
+        for field_name, value in list(validated_data.items()):
             setattr(instance, field_name, value)
         instance.save()
         return instance

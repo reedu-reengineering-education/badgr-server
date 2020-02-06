@@ -1,4 +1,4 @@
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 from django.http import HttpResponseRedirect
 from rest_framework.authentication import TokenAuthentication
@@ -49,7 +49,7 @@ def redirect_to_frontend_error_toast(request, message):
     badgr_app = BadgrApp.objects.get_current(request)
     redirect_url = "{url}?authError={message}".format(
         url=badgr_app.ui_login_redirect,
-        message=urllib.quote(message))
+        message=urllib.parse.quote(message))
     return HttpResponseRedirect(redirect_to=redirect_url)
 
 

@@ -1,4 +1,4 @@
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 from allauth.account.models import EmailAddress
 from allauth.socialaccount import providers

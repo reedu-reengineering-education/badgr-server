@@ -1,9 +1,9 @@
 # encoding: utf-8
-from __future__ import unicode_literals
+
 
 import time
-import urllib
-from urlparse import urlparse
+import urllib.request, urllib.parse, urllib.error
+from urllib.parse import urlparse
 
 from django.core.urlresolvers import reverse
 from django.test import override_settings
@@ -156,7 +156,7 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         for n in range(5):
             assertions.append(badgeclass.issue(recipient_id=recipient.email))
 
-        cut_time = urllib.quote(timezone.now().isoformat())
+        cut_time = urllib.parse.quote(timezone.now().isoformat())
         time.sleep(0.1)
 
         for n in range(10):

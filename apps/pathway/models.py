@@ -25,7 +25,7 @@ class Pathway(cachemodel.CacheModel, IsActive):
 
     cached = SlugOrJsonIdCacheModelManager('pathway_slug')
 
-    def __unicode__(self):
+    def __str__(self):
         return self.jsonld_id
 
     def publish(self):
@@ -158,7 +158,7 @@ class PathwayElement(cachemodel.CacheModel, CreatedUpdatedAt, CreatedUpdatedBy, 
     class Meta:
         ordering = ('ordering',)
 
-    def __unicode__(self):
+    def __str__(self):
         return self.jsonld_id
 
     def save(self, *args, **kwargs):
@@ -272,7 +272,7 @@ class PathwayElement(cachemodel.CacheModel, CreatedUpdatedAt, CreatedUpdatedBy, 
                 order += 1
                 pathway_badge.save()
             if len(_idx):
-                for badge in _idx.values():
+                for badge in list(_idx.values()):
                     badge.delete()
             self.publish()
 

@@ -83,7 +83,7 @@ class LinkedDataReferenceField(serializers.Serializer):
         return output
 
     def to_internal_value(self, data):
-        if not isinstance(data, basestring):
+        if not isinstance(data, str):
             idstring = data.get('@id')
         else:
             idstring = data
@@ -178,7 +178,7 @@ class OriginalJsonSerializerMixin(serializers.Serializer):
             # properties in original_json not natively supported
             extra_properties = instance.get_filtered_json()
             if extra_properties and len(extra_properties) > 0:
-                for k, v in extra_properties.items():
+                for k, v in list(extra_properties.items()):
                     if k not in representation or v is not None and representation.get(k, None) is None:
                         representation[k] = v
 

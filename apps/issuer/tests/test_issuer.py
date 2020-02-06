@@ -1,8 +1,8 @@
 # encoding: utf-8
-from __future__ import unicode_literals
+
 
 import os.path
-from urllib import quote_plus
+from urllib.parse import quote_plus
 
 import os
 from django.contrib.auth import get_user_model
@@ -72,7 +72,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         issuer_email = CachedEmailAddress.objects.create(
             user=test_user, email=self.example_issuer_props['email'], verified=True)
 
-        with open(image_path, 'r') as badge_image:
+        with open(image_path, 'rb') as badge_image:
             issuer_fields_with_image = self.example_issuer_props.copy()
             issuer_fields_with_image['image'] = badge_image
 

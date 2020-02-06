@@ -10,7 +10,7 @@ from django.utils.html import strip_tags
 from django.utils import timezone
 from rest_framework import serializers
 
-import utils
+from . import utils
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserIdentifierFieldV1
 from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
@@ -29,7 +29,7 @@ class CachedListSerializer(serializers.ListSerializer):
 class IssuerStaffSerializerV1(serializers.Serializer):
     """ A read_only serializer for staff roles """
     user = BadgeUserProfileSerializerV1(source='cached_user')
-    role = serializers.CharField(validators=[ChoicesValidator(dict(IssuerStaff.ROLE_CHOICES).keys())])
+    role = serializers.CharField(validators=[ChoicesValidator(list(dict(IssuerStaff.ROLE_CHOICES).keys()))])
 
     class Meta:
         list_serializer_class = CachedListSerializer
@@ -120,7 +120,7 @@ class IssuerRoleActionSerializerV1(serializers.Serializer):
     username = serializers.CharField(allow_blank=True, required=False)
     email = serializers.EmailField(allow_blank=True, required=False)
     role = serializers.CharField(
-        validators=[ChoicesValidator(dict(IssuerStaff.ROLE_CHOICES).keys())],
+        validators=[ChoicesValidator(list(dict(IssuerStaff.ROLE_CHOICES).keys()))],
         default=IssuerStaff.ROLE_STAFF)
 
     def validate(self, attrs):
@@ -238,7 +238,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
 
             if utils.is_probable_url(data.get('criteria')):
                 data['criteria_url'] = data.pop('criteria')
-            elif not isinstance(data.get('criteria'), (str, unicode)):
+            elif not isinstance(data.get('criteria'), str):
                 raise serializers.ValidationError(
                     "Provided criteria text could not be properly processed as URL or plain text."
                 )

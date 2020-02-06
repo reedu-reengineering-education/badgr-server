@@ -1,8 +1,8 @@
-from __future__ import unicode_literals
 
-import StringIO
+
+import io
 import datetime
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 import dateutil
 import re
@@ -80,7 +80,7 @@ class OriginalJsonMixin(models.Model):
     def get_filtered_json(self, excluded_fields=()):
         original = self.get_original_json()
         if original is not None:
-            return {key: original[key] for key in filter(lambda k: k not in excluded_fields, original.keys())}
+            return {key: original[key] for key in [k for k in list(original.keys()) if k not in excluded_fields]}
 
 
 class BaseOpenBadgeObjectModel(OriginalJsonMixin, cachemodel.CacheModel):
@@ -124,7 +124,7 @@ class BaseOpenBadgeObjectModel(OriginalJsonMixin, cachemodel.CacheModel):
                 self.save()
 
             # add new
-            for ext_name, ext in value.items():
+            for ext_name, ext in list(value.items()):
                 ext_json = json_dumps(ext)
                 ext, ext_created = self.get_extensions_manager().get_or_create(name=ext_name, defaults=dict(
                     original_json=ext_json
@@ -144,7 +144,7 @@ class BaseOpenBadgeExtension(cachemodel.CacheModel):
     name = models.CharField(max_length=254)
     original_json = models.TextField(blank=True, null=True, default=None)
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
     class Meta:
@@ -344,7 +344,7 @@ class Issuer(ResizeUploadedImage,
         if include_extra:
             extra = self.get_filtered_json()
             if extra is not None:
-                for k,v in extra.items():
+                for k,v in list(extra.items()):
                     if k not in json:
                         json[k] = v
 
@@ -676,7 +676,7 @@ class BadgeClass(ResizeUploadedImage,
         if include_extra:
             extra = self.get_filtered_json()
             if extra is not None:
-                for k,v in extra.items():
+                for k,v in list(extra.items()):
                     if k not in json:
                         json[k] = v
 
@@ -780,7 +780,7 @@ class BadgeInstance(BaseAuditedModel,
     def get_share_url(self, include_identifier=False):
         url = self.share_url
         if include_identifier:
-            url = '%s?identifier__%s=%s' % (url, self.recipient_type, urllib.quote(self.recipient_identifier))
+            url = '%s?identifier__%s=%s' % (url, self.recipient_type, urllib.parse.quote(self.recipient_identifier))
         return url
 
     @property
@@ -858,7 +858,7 @@ class BadgeInstance(BaseAuditedModel,
 
             if not self.image:
                 badgeclass_name, ext = os.path.splitext(self.badgeclass.image.file.name)
-                new_image = StringIO.StringIO()
+                new_image = io.BytesIO()
                 bake(image_file=self.cached_badgeclass.image.file,
                      assertion_json_string=json_dumps(self.get_json(obi_version=UNVERSIONED_BAKED_VERSION), indent=2),
                      output_file=new_image)
@@ -881,7 +881,7 @@ class BadgeInstance(BaseAuditedModel,
         super(BadgeInstance, self).save(*args, **kwargs)
 
     def rebake(self, obi_version=CURRENT_OBI_VERSION, save=True):
-        new_image = StringIO.StringIO()
+        new_image = io.BytesIO()
         bake(
             image_file=self.cached_badgeclass.image.file,
             assertion_json_string=json_dumps(self.get_json(obi_version=obi_version), indent=2),
@@ -1139,7 +1139,7 @@ class BadgeInstance(BaseAuditedModel,
         if include_extra:
             extra = self.get_filtered_json()
             if extra is not None:
-                for k,v in extra.items():
+                for k,v in list(extra.items()):
                     if k not in json:
                         json[k] = v
 
@@ -1179,7 +1179,7 @@ class BadgeInstance(BaseAuditedModel,
     @evidence_items.setter
     def evidence_items(self, value):
         def _key(narrative, url):
-            return u'{}-{}'.format(narrative or '', url or '')
+            return '{}-{}'.format(narrative or '', url or '')
         existing_evidence_idx = {_key(e.narrative, e.evidence_url): e for e in self.evidence_items}
         new_evidence_idx = {_key(v.get('narrative', None), v.get('evidence_url', None)): v for v in value}
 
@@ -1225,7 +1225,7 @@ class BadgeInstance(BaseAuditedModel,
                 include_extra=True
             )
             badgeclass_name, ext = os.path.splitext(self.badgeclass.image.file.name)
-            new_image = StringIO.StringIO()
+            new_image = io.BytesIO()
             bake(image_file=self.cached_badgeclass.image.file,
                  assertion_json_string=json_dumps(json_to_bake, indent=2),
                  output_file=new_image)
@@ -1329,7 +1329,7 @@ class BadgeClassTag(cachemodel.CacheModel):
     badgeclass = models.ForeignKey('issuer.BadgeClass')
     name = models.CharField(max_length=254, db_index=True)
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
     def publish(self):
