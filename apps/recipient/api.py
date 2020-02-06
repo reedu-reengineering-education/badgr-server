@@ -10,8 +10,8 @@ from recipient.models import RecipientGroup
 from recipient.serializers_v1 import RecipientGroupSerializerV1, IssuerRecipientGroupListSerializerV1
 from recipient.serializers_v2 import RecipientGroupSerializerV2
 
-_TRUE_VALUES = ['true','t','on','yes','y','1',1,1.0,True]
-_FALSE_VALUES = ['false','f','off','no','n','0',0,0.0,False]
+_TRUE_VALUES = ['true', 't', 'on', 'yes', 'y', '1', 1, 1.0, True]
+_FALSE_VALUES = ['false', 'f', 'off', 'no', 'n', '0', 0, 0.0, False]
 
 
 def _scrub_boolean(boolean_str, default=None):

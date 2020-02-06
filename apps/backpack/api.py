@@ -316,7 +316,7 @@ class ShareBackpackAssertion(BaseEntityDetailView):
         if not badge:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        include_identifier = 'include_identifier' in request.query_params
+        include_identifier = _scrub_boolean(request.query_params.get('include_identifier', False))
 
         share = BackpackBadgeShare(provider=provider, badgeinstance=badge, source=source)
         share_url = share.get_share_url(provider, include_identifier=include_identifier)
