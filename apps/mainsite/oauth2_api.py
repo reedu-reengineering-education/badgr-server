@@ -16,7 +16,7 @@ from oauth2_provider.views.mixins import OAuthLibMixin
 from oauthlib.oauth2.rfc6749.utils import scope_to_list
 from rest_framework import serializers
 from rest_framework.response import Response
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_200_OK, HTTP_201_CREATED
+from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
 from rest_framework.views import APIView
 
 import badgrlog
@@ -27,6 +27,7 @@ from mainsite.oauth_validator import BadgrRequestValidator, BadgrOauthServer
 from mainsite.utils import client_ip_from_request, throttleable
 
 badgrlogger = badgrlog.BadgrLogger()
+
 
 class AuthorizationSerializer(serializers.Serializer):
     client_id = serializers.CharField(required=True)
@@ -253,7 +254,6 @@ class RegisterApiView(APIView):
 
 
 class TokenView(OAuth2ProviderTokenView):
-
     server_class = BadgrOauthServer
     validator_class = BadgrRequestValidator
 
