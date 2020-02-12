@@ -3,32 +3,33 @@ from .base import BaseBadgrEvent
 
 
 class BadgeUploaded(BaseBadgrEvent):
-
-    def __init__(self, instance_json, badge_check, user):
-        self.instance_json = instance_json
-        self.badge_check = badge_check
-        self.user = user
+    def __init__(self, instance):
+        self.instance = instance
 
     def to_representation(self):
         return {
-            'username': self.user.username,
-            'badgeInstance': self.instance_json,
-            'results': self.badge_check.results
+            'user_entityId': self.instance.recipient_user.entity_id,
+            'badgeInstance': self.instance
         }
+
+
+class InvalidBadgeUploadReport:
+    def __init__(self, image_data, user_entity_id, error_name, error_result):
+        self.image_data = image_data
+        self.user_entity_id = user_entity_id
+        self.error_name = error_name
+        self.error_result = error_result
 
 
 class InvalidBadgeUploaded(BaseBadgrEvent):
 
-    def __init__(self, components, error, user):
-        self.components = components
-        self.error = error
-        self.user = user
+    def __init__(self, error_report):
+        self.error_report = error_report
 
     def to_representation(self):
         return {
-            'username': self.user.username,
-            'badgeInstance': self.components.badge_instance,
-            'badge': self.components.badge_class,
-            'issuer': self.components.issuer,
-            'error': self.error
+            'userId': self.error_report.user_entity_id,
+            'imageData': self.error_report.image_data,
+            'errorName': self.error_report.error_name,
+            'errorMessage': self.error_report.error_result
         }
