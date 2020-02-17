@@ -531,7 +531,23 @@ class BadgeInstanceDetail(BaseEntityDetailView):
             ('400', {
                 'description': "Assertion is already revoked"
             })
-        ])
+        ]),
+        parameters=[{
+            "in": "body",
+            "name": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "revocation_reason": {
+                        "type": "string",
+                        "format": "string",
+                        'description': "The reason for revoking this assertion",
+                        'required': False
+                    },
+                }
+            }
+        }]
     )
     def delete(self, request, **kwargs):
         # verify the user has permission to the assertion
