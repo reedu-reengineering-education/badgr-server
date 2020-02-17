@@ -53,6 +53,18 @@ class TestShareProviders(SetupIssuerHelper, BadgrTestCase):
         share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
         share_url = share.get_share_url(provider, include_identifier=True)
 
+    def test_unsupported_share_provider_returns_404(self):
+        provider = 'unsupported_share_provider'
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_assertion = test_badgeclass.issue(recipient_id="nobody@example.com")
+        get_response = self.client.get('/v1/earner/share/badge/{badge_id}?provider={provider}'.format(
+            badge_id=test_assertion.entity_id,
+            provider=provider
+        ))
+        self.assertEqual(get_response.status_code, 404)
+
 
 class TestBadgeUploads(BadgrTestCase):
     def test_uniqueness(self):
