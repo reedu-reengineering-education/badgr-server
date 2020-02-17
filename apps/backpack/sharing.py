@@ -1,6 +1,7 @@
 import urllib
 
 from django.conf import settings
+from django.http import Http404
 
 from issuer.models import BadgeInstance
 
@@ -115,7 +116,7 @@ class SharingManager(object):
     def share_url(cls, provider, badge_instance, include_identifier=False, **kwargs):
         manager_cls = SharingManager.ManagerProviders.get(provider.lower(), None)
         if manager_cls is None:
-            raise NotImplementedError(u"Provider not supported: {}".format(provider))
+            raise Http404(u"Provider not supported: {}".format(provider))
         manager = manager_cls(provider)
         url = manager.share_url(badge_instance, include_identifier=include_identifier)
         return url
