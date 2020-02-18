@@ -1,9 +1,12 @@
 # encoding: utf-8
 from __future__ import unicode_literals
 
+import badgrlog
+
 from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.response import Response
+from rest_framework import serializers
 from rest_framework import status
 
 from backpack.models import BackpackCollection, BackpackBadgeShare, BackpackCollectionShare
@@ -18,11 +21,13 @@ from apispec_drf.decorators import apispec_list_operation, apispec_post_operatio
     apispec_delete_operation, apispec_put_operation, apispec_operation
 from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 
+logger = badgrlog.BadgrLogger()
 
 class BackpackAssertionList(BaseEntityListView):
     model = BadgeInstance
     v1_serializer_class = LocalBadgeInstanceUploadSerializerV1
     v2_serializer_class = BackpackAssertionSerializerV2
+    create_event = badgrlog.BadgeUploaded
     permission_classes = (AuthenticatedWithVerifiedIdentifier, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
     http_method_names = ('get', 'post')
     valid_scopes = {
@@ -79,9 +84,35 @@ class BackpackAssertionList(BaseEntityListView):
     )
     def post(self, request, **kwargs):
         if kwargs.get('version', 'v1') == 'v1':
-            return super(BackpackAssertionList, self).post(request, **kwargs)
-
+            try:
+                return super(BackpackAssertionList, self).post(request, **kwargs)
+            except serializers.ValidationError as e:
+                self.log_not_created(e)
+                raise e
         raise NotImplementedError("use BackpackImportBadge.post instead")
+
+    def log_not_created(self, error):
+        request = self.request
+        user = request.user
+        image_data = ''
+        user_entity_id = ''
+        error_name = ''
+        error_result = ''
+
+        if request.data.get('image', None) is not None:
+            image_data = request.data.get('image', '')[:1024]
+
+        if user is not None:
+            user_entity_id = user.entity_id
+
+        if len(error.detail) <= 1:
+            #grab first error
+            e = error.detail[0]
+            error_name = e.get('name', '')
+            error_result = e.get('result', '')
+
+        invalid_badge_upload_report = badgrlog.InvalidBadgeUploadReport(image_data, user_entity_id, error_name, error_result)
+        logger.event(badgrlog.InvalidBadgeUploaded(invalid_badge_upload_report))
 
     def get_context_data(self, **kwargs):
         context = super(BackpackAssertionList, self).get_context_data(**kwargs)
