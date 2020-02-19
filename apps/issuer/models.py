@@ -780,7 +780,7 @@ class BadgeInstance(BaseAuditedModel,
     def get_share_url(self, include_identifier=False):
         url = self.share_url
         if include_identifier:
-            url = '%s?identifier__%s=%s' % (url, self.recipient_type, urllib.quote(self.recipient_identifier))
+            url = '%s?identity__%s=%s' % (url, self.recipient_type, urllib.quote(self.recipient_identifier))
         return url
 
     @property
