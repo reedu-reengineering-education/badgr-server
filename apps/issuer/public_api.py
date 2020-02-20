@@ -382,6 +382,7 @@ class BadgeInstanceJson(JSONComponentView):
         )
 
         return dict(
+            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
             title=self.current_object.cached_badgeclass.name,
             description=self.current_object.cached_badgeclass.description,
             public_url=self.current_object.public_url,
@@ -531,6 +532,7 @@ class OEmbedAPIEndpoint(APIView):
         badgeclass = badgeinstance.cached_badgeclass
         issuer = badgeinstance.cached_issuer
         badgrapp = BadgrApp.objects.get_current(request)
+        wide_thumbnail_url = badgeinstance.image_url() + '?fmt=wide'
 
         data = {
             'type': 'rich',
@@ -540,7 +542,7 @@ class OEmbedAPIEndpoint(APIView):
             'author_url': issuer.url,
             'provider_name': badgrapp.name,
             'provider_url': badgrapp.ui_login_redirect,
-            'thumbnail_url': badgeinstance.image_url(),
+            'thumbnail_url': wide_thumbnail_url,
             'thumnail_width': 200,  # TODO: get real data; respect maxwidth
             'thumbnail_height': 200,  # TODO: get real data; respect maxheight
             'width': constrained_width,
@@ -554,6 +556,7 @@ class OEmbedAPIEndpoint(APIView):
         )
 
         return Response(data, status=status.HTTP_200_OK)
+
 
 
 class VerifyBadgeAPIEndpoint(JSONComponentView):
