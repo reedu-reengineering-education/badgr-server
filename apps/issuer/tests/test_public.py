@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import io
 import json
+import urllib
 
 import responses
 from django.urls import reverse
@@ -11,7 +12,8 @@ from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V1_URI, OP
 from openbadges_bakery import unbake
 
 from backpack.models import BackpackCollection, BackpackCollectionBadgeInstance
-from backpack.tests import setup_resources, setup_basic_1_0
+from backpack.tests.utils import setup_resources, setup_basic_1_0
+from badgeuser.models import CachedEmailAddress
 from issuer.models import Issuer, BadgeInstance
 from issuer.utils import CURRENT_OBI_VERSION, OBI_VERSION_CONTEXT_IRIS, UNVERSIONED_BAKED_VERSION
 from mainsite.models import BadgrApp
@@ -66,7 +68,7 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
 
-        with self.assertNumQueries(0):
+        with self.assertNumQueries(1):
             response = self.client.get('/public/assertions/{}'.format(assertion.entity_id),
                                        **{'HTTP_ACCEPT': 'application/json'})
             self.assertEqual(response.status_code, 200)
@@ -83,7 +85,7 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
 
-        with self.assertNumQueries(0):
+        with self.assertNumQueries(1):
             response = self.client.get('/public/assertions/{}'.format(assertion.entity_id))
             self.assertEqual(response.status_code, 200)
 
@@ -99,6 +101,7 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         assertion = test_badgeclass.issue(recipient_id=test_user_email)
+        assertion.pending  # prepopulate cache
 
         # create a shared collection
         test_collection = BackpackCollection.objects.create(created_by=test_user, name='Test Collection', description="testing")
@@ -139,10 +142,39 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
                 self.assertTrue(response.get('content-type').startswith('text/html'))
                 self.assertContains(response, '<meta property="og:url" content="{}">'.format(test_collection.share_url), html=True)
 
+    def test_public_collection_json(self):
+        test_user_email = 'test.user@email.test'
+
+        test_user = self.setup_user(authenticate=False, email=test_user_email)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(recipient_id=test_user_email)
+        assertion.pending  # prepopulate cache
+
+        # create a shared collection
+        test_collection = BackpackCollection.objects.create(created_by=test_user, name='Test Collection',
+                                                            description="testing")
+        BackpackCollectionBadgeInstance.objects.create(collection=test_collection, badgeinstance=assertion,
+                                                       badgeuser=test_user)  # add assertion to collection
+        test_collection.published = True
+        test_collection.save()
+        self.assertIsNotNone(test_collection.share_url)
+
+        response = self.client.get(
+            '/public/collections/{}'.format(test_collection.share_hash), header={'Accept': 'application/json'}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['entityId'], test_collection.entity_id)
+
+
     def test_get_assertion_html_redirects_to_frontend(self):
-        badgr_app = BadgrApp(cors='frontend.ui',
-                             public_pages_redirect='http://frontend.ui/public')
+        badgr_app = BadgrApp(
+            cors='frontend.ui', is_default=True, signup_redirect='http://frontend.ui/signup', public_pages_redirect='http://frontend.ui/public'
+        )
         badgr_app.save()
+
+        badgr_app_two = BadgrApp(cors='stuff.com', is_default=False, signup_redirect='http://stuff.com/signup', public_pages_redirect='http://stuff.com/public')
+        badgr_app_two.save()
 
         redirect_accepts = [
             {'HTTP_ACCEPT': 'application/xml,application/xhtml+xml,text/html;q=0.9, text/plain;q=0.8,image/png,*/*;q=0.5'},  # safari/chrome
@@ -154,24 +186,25 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
             {},  # no accept header
         ]
 
-        with self.settings(BADGR_APP_ID=badgr_app.id):
-            test_user = self.setup_user(authenticate=False)
-            test_issuer = self.setup_issuer(owner=test_user)
-            test_issuer.cached_badgrapp  # publish badgrapp to cache
-            test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
-            assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_issuer.badgrapp = badgr_app_two
+        test_issuer.save()
+        test_issuer.cached_badgrapp  # publish badgrapp to cache
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
 
-            for headers in redirect_accepts:
-                with self.assertNumQueries(0):
-                    response = self.client.get('/public/assertions/{}'.format(assertion.entity_id), **headers)
-                    self.assertEqual(response.status_code, 302)
-                    self.assertEqual(response.get('Location'), 'http://frontend.ui/public/assertions/{}'.format(assertion.entity_id))
+        for headers in redirect_accepts:
+            with self.assertNumQueries(2):
+                response = self.client.get('/public/assertions/{}'.format(assertion.entity_id), **headers)
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.get('Location'), 'http://stuff.com/public/assertions/{}'.format(assertion.entity_id))
 
-            for headers in json_accepts:
-                with self.assertNumQueries(0):
-                    response = self.client.get('/public/assertions/{}'.format(assertion.entity_id), **headers)
-                    self.assertEqual(response.status_code, 200)
-                    self.assertEqual(response.get('Content-Type'), "application/ld+json")
+        for headers in json_accepts:
+            with self.assertNumQueries(1):
+                response = self.client.get('/public/assertions/{}'.format(assertion.entity_id), **headers)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get('Content-Type'), "application/ld+json")
 
     @responses.activate
     def test_uploaded_badge_returns_coerced_json(self):
@@ -255,3 +288,70 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get('/public/assertions/{}?expand=badge'.format(assertion.entity_id), Accept='application/json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.get('badge', {}).get('name', None), new_badgeclass_name)
+
+
+class PendingAssertionsPublicAPITests(SetupIssuerHelper, BadgrTestCase):
+    @responses.activate
+    def test_pending_assertion_returns_404(self):
+        setup_resources([
+            {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png"},
+        ])
+        unverified_email = 'test@example.com'
+        test_user = self.setup_user(email='verified@example.com', authenticate=True)
+        CachedEmailAddress.objects.add_email(test_user, unverified_email)
+        post_input = {"url": "http://a.com/assertion-embedded1"}
+
+        post_resp = self.client.post('/v2/backpack/import', post_input, format='json')
+        assertion = BadgeInstance.objects.first()
+
+        self.client.logout()
+        get_resp = self.client.get('/public/assertions/{}'.format(assertion.entity_id))
+        self.assertEqual(get_resp.status_code, 404)
+
+
+class OEmbedTests(SetupIssuerHelper, BadgrTestCase):
+    """
+    oEmbed url schemes:
+      - {HTTP_ORIGIN}/public/assertions/{entity_id}/embed
+
+    oEmbed API endpoint:
+      - {HTTP_ORIGIN}/public/oembed?format=json&url={HTTP_ORIGIN}/public/assertions/{entity_id}
+
+
+    """
+
+    def test_get_oembed_json(self):
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        # with self.assertNumQueries(0):
+        response = self.client.get('/public/oembed?format=json&url={}'.format(urllib.quote(assertion.jsonld_id)))
+        self.assertEqual(response.status_code, 200)
+
+    def test_endpoint_handles_malformed_urls(self):
+        response = self.client.get('/public/oembed?format=json&url={}'.format(urllib.quote('ralph the dog')))
+        self.assertEqual(response.status_code, 404)
+
+    def test_auto_discovery_of_api_endpoint(self):
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        response = self.client.get(
+            '/public/assertions/{}'.format(assertion.entity_id),
+            HTTP_USER_AGENT='Mozilla/5.0 (compatible; Embedly/0.2; +http://support.embed.ly/)',
+            HTTP_ACCEPT='text/html,application/xml,application/xhtml+xml;q=0.9,text//plain;q0.8,image/png,*/*;q=0.5'
+
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'oembed')
+
+
+class PublicReverificationTests(BadgrTestCase):
+    def test_can_reverify_basic(self):
+        pass

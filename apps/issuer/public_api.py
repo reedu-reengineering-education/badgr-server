@@ -1,8 +1,11 @@
-import StringIO
 import os
 import re
+import StringIO
+import urllib
+import urlparse
 
 import cairosvg
+import openbadges
 from PIL import Image
 from django.conf import settings
 from django.core.files.storage import DefaultStorage
@@ -10,10 +13,10 @@ from django.core.urlresolvers import resolve, reverse, Resolver404, NoReverseMat
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import redirect, render_to_response
 from django.views.generic import RedirectView
+from entity.serializers import BaseSerializerV2
 from rest_framework import status, permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.status import HTTP_400_BAD_REQUEST
 from rest_framework.views import APIView
 
 import badgrlog
@@ -21,9 +24,8 @@ import utils
 from backpack.models import BackpackCollection
 from entity.api import VersionedObjectMixin
 from mainsite.models import BadgrApp
-from mainsite.utils import OriginSetting
+from mainsite.utils import OriginSetting, set_url_query_params, first_node_match
 from .models import Issuer, BadgeClass, BadgeInstance
-
 logger = badgrlog.BadgrLogger()
 
 
@@ -63,6 +65,7 @@ class JSONComponentView(VersionedObjectMixin, APIView, SlugToEntityIdRedirectMix
     Abstract Component Class
     """
     permission_classes = (permissions.AllowAny,)
+    allow_any_unauthenticated_access = True
     authentication_classes = ()
     html_renderer_class = None
     template_name = 'public/bot_openbadge.html'
@@ -220,7 +223,10 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
                 with storage.open(image_prop.name, 'rb') as input_svg:
                     svg_buf = StringIO.StringIO()
                     out_buf = StringIO.StringIO()
-                    cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
+                    try:
+                        cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
+                    except IOError:
+                        return redirect(storage.url(image_prop.name))  # If conversion fails, return existing file.
                     img = Image.open(svg_buf)
 
                     img = _fit_to_height(img, supported_fmts[image_fmt])
@@ -346,6 +352,11 @@ class BadgeInstanceJson(JSONComponentView):
     permission_classes = (permissions.AllowAny,)
     model = BadgeInstance
 
+    def has_object_permissions(self, request, obj):
+        if obj.pending:
+            raise Http404
+        return super(BadgeInstanceJson, self).has_object_permissions(request, obj)
+
     def get_json(self, request):
         expands = request.GET.getlist('expand', [])
         json = super(BadgeInstanceJson, self).get_json(
@@ -363,11 +374,19 @@ class BadgeInstanceJson(JSONComponentView):
         )
         if self.is_wide_bot():
             image_url = "{}&fmt=wide".format(image_url)
+
+        oembed_link_url = '{}{}?format=json&url={}'.format(
+            getattr(settings, 'HTTP_ORIGIN'),
+            reverse('oembed_api_endpoint'),
+            urllib.quote(self.current_object.public_url)
+        )
+
         return dict(
             title=self.current_object.cached_badgeclass.name,
             description=self.current_object.cached_badgeclass.description,
             public_url=self.current_object.public_url,
-            image_url=image_url
+            image_url=image_url,
+            oembed_link_url=oembed_link_url
         )
 
 
@@ -421,6 +440,7 @@ class BackpackCollectionJson(JSONComponentView):
 
 class BakedBadgeInstanceImage(VersionedObjectMixin, APIView, SlugToEntityIdRedirectMixin):
     permission_classes = (permissions.AllowAny,)
+    allow_any_unauthenticated_access = True
     model = BadgeInstance
 
     def get(self, request, **kwargs):
@@ -441,3 +461,184 @@ class BakedBadgeInstanceImage(VersionedObjectMixin, APIView, SlugToEntityIdRedir
         redirect_url = assertion.get_baked_image_url(obi_version=requested_version)
 
         return redirect(redirect_url, permanent=True)
+
+
+
+class OEmbedAPIEndpoint(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    @staticmethod
+    def get_object(url):
+        request_url = urlparse.urlparse(url)
+
+        try:
+            resolved = resolve(request_url.path)
+        except Http404:
+            raise Http404("Cannot find resource.")
+
+        if resolved.url_name == 'badgeinstance_json':
+            return BadgeInstance.cached.get(entity_id=resolved.kwargs.get('entity_id'))
+        raise Http404('Cannot find resource.')
+
+    def get_badgrapp_redirect(self, entity):
+        badgrapp = entity.cached_badgrapp
+        if not badgrapp or not badgrapp.public_pages_redirect:
+            badgrapp = BadgrApp.objects.get_current(request=None)  # use the default badgrapp
+
+        redirect_url = badgrapp.public_pages_redirect
+        if not redirect_url:
+            redirect_url = 'https://{}/public/'.format(badgrapp.cors)
+        else:
+            if not redirect_url.endswith('/'):
+                redirect_url += '/'
+
+        path = entity.get_absolute_url()
+        stripped_path = re.sub(r'^/public/', '', path)
+        ret = '{redirect}{path}'.format(
+            redirect=redirect_url,
+            path=stripped_path)
+        ret = set_url_query_params(ret, embedVersion=2)
+        return ret
+
+    def get_max_constrained_height(self, request):
+        min_height = 420
+        height = int(request.query_params.get('maxwidth', min_height))
+        return max(min_height, height)
+
+    def get_max_constrained_width(self, request):
+        max_width = 800
+        min_width = 320
+        width = int(request.query_params.get('maxwidth', max_width))
+        return max(min_width, min(width, max_width))
+
+    def get(self, request, **kwargs):
+        try:
+            url = request.query_params.get('url')
+            constrained_height = self.get_max_constrained_height(request)
+            constrained_width = self.get_max_constrained_width(request)
+            response_format = request.query_params.get('format', 'json')
+        except (TypeError, ValueError):
+            raise ValidationError("Cannot parse OEmbed request parameters.")
+
+        if response_format != 'json':
+            return Response("Only json format is supported at this time.", status=status.HTTP_501_NOT_IMPLEMENTED)
+
+        try:
+            badgeinstance = self.get_object(url)
+        except BadgeInstance.DoesNotExist:
+            raise Http404("Object to embed not found.")
+
+        badgeclass = badgeinstance.cached_badgeclass
+        issuer = badgeinstance.cached_issuer
+        badgrapp = BadgrApp.objects.get_current(request)
+
+        data = {
+            'type': 'rich',
+            'version': '1.0',
+            'title': badgeclass.name,
+            'author_name': issuer.name,
+            'author_url': issuer.url,
+            'provider_name': badgrapp.name,
+            'provider_url': badgrapp.ui_login_redirect,
+            'thumbnail_url': badgeinstance.image_url(),
+            'thumnail_width': 200,  # TODO: get real data; respect maxwidth
+            'thumbnail_height': 200,  # TODO: get real data; respect maxheight
+            'width': constrained_width,
+            'height': constrained_height
+        }
+
+        data['html'] = """<iframe src="{src}" frameborder="0" width="{width}px" height="{height}px"></iframe>""".format(
+            src=self.get_badgrapp_redirect(badgeinstance),
+            width=constrained_width,
+            height=constrained_height
+        )
+
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class VerifyBadgeAPIEndpoint(JSONComponentView):
+    permission_classes = (permissions.AllowAny,)
+    @staticmethod
+    def get_object(entity_id):
+        try:
+            return BadgeInstance.cached.get(entity_id=entity_id)
+
+        except BadgeInstance.DoesNotExist:
+            raise Http404
+
+    def post(self, request, **kwargs):
+        entity_id = request.data.get('entity_id')
+        badge_instance = self.get_object(entity_id)
+
+        #only do badgecheck verify if not a local badge
+        if (badge_instance.source_url):
+            recipient_profile = {
+                badge_instance.recipient_type: badge_instance.recipient_identifier
+            }
+
+            badge_check_options = {
+                'include_original_json': True,
+                'use_cache': True,
+            }
+
+            try:
+                response = openbadges.verify(badge_instance.jsonld_id, recipient_profile=recipient_profile, **badge_check_options)
+            except ValueError as e:
+                raise ValidationError([{'name': "INVALID_BADGE", 'description': str(e)}])
+
+            graph = response.get('graph', [])
+
+            revoked_obo = first_node_match(graph, dict(revoked=True))
+
+            if bool(revoked_obo):
+                instance = BadgeInstance.objects.get(source_url=revoked_obo['id'])
+                instance.revoke(revoked_obo.get('revocationReason', 'Badge is revoked'))
+
+            else:
+                report = response.get('report', {})
+                is_valid = report.get('valid')
+
+                if not is_valid:
+                    if report.get('errorCount', 0) > 0:
+                        errors = [{'name': 'UNABLE_TO_VERIFY', 'description': 'Unable to verify the assertion'}]
+                    raise ValidationError(errors)
+
+                validation_subject = report.get('validationSubject')
+
+                badge_instance_obo = first_node_match(graph, dict(id=validation_subject))
+                if not badge_instance_obo:
+                    raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find an badge instance'}])
+
+                badgeclass_obo = first_node_match(graph, dict(id=badge_instance_obo.get('badge', None)))
+                if not badgeclass_obo:
+                    raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find a badgeclass'}])
+
+                issuer_obo = first_node_match(graph, dict(id=badgeclass_obo.get('issuer', None)))
+                if not issuer_obo:
+                    raise ValidationError([{'name': 'ASSERTION_NOT_FOUND', 'description': 'Unable to find an issuer'}])
+
+                original_json = response.get('input').get('original_json', {})
+
+                BadgeInstance.objects.update_from_ob2(
+                    badge_instance.badgeclass,
+                    badge_instance_obo,
+                    badge_instance.recipient_identifier,
+                    badge_instance.recipient_type,
+                    original_json.get(badge_instance_obo.get('id', ''), None)
+                )
+
+                badge_instance.rebake(save=True)
+
+                BadgeClass.objects.update_from_ob2(
+                    badge_instance.issuer,
+                    badgeclass_obo,
+                    original_json.get(badgeclass_obo.get('id', ''), None)
+                )
+
+                Issuer.objects.update_from_ob2(
+                    issuer_obo,
+                    original_json.get(issuer_obo.get('id', ''), None)
+                )
+        result = self.get_object(entity_id).get_json(expand_badgeclass=True, expand_issuer=True)
+
+        return Response(BaseSerializerV2.response_envelope([result], True, 'OK'), status=status.HTTP_200_OK)

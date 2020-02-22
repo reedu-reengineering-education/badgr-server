@@ -1,10 +1,8 @@
 # encoding: utf-8
 from __future__ import unicode_literals
-import urlparse
 
-from django.apps import apps
+from apispec_drf.decorators import apispec_list_operation, apispec_operation
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status, authentication
 from rest_framework.exceptions import ValidationError, PermissionDenied, NotFound
 from rest_framework.response import Response
@@ -12,18 +10,13 @@ from rest_framework.views import APIView
 
 import badgrlog
 from badgeuser.models import CachedEmailAddress
-from entity.api import BaseEntityListView, BaseEntityDetailView, VersionedObjectMixin
-from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance
-from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass,
-                                IsEditor, IsStaff, IsOwnerOrStaff, ApprovedIssuersOnly)
-from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
-                                   BadgeInstanceSerializerV1, IssuerRoleActionSerializerV1,
-                                   IssuerStaffSerializerV1)
-from issuer.serializers_v2 import IssuerSerializerV2
+from entity.api import VersionedObjectMixin
+from issuer.models import Issuer, IssuerStaff
+from issuer.permissions import IsOwnerOrStaff, BadgrOAuthTokenHasEntityScope
+from issuer.serializers_v1 import BadgeClassSerializerV1, IssuerRoleActionSerializerV1, IssuerStaffSerializerV1
 from issuer.utils import get_badgeclass_by_identifier
-from apispec_drf.decorators import apispec_list_operation, apispec_operation
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
-
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier, IsServerAdmin
+from mainsite.utils import throttleable
 
 logger = badgrlog.BadgrLogger()
 
@@ -34,7 +27,7 @@ class AbstractIssuerAPIEndpoint(APIView):
         authentication.SessionAuthentication,
         authentication.BasicAuthentication,
     )
-    permission_classes = (AuthenticatedWithVerifiedEmail,)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier,)
 
     def get_object(self, slug, queryset=None):
         """ Ensure user has permissions on Issuer """
@@ -78,7 +71,12 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
     role = 'staff'
     queryset = Issuer.objects.all()
     model = Issuer
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsOwnerOrStaff,)
+    permission_classes = [
+        IsServerAdmin |
+        (AuthenticatedWithVerifiedIdentifier & IsOwnerOrStaff) |
+        BadgrOAuthTokenHasEntityScope
+    ]
+    valid_scopes = ["rw:issuerOwner:*"]
 
     @apispec_list_operation('IssuerStaff',
         tags=['Issuers'],
@@ -88,7 +86,9 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
         current_issuer = self.get_object(request, **kwargs)
         if not self.has_object_permissions(request, current_issuer):
             return Response(
-                "Issuer %s not found. Authenticated user must have owner, editor or staff rights on the issuer." % slug,
+                "Issuer %s not found. Authenticated user must have owner, editor or staff rights on the issuer.".format(
+                    kwargs.get('slug')
+                ),
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -105,6 +105,7 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
         tags=['Issuers'],
         summary="Add or remove a user from a role on an issuer. Limited to Owner users only"
     )
+    @throttleable
     def post(self, request, **kwargs):
         """
         ---
@@ -142,15 +143,8 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         current_issuer = self.get_object(request, **kwargs)
-        if not self.has_object_permissions(request, current_issuer):
-            return Response(
-                "Issuer not found. Authenticated user must be Issuer's owner to modify user permissions.",
-                status=status.HTTP_404_NOT_FOUND
-            )
 
-        if not request.user.is_superuser and request.user not in current_issuer.owners:
-            raise PermissionDenied("Must be an owner of an issuer profile to modify permissions")
-
+        user_id = None
         try:
             if serializer.validated_data.get('username'):
                 user_id = serializer.validated_data.get('username')
@@ -160,7 +154,7 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
                 user_to_modify = CachedEmailAddress.objects.get(
                     email=user_id, verified=True).user
         except (get_user_model().DoesNotExist, CachedEmailAddress.DoesNotExist,):
-            error_text = "User not found. Email must be verified and correspond to an existing user."
+            error_text = "User not found. Email must correspond to an existing user."
             if user_id is None:
                 error_text = 'User not found. Neither email address or username was provided.'
             return Response(
@@ -199,7 +193,7 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
 
         elif action == 'remove':
             IssuerStaff.objects.filter(user=user_to_modify, issuer=current_issuer).delete()
-            current_issuer.publish()
+            current_issuer.publish(publish_staff=False)
             user_to_modify.publish()
             return Response(
                 "User %s has been removed from %s staff." % (user_to_modify.username, current_issuer.name),
@@ -215,7 +209,7 @@ class FindBadgeClassDetail(APIView):
     """
     GET a specific BadgeClass by searching by identifier
     """
-    permission_classes = (AuthenticatedWithVerifiedEmail,)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier,)
 
     @apispec_operation(
         summary="Get a specific BadgeClass by searching by identifier",

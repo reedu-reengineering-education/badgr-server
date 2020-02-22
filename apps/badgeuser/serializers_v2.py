@@ -2,19 +2,21 @@ import base64
 from collections import OrderedDict
 
 from rest_framework import serializers
+from django.contrib.auth.hashers import is_password_usable
 
 from badgeuser.models import BadgeUser, TermsVersion
 from badgeuser.utils import notify_on_password_change
-from entity.serializers import DetailSerializerV2, BaseSerializerV2
+from entity.serializers import DetailSerializerV2, BaseSerializerV2, ListSerializerV2
 from mainsite.models import BadgrApp
-from mainsite.serializers import StripTagsCharField
+from mainsite.serializers import DateTimeWithUtcZAtEndField, StripTagsCharField
 from mainsite.validators import PasswordValidator
 
 
 class BadgeUserEmailSerializerV2(DetailSerializerV2):
     email = serializers.EmailField()
     verified = serializers.BooleanField(read_only=True)
-    primary = serializers.BooleanField(required=False)
+    primary = serializers.BooleanField(required=False, default=False)
+    caseVariants = serializers.ListField(child=serializers.CharField(), required=False, source='cached_variant_emails')
 
     class Meta(DetailSerializerV2.Meta):
         apispec_definition = ('BadgeUserEmail', {
@@ -42,8 +44,30 @@ class BadgeUserSerializerV2(DetailSerializerV2):
     password = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False, validators=[PasswordValidator()])
     currentPassword = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False)
     emails = BadgeUserEmailSerializerV2(many=True, source='email_items', required=False)
+    url = serializers.ListField(read_only=True, source='cached_verified_urls')
+    telephone = serializers.ListField(read_only=True, source='cached_verified_phone_numbers')
     agreedTermsVersion = serializers.IntegerField(source='agreed_terms_version', required=False)
+    hasAgreedToLatestTermsVersion = serializers.SerializerMethodField(read_only=True)
     marketingOptIn = serializers.BooleanField(source='marketing_opt_in', required=False)
+    badgrDomain = serializers.CharField(read_only=True, max_length=255, source='badgrapp')
+    hasPasswordSet = serializers.SerializerMethodField('get_has_password_set')
+    recipient = serializers.SerializerMethodField(read_only=True)
+
+    def get_has_password_set(self, obj):
+        return is_password_usable(obj.password)
+
+    def get_recipient(self, obj):
+        primary_email = next((e for e in obj.cached_emails() if e.primary), None)
+        if primary_email:
+            return dict(type='email', identity=primary_email.email)
+        identifier = obj.userrecipientidentifier_set.filter(verified=True).order_by('pk').first()
+        if identifier:
+            return dict(type=identifier.type, identity=identifier.identifier)
+        return None
+
+    def get_hasAgreedToLatestTermsVersion(self, obj):
+        latest = TermsVersion.cached.cached_latest()
+        return obj.agreed_terms_version == latest.version
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeUser
@@ -79,12 +103,12 @@ class BadgeUserSerializerV2(DetailSerializerV2):
 
         if password:
             if not current_password:
-                raise serializers.ValidationError({'currrent_password': "Field is required"})
+                raise serializers.ValidationError({'current_password': "Field is required"})
             if instance.check_password(current_password):
                 instance.set_password(password)
                 notify_on_password_change(instance)
             else:
-                raise serializers.ValidationError({'currrent_password': "Incorrect password"})
+                raise serializers.ValidationError({'current_password': "Incorrect password"})
 
         instance.badgrapp = BadgrApp.objects.get_current(request=self.context.get('request', None))
 
@@ -112,6 +136,7 @@ class BadgeUserTokenSerializerV2(BaseSerializerV2):
     token = serializers.CharField(read_only=True, source='cached_token')
 
     class Meta:
+        list_serializer_class = ListSerializerV2
         apispec_definition = ('BadgeUserToken', {
             'properties': OrderedDict([
                 ('token', {
@@ -137,9 +162,16 @@ class ApplicationInfoSerializer(serializers.Serializer):
 class AccessTokenSerializerV2(DetailSerializerV2):
     application = ApplicationInfoSerializer(source='applicationinfo')
     scope = serializers.CharField(read_only=True)
-    expires = serializers.DateTimeField(read_only=True)
-    created = serializers.DateTimeField(read_only=True)
+    expires = DateTimeWithUtcZAtEndField(read_only=True)
+    created = DateTimeWithUtcZAtEndField(read_only=True)
 
     class Meta:
+        list_serializer_class = ListSerializerV2
         apispec_definition = ('AccessToken', {})
 
+
+class TermsVersionSerializerV2(DetailSerializerV2):
+    version = serializers.IntegerField(read_only=True)
+    shortDescription = serializers.CharField(read_only=True, source='short_description')
+    created = DateTimeWithUtcZAtEndField(read_only=True, source='created_at')
+    updated = DateTimeWithUtcZAtEndField(read_only=True, source='updated_at')

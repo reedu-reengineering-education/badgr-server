@@ -4,6 +4,8 @@ from rest_framework.pagination import CursorPagination
 
 class BadgrCursorPagination(CursorPagination):
     ordering = '-created_at'
+    page_size_query_param = 'num'
+    offset_cutoff = 15000
 
     def __init__(self, ordering=None, page_size=None):
         if ordering is not None:

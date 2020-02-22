@@ -8,12 +8,13 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError as RestframeworkValidationError
 
 from backpack.models import BackpackCollection
+from badgeuser.models import BadgeUser
 from entity.serializers import DetailSerializerV2, EntityRelatedFieldV2
 from issuer.helpers import BadgeCheckHelper
 from issuer.models import BadgeInstance, BadgeClass, Issuer
 from issuer.serializers_v2 import BadgeRecipientSerializerV2, EvidenceItemSerializerV2
 from mainsite.drf_fields import ValidImageField
-from mainsite.serializers import MarkdownCharField, HumanReadableBooleanField, OriginalJsonSerializerMixin
+from mainsite.serializers import DateTimeWithUtcZAtEndField, MarkdownCharField, HumanReadableBooleanField, OriginalJsonSerializerMixin
 from issuer.utils import generate_sha256_hashstring, CURRENT_OBI_VERSION
 
 
@@ -29,12 +30,13 @@ class BackpackAssertionSerializerV2(DetailSerializerV2, OriginalJsonSerializerMi
 
     image = serializers.FileField(read_only=True)
     recipient = BadgeRecipientSerializerV2(source='*')
-    issuedOn = serializers.DateTimeField(source='issued_on', read_only=True)
+    issuedOn = DateTimeWithUtcZAtEndField(source='issued_on', read_only=True)
     narrative = MarkdownCharField(required=False)
     evidence = EvidenceItemSerializerV2(many=True, required=False)
     revoked = HumanReadableBooleanField(read_only=True)
     revocationReason = serializers.CharField(source='revocation_reason', read_only=True)
-    expires = serializers.DateTimeField(source='expires_at', required=False)
+    expires = DateTimeWithUtcZAtEndField(source='expires_at', required=False)
+    pending = serializers.ReadOnlyField()
 
     class Meta(DetailSerializerV2.Meta):
         model = BadgeInstance
@@ -58,10 +60,26 @@ class BackpackAssertionSerializerV2(DetailSerializerV2, OriginalJsonSerializerMi
         return representation
 
 
+class BackpackAssertionAcceptanceSerializerV2(serializers.Serializer):
+    acceptance = serializers.ChoiceField(choices=[BadgeInstance.ACCEPTANCE_ACCEPTED], write_only=True)
+
+    def update(self, instance, validated_data):
+        instance.acceptance = 'Accepted'
+
+        instance.save()
+        owner = instance.user
+        if owner:
+            owner.publish()
+
+        return instance
+
+
 class BackpackCollectionSerializerV2(DetailSerializerV2):
     name = serializers.CharField()
     description = MarkdownCharField(required=False)
+    owner = EntityRelatedFieldV2(read_only=True, source='created_by')
     share_url = serializers.URLField(read_only=True)
+    shareHash = serializers.CharField(read_only=True, source='share_hash')
     published = serializers.BooleanField(required=False)
 
     assertions = EntityRelatedFieldV2(many=True, source='badge_items', required=False, queryset=BadgeInstance.cached)
@@ -104,7 +122,12 @@ class BackpackCollectionSerializerV2(DetailSerializerV2):
                 ('share_url', {
                     'type': "string",
                     'format': "url",
-                    'description': "A public URL for sharing the Collection",
+                    'description': "A public URL for sharing the Collection. Read only.",
+                }),
+                ('shareHash', {
+                    'type': "string",
+                    'format': "url",
+                    'description': "The share hash that allows construction of a public sharing URL. Read only.",
                 }),
                 ('published', {
                     'type': "boolean",
@@ -117,8 +140,6 @@ class BackpackCollectionSerializerV2(DetailSerializerV2):
                     },
                     'description': "List of Assertions in the collection",
                 }),
-
-
             ])
         })
 
@@ -129,12 +150,14 @@ class BackpackImportSerializerV2(DetailSerializerV2):
     assertion = serializers.DictField(required=False)
 
     def validate(self, attrs):
+        # TODO: when test is run, why is assertion field blank???
         if sum(1 if v else 0 for v in attrs.values()) != 1:
             raise serializers.ValidationError("Must provide only one of 'url', 'image' or 'assertion'.")
         return attrs
 
     def create(self, validated_data):
         try:
+            validated_data['imagefile'] = validated_data.pop('image', None)
             instance, created = BadgeCheckHelper.get_or_create_assertion(**validated_data)
             if not created:
                 instance.acceptance = BadgeInstance.ACCEPTANCE_ACCEPTED

@@ -3,11 +3,13 @@ from __future__ import unicode_literals
 
 import base64
 import json
+from urllib import quote_plus
 
 from django.core.files.images import get_image_dimensions
 from django.core.urlresolvers import reverse
+from django.utils import timezone
 
-from issuer.models import BadgeClass
+from issuer.models import BadgeClass, IssuerStaff
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import OriginSetting
 
@@ -40,7 +42,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
     def _create_badgeclass_for_issuer_authenticated(self, image_path, **kwargs):
         with open(image_path, 'r') as badge_image:
 
-            image_str = self._base64_data_uri_encode(badge_image, "image/png")
+            image_str = self._base64_data_uri_encode(badge_image, kwargs.get("image_mimetype", "image/png"))
             example_badgeclass_props = {
                 'name': 'Badge of Awesome',
                 'description': "An awesome badge only awarded to awesome people or non-existent test entities",
@@ -77,6 +79,99 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
     def test_can_create_badgeclass(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_image_path())
+
+    def test_cannot_create_badgeclass_only_with_invalid_image_data_uri(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.issuer = test_issuer
+        badgeclass_props = {
+            'name': 'Badge of Slugs',
+            'description': "Recognizes slimy learners with a penchant for lettuce",
+            'image': 'http://placekitten.com/400/400',
+            'criteriaNarrative': 'Eat lettuce. Grow big.'
+        }
+
+        response = self.client.post(
+            '/v2/issuers/{}/badgeclasses'.format(test_issuer.entity_id),
+            badgeclass_props, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_staff_cannot_create_badgeclass(self):
+        with open(self.get_test_image_path(), 'r') as badge_image:
+
+            image_str = self._base64_data_uri_encode(badge_image, "image/png")
+            example_badgeclass_props = {
+                'name': 'Badge of Awesome',
+                'description': "An awesome badge only awarded to awesome people or non-existent test entities",
+                'image': image_str,
+                'criteria': 'http://wikipedia.org/Awesome',
+            }
+
+            test_owner = self.setup_user(authenticate=False)
+            test_user = self.setup_user(authenticate=True)
+            test_issuer = self.setup_issuer(owner=test_owner)
+            IssuerStaff.objects.create(issuer=test_issuer, user=test_user, role=IssuerStaff.ROLE_STAFF)
+            self.issuer = test_issuer
+            response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
+                data=example_badgeclass_props,
+                format="json"
+            )
+            self.assertEqual(response.status_code, 404)
+
+    def test_v2_post_put_badgeclasses_permissions(self):
+        test_owner = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_owner)
+        test_user = self.setup_user(authenticate=True, token_scope='rw:issuer')
+
+        badgeclass_data = {
+            'name': 'Test Badge',
+            'description': "A testing badge",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+            'issuer': test_issuer.entity_id,
+        }
+
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 400)
+
+        staff_record = IssuerStaff.objects.create(issuer=test_issuer, user=test_user, role=IssuerStaff.ROLE_STAFF)
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 400)
+
+        staff_record.role = IssuerStaff.ROLE_EDITOR
+        staff_record.save()
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 201)
+        entity_id = response.data['result'][0]['entityId']
+
+        badgeclass_data['name'] = 'Edited Badge'
+        staff_record.role = IssuerStaff.ROLE_STAFF
+        staff_record.save()
+        response = self.client.put('/v2/badgeclasses/{}'.format(entity_id), data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 404)
+
+        staff_record.role = IssuerStaff.ROLE_EDITOR
+        staff_record.save()
+        response = self.client.put('/v2/badgeclasses/{}'.format(entity_id), data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 200)
+
+    def test_v2_badgeclasses_reasonable_404_error(self):
+        test_owner = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_owner)
+        test_user = self.setup_user(authenticate=True, token_scope='rw:issuer')
+
+        badgeclass_data = {
+            'name': 'Test Badge',
+            'description': "A testing badge",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+            'issuer': 'abc123',
+        }
+
+        # Also test whether I can create a badgeclass for an issuer that does not exist.
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 400)
 
     def test_badgeclass_with_expires_in_days_v1(self):
         test_user = self.setup_user(authenticate=True)
@@ -192,8 +287,36 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             response = _update_badgeclass(v2_data)
             self.assertEqual(response.status_code, 400)
 
+    def test_badgeclass_relative_expire_date_generation(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+
+        badgeclass = BadgeClass.objects.create(issuer=test_issuer)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_MONTHS
+        badgeclass.expires_amount = 6
+
+        date = badgeclass.generate_expires_at(issued_on=timezone.datetime(year=2018, month=8, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2019)
+        self.assertEqual(date.month, 2)
+        self.assertEqual(date.day, 28)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_YEARS
+        date = badgeclass.generate_expires_at(
+            issued_on=timezone.datetime(year=2020, month=2, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2026)
+        self.assertEqual(date.month, 2)
+        self.assertEqual(date.day, 28)
+
+        badgeclass.expires_duration = BadgeClass.EXPIRES_DURATION_DAYS
+        date = badgeclass.generate_expires_at(
+            issued_on=timezone.datetime(year=2020, month=2, day=29, hour=12, tzinfo=timezone.utc))
+        self.assertEqual(date.year, 2020)
+        self.assertEqual(date.month, 3)
+        self.assertEqual(date.day, 6)
+
     def test_can_create_badgeclass_with_svg(self):
-        self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path())
+        self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path(), image_mimetype='image/svg+xml')
 
     def test_create_badgeclass_scrubs_svg(self):
         with open(self.get_testfiles_path('hacked-svg-with-embedded-script-tags.svg'), 'r') as attack_badge_image:
@@ -213,8 +336,9 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             # make sure code was stripped
             bc = BadgeClass.objects.get(entity_id=response.data.get('slug'))
             image_content = bc.image.file.readlines()
-            self.assertNotIn('onload', image_content)
-            self.assertNotIn('<script>', image_content)
+            for ic in image_content:
+                self.assertNotIn('onload', ic)
+                self.assertNotIn('<script>', ic)
 
             # make sure we can issue the badge
             badgeinstance = bc.issue(recipient_id='fakerecipient@email.test')
@@ -327,34 +451,28 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
         self.assertTrue(BadgeClass.objects.filter(entity_id=test_badgeclass.entity_id).exists())
 
-    # TODO: review this test for deprecation -- we no longer allow writable slugs
-    # def test_create_badgeclass_with_underscore_slug(self):
-    #     """
-    #     Tests that a manually-defined slug that includes underscores does not
-    #     trigger an error when defining a new BadgeClass
-    #     """
-    #     with open(
-    #             os.path.join(os.path.dirname(__file__), 'testfiles', 'guinea_pig_testing_badge.png'), 'r'
-    #     ) as badge_image:
-    #
-    #         badgeclass_props = {
-    #             'name': 'Badge of Slugs',
-    #             'slug': 'badge_of_slugs_99',
-    #             'description': "Recognizes slimy learners with a penchant for lettuce",
-    #             'image': badge_image,
-    #             'criteria': 'The earner of this badge must slither through a garden and return home before morning.',
-    #         }
-    #
-    #         self.client.force_authenticate(user=get_user_model().objects.get(pk=1))
-    #         response = self.client.post(
-    #             '/v1/issuer/issuers/test-issuer/badges',
-    #             badgeclass_props
-    #         )
-    #         self.assertEqual(response.status_code, 201)
-    #         self.assertRegexpMatches(response.data.get(
-    #             'json', {}).get('criteria'),
-    #                                  r'badge_of_slugs_99/criteria$'
-    #                                  )
+    def test_can_delete_already_issued_badgeclass_if_all_expired(self):
+        """
+        A user should not be able to delete a badge class if it has been issued,
+        unless all of the assertions are expired. This is a sufficient safety check.
+        """
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        yesterday = timezone.now() - timezone.timedelta(days=1)
+        recently = timezone.now() - timezone.timedelta(hours=12)
+
+        # issue badge to a recipient
+        test_badgeclass.issue(recipient_id='new.recipient@email.test', issued_on=yesterday, expires_at=recently)
+
+        response = self.client.delete('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ))
+        self.assertEqual(response.status_code, 204)
+
+        self.assertFalse(BadgeClass.objects.filter(entity_id=test_badgeclass.entity_id).exists())
 
     def test_cannot_create_badgeclass_with_invalid_markdown(self):
         with open(self.get_test_image_path(), 'r') as badge_image:
@@ -463,6 +581,28 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(response.status_code, 201)
 
             self.assertEqual(len(list(test_user.cached_badgeclasses())), number_of_badgeclasses + 1)
+
+    def test_issuer_edits_reflected_in_badgeclass(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user, name='1')
+
+        badgeclass = self.setup_badgeclass(test_issuer, name='test badgeclass 1')
+
+        response = self.client.get('/v2/issuers/{}/badgeclasses'.format(test_issuer.entity_id))  # populate cache
+        response = self.client.get('/public/badges/{}?expand=issuer'.format(badgeclass.entity_id))
+
+        issuer_data = {
+            'name': '2',
+            'description': test_issuer.description,
+            'email': test_user.email,
+            'url': 'http://example.com'
+        }
+        response = self.client.put('/v2/issuers/{}'.format(test_issuer.entity_id), data=issuer_data)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get('/public/badges/{}?expand=issuer'.format(badgeclass.entity_id))
+        issuer_name = response.data['issuer']['name']
+        self.assertEqual(issuer_name, '2')
 
     def test_new_badgeclass_updates_cached_user_badgeclasses(self):
         test_user = self.setup_user(authenticate=True)
@@ -882,3 +1022,84 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             badgeclass=test_badgeclass.entity_id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.get('description', None), "")
+
+    def test_updating_issuer_cache(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user, name='Issuer 1')
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name='Badge 1', description='test')
+
+        assertion_data = {
+            "email": "test@example.com",
+            "create_notification": False,
+        }
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ), assertion_data)
+        self.assertEqual(response.status_code, 201)
+        assertion_slug = response.data.get('slug')
+
+        updated_issuer_props = {
+            'name': 'Issuer 1 updated',
+            'description': 'test',
+            'url': 'http://example.com/',
+            'email': 'example@example.org'
+        }
+        response = self.client.put('/v1/issuer/issuers/{}'.format(test_issuer.entity_id), updated_issuer_props)
+        self.assertEqual(response.status_code, 200)
+
+        badgeclass_props = {
+            'name': 'Badge 1 updated',
+            'description': 'test',
+            'criteria': 'http://example.com',
+        }
+
+        response = self.client.put(
+            '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_issuer.entity_id,
+                badge=test_badgeclass.entity_id
+            ),
+            dict(badgeclass_props, image='http://example.com/example.png')
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get('/public/assertions/{}.json?expand=badge&expand=badge.issuer'.format(assertion_slug))
+        self.assertEqual(response.data['badge']['issuer']['name'], 'Issuer 1 updated')
+
+
+class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
+    def test_application_can_get_changed_badgeclasses(self):
+        issuer_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:serverAdmin')
+        test_issuer = self.setup_issuer(owner=issuer_user)
+        test_badgeclass = self.setup_badgeclass(
+            issuer=test_issuer, name='Badge Class 1', description='test')
+        test_badgeclass2 = self.setup_badgeclass(
+            issuer=test_issuer, name='Badge Class 2', description='test')
+        test_badgeclass3 = self.setup_badgeclass(
+            issuer=test_issuer, name='Badge Class 3', description='test')
+
+        other_user = self.setup_user(authenticate=False, verified=True)
+        other_issuer = self.setup_issuer(owner=other_user)
+
+        other_badgeclass = self.setup_badgeclass(
+            issuer=other_issuer, name='Badge Class 1', description='test')
+        other_badgeclass2 = self.setup_badgeclass(
+            issuer=other_issuer, name='Badge Class 2', description='test')
+        other_badgeclass3 = self.setup_badgeclass(
+            issuer=other_issuer, name='Badge Class 3', description='test')
+
+        response = self.client.get('/v2/badgeclasses/changed')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 3)
+        timestamp = response.data['timestamp']
+
+        response = self.client.get('/v2/badgeclasses/changed?since={}'.format(quote_plus(timestamp)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 0)
+
+        test_badgeclass.name = 'Badge Class 1 updated'
+        test_badgeclass.save()
+
+        response = self.client.get('/v2/badgeclasses/changed?since={}'.format(quote_plus(timestamp)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)

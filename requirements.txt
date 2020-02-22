@@ -1,18 +1,15 @@
 # Django stuff
-Django==1.11.15
+Django==1.11.28
 semver==2.6.0
 pytz==2017.2
 # PIL support
-Pillow==3.1.1
+Pillow==6.2.0
 python-dateutil==2.7.5
 
 # mysql database
 MySQL-python==1.2.5
 
 django-storages==1.6.5
-
-
-
 python-resize-image==1.1.10
 
 # CSky models
@@ -23,10 +20,10 @@ django-object-actions==0.8.2
 
 python-memcached==1.58
 
-djangorestframework==3.6.2
+djangorestframework==3.9.1
 
 # Django Allauth
-django-allauth==0.37.1
+django-allauth==0.39.1
 oauthlib==2.1.0
 requests==2.20.0
 requests-oauthlib==0.4.2
@@ -39,9 +36,11 @@ django-oauth-toolkit==1.1.2
 # Some extras
 django-cors-headers==1.1.0
 django-autoslug==1.9.3
+puremagic==1.6
 wsgiref==0.1.2
 sqlparse==0.1.14
 netaddr
+defusedxml
 
 # Utilities for working with badges
 jsonschema==2.6.0
@@ -59,7 +58,7 @@ django-markdownify==0.1.0
 bleach==2.0.0
 
 # Open Badges related utilities
-openbadges==1.1.0
+openbadges==1.1.1
 openbadges-bakery==1.0.1
 
 celery==4.1.1
@@ -78,6 +77,7 @@ six==1.9.0
 
 #svg 2 png support
 CairoSVG==1.0.22
+cairocffi==0.9.0
 cssselect==0.9.2
 tinycss==0.4
 
@@ -86,15 +86,18 @@ backports.csv==1.0.4
 
 apispec==0.22.0
 
-apispec-djangorestframework==1.0.5
+apispec-djangorestframework==1.0.6
 responses==0.8.1
+mock==3.0.5
 django_mock_queries==2.0.0
 
 # lti consumer
 lti==0.9.2
 
 # Optional AWS dependencies
-boto==2.48.0
-boto3==1.5.6
+boto==2.49.0
+boto3==1.9.226
 django-boto==0.3.12
-django-ses==0.8.4
+django-ses==0.8.12
+
+pysaml2==4.7.0

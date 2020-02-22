@@ -9,22 +9,28 @@ from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_204_NO_CONTENT, HTTP_
 from rest_framework.views import APIView
 
 from badgeuser.authcode import authcode_for_accesstoken
+from badgeuser.models import UserRecipientIdentifier
 from badgrsocialauth.permissions import IsSocialAccountOwner
-from badgrsocialauth.serializers import BadgrSocialAccountSerializerV1
+from badgrsocialauth.serializers_v1 import BadgrSocialAccountSerializerV1
+from badgrsocialauth.serializers_v2 import BadgrSocialAccountSerializerV2
 from entity.api import BaseEntityListView, BaseEntityDetailView
+from entity.serializers import BaseSerializerV2
 from issuer.permissions import BadgrOAuthTokenHasScope
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
 from mainsite.utils import OriginSetting
 
 
 class BadgrSocialAccountList(BaseEntityListView):
     model = SocialAccount
     v1_serializer_class = BadgrSocialAccountSerializerV1
-    v2_serializer_class = None
-    permission_classes = (AuthenticatedWithVerifiedEmail,)
+    v2_serializer_class = BadgrSocialAccountSerializerV2
+    permission_classes = (BadgrOAuthTokenHasScope,)
+    valid_scopes = {
+        'get': ['r:profile', 'rw:profile'],
+        'post': ['rw:profile']
+    }
 
     def get_objects(self, request, **kwargs):
-        obj =  self.request.user.socialaccount_set.all()
+        obj = self.request.user.socialaccount_set.all()
         return obj
 
     def get(self, request, **kwargs):
@@ -32,7 +38,7 @@ class BadgrSocialAccountList(BaseEntityListView):
 
 
 class BadgrSocialAccountConnect(APIView):
-    permission_classes = (AuthenticatedWithVerifiedEmail, BadgrOAuthTokenHasScope)
+    permission_classes = (BadgrOAuthTokenHasScope,)
     valid_scopes = ['rw:profile']
 
     def get(self, request, **kwargs):
@@ -50,14 +56,23 @@ class BadgrSocialAccountConnect(APIView):
             provider=provider_name,
             code=authcode)
 
-        return Response(dict(url=redirect_url))
+        response_data = dict(url=redirect_url)
+        if kwargs['version'] == 'v1':
+            return Response(response_data)
+
+        return Response(BaseSerializerV2.response_envelope(response_data, True, 'OK'))
 
 
 class BadgrSocialAccountDetail(BaseEntityDetailView):
     model = SocialAccount
     v1_serializer_class = BadgrSocialAccountSerializerV1
-    v2_serializer_class = None
-    permission_classes = (AuthenticatedWithVerifiedEmail, IsSocialAccountOwner)
+    v2_serializer_class = BadgrSocialAccountSerializerV2
+    permission_classes = (BadgrOAuthTokenHasScope, IsSocialAccountOwner)
+    valid_scopes = {
+        'get': ['r:profile', 'rw:profile'],
+        'post': ['rw:profile'],
+        'delete': ['rw:profile']
+    }
 
     def get_object(self, request, **kwargs):
         try:
@@ -79,6 +94,14 @@ class BadgrSocialAccountDetail(BaseEntityDetailView):
             get_adapter().validate_disconnect(social_account, user_social_accounts)
         except ValidationError as e:
             return Response(e.message, status=HTTP_403_FORBIDDEN)
+
+        if social_account.provider == 'twitter':
+            identifier = 'https://twitter.com/{}'.format(social_account.extra_data.get('screen_name', '').lower())
+            try:
+                uri = UserRecipientIdentifier.objects.get(identifier=identifier)
+                uri.delete()
+            except UserRecipientIdentifier.DoesNotExist:
+                pass
 
         social_account.delete()
 

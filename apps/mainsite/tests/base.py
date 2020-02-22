@@ -10,13 +10,13 @@ from django.core.cache import cache
 from django.core.cache.backends.filebased import FileBasedCache
 from django.test import override_settings, TransactionTestCase
 from django.utils import timezone
-from oauth2_provider.models import AccessToken, Application
+from oauth2_provider.models import Application
 from rest_framework.test import APITransactionTestCase
 
-from badgeuser.models import BadgeUser, TermsVersion
+from badgeuser.models import BadgeUser, TermsVersion, UserRecipientIdentifier
 from issuer.models import Issuer, BadgeClass
 from mainsite import TOP_DIR
-from mainsite.models import BadgrApp, ApplicationInfo
+from mainsite.models import BadgrApp, ApplicationInfo, AccessTokenProxy
 
 
 class SetupOAuth2ApplicationHelper(object):
@@ -54,6 +54,7 @@ class SetupOAuth2ApplicationHelper(object):
 
 
 class SetupUserHelper(object):
+
     def setup_user(self,
                    email=None,
                    first_name='firsty',
@@ -67,7 +68,6 @@ class SetupUserHelper(object):
                    token_scope=None,
                    terms_version=1
                    ):
-
 
         if email is None:
             email = 'setup_user_{}@email.test'.format(random.random())
@@ -98,7 +98,7 @@ class SetupUserHelper(object):
             app = Application.objects.create(
                 client_id='test', client_secret='testsecret', authorization_grant_type='client-credentials',  # 'authorization-code'
                 user=user)
-            token = AccessToken.objects.create(
+            token = AccessTokenProxy.objects.create(
                 user=user, scope=token_scope, expires=timezone.now() + timedelta(hours=1),
                 token='prettyplease', application=app
             )
@@ -113,7 +113,10 @@ class SetupIssuerHelper(object):
                      name='Test Issuer',
                      description='test case Issuer',
                      owner=None):
-        issuer = Issuer.objects.create(name=name, description=description, created_by=owner)
+        issuer = Issuer.objects.create(
+            name=name, description=description, created_by=owner, email=owner.email,
+            url='http://example.com'
+        )
         return issuer
 
     def get_testfiles_path(self, *args):
@@ -122,8 +125,29 @@ class SetupIssuerHelper(object):
     def get_test_image_path(self):
         return os.path.join(self.get_testfiles_path(), 'guinea_pig_testing_badge.png')
 
+    def get_test_png_image_path(self):
+        return self.get_test_image_path()
+
+    def get_test_png_with_no_extension_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'test_badge_png_with_no_extension')
+
+    def get_test_jpeg_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'test_jpeg.jpeg')
+
+    def get_test_jpeg_with_no_extension_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'test_jpeg_no_extension')
+
+    def get_hacked_svg_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'hacked-svg-with-embedded-script-tags.svg')
+
+    def get_test_image_data_uri(self):
+        return os.path.join(self.get_testfiles_path(), 'test_image_data_uri')
+
     def get_test_svg_image_path(self):
         return os.path.join(self.get_testfiles_path(), 'test_badgeclass.svg')
+
+    def get_test_svg_with_no_extension_image_path(self):
+        return os.path.join(self.get_testfiles_path(), 'test_badgeclass_with_no_svg_extension')
 
     def setup_badgeclass(self,
                          issuer,
@@ -144,14 +168,14 @@ class SetupIssuerHelper(object):
             image=image,
             name=name,
             description=description,
+            criteria_text=criteria_text,
+            criteria_url=criteria_url
         )
         return badgeclass
 
     def setup_badgeclasses(self, how_many=3, **kwargs):
         for i in range(0, how_many):
             yield self.setup_badgeclass(**kwargs)
-
-
 
 
 @override_settings(
@@ -176,20 +200,17 @@ class CachingTestCase(TransactionTestCase):
 @override_settings(
     CELERY_ALWAYS_EAGER=True,
     SESSION_ENGINE='django.contrib.sessions.backends.cache',
-    HTTP_ORIGIN="http://localhost:8000",
-    BADGR_APP_ID=1,
+    HTTP_ORIGIN="http://localhost:8000"
 )
 class BadgrTestCase(SetupUserHelper, APITransactionTestCase, CachingTestCase):
     def setUp(self):
         super(BadgrTestCase, self).setUp()
 
-        from django.conf import settings
-        badgr_app_id = getattr(settings, 'BADGR_APP_ID')
         try:
-            self.badgr_app = BadgrApp.objects.get(pk=badgr_app_id)
+            self.badgr_app = BadgrApp.objects.get(is_default=True)
         except BadgrApp.DoesNotExist:
             self.badgr_app = BadgrApp.objects.create(
+                is_default=True,
                 name='test cors',
-                cors='localhost:8000')
-
-        self.assertEquals(self.badgr_app.pk, badgr_app_id)
+                cors='localhost:8000'
+            )

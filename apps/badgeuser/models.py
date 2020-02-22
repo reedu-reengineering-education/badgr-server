@@ -1,10 +1,7 @@
 from __future__ import unicode_literals
 
 import base64
-import random
 import re
-import string
-from hashlib import md5
 from itertools import chain
 
 import cachemodel
@@ -16,19 +13,22 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.core.validators import URLValidator, RegexValidator
 from django.db import models, transaction
-from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
-from oauth2_provider.models import AccessToken, Application
-from oauthlib.common import generate_token
-from oauthlib.oauth2 import BearerToken
+from oauth2_provider.models import Application
 from rest_framework.authtoken.models import Token
 
 from backpack.models import BackpackCollection
+from badgeuser.tasks import process_post_recipient_id_deletion, process_post_recipient_id_verification_change
 from entity.models import BaseVersionedEntity
 from issuer.models import Issuer, BadgeInstance, BaseAuditedModel
 from badgeuser.managers import CachedEmailAddressManager, BadgeUserManager
+from badgeuser.utils import generate_badgr_username
 from mainsite.models import ApplicationInfo
+
+
+AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 
 class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
@@ -68,6 +68,7 @@ class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
         user = self.user
         self.publish_delete('email')
         self.publish_delete('pk')
+        process_post_recipient_id_deletion.delay(self.email)
         super(CachedEmailAddress, self).delete(*args, **kwargs)
         user.publish()
 
@@ -83,13 +84,16 @@ class CachedEmailAddress(EmailAddress, cachemodel.CacheModel):
 
     def save(self, *args, **kwargs):
         super(CachedEmailAddress, self).save(*args, **kwargs)
-
+        process_post_recipient_id_verification_change.delay(self.email, 'email', self.verified)
         if not self.emailaddressvariant_set.exists() and self.email != self.email.lower():
             self.add_variant(self.email.lower())
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_variants(self):
         return self.emailaddressvariant_set.all()
+
+    def cached_variant_emails(self):
+        return [e.email for e in self.cached_variants()]
 
     def add_variant(self, email_variation):
         existing_variants = EmailAddressVariant.objects.filter(
@@ -147,6 +151,65 @@ class EmailAddressVariant(models.Model):
         return True
 
 
+class UserRecipientIdentifier(cachemodel.CacheModel):
+    """
+    Holds recipient identifiers that are not email addresses (emails are in allauth.account.models.EmailAddress).
+
+    In the long term, this should be extended to support email address identifiers as well.
+    """
+
+    IDENTIFIER_TYPE_URL = 'url'
+    IDENTIFIER_TYPE_TELEPHONE = 'telephone'
+    IDENTIFIER_TYPE_CHOICES = (
+        (IDENTIFIER_TYPE_URL, 'URL'),
+        (IDENTIFIER_TYPE_TELEPHONE, 'Phone Number'),
+    )
+    IDENTIFIER_VALIDATORS = {
+        IDENTIFIER_TYPE_URL: (URLValidator(),),
+        IDENTIFIER_TYPE_TELEPHONE: (RegexValidator(regex=r"^\+?[1-9]\d{1,14}$", message="Enter a valid Phone Number."),),
+    }
+    type = models.CharField(max_length=9, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
+    identifier = models.CharField(max_length=255)
+    user = models.ForeignKey(AUTH_USER_MODEL)
+    verified = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('user', 'type', 'identifier')
+
+    def get_identifier_validators(self):
+        return UserRecipientIdentifier.IDENTIFIER_VALIDATORS[self.type]
+
+    def validate_identifier(self):
+        # format-specific validation
+        for validator in self.get_identifier_validators():
+            validator(self.identifier)
+
+        # regardless of format, only one user may have verified a given identifier
+        if self.verified and UserRecipientIdentifier.objects\
+                .filter(identifier=self.identifier, type=self.type, verified=True)\
+                .exclude(pk=self.pk)\
+                .exists():
+            raise ValidationError('Identifier already verified by another user.')
+
+    def clean_fields(self, exclude=None):
+        super(UserRecipientIdentifier, self).clean_fields(exclude=exclude)
+        self.validate_identifier()
+
+    def save(self, *args, **kwargs):
+        self.validate_identifier()
+        super(UserRecipientIdentifier, self).save(*args, **kwargs)
+        process_post_recipient_id_verification_change.delay(self.identifier, self.type, self.verified)
+
+
+    def publish(self):
+        super(UserRecipientIdentifier, self).publish()
+        self.user.publish()
+
+    def delete(self):
+        super(UserRecipientIdentifier, self).delete()
+        process_post_recipient_id_deletion.delay(self.identifier)
+
+
 class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     """
     A full-featured user model that can be an Earner, Issuer, or Consumer of Open Badges
@@ -156,7 +219,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = ['email']
 
-    badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None)
+    badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None, on_delete=models.SET_NULL)
 
     marketing_opt_in = models.BooleanField(default=False)
 
@@ -168,7 +231,8 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         db_table = 'users'
 
     def __unicode__(self):
-        return u"{} <{}>".format(self.get_full_name(), self.email)
+        primary_identifier = self.email or next((e for e in self.all_verified_recipient_identifiers), '')
+        return u"{} ({})".format(self.get_full_name(), primary_identifier)
 
     def get_full_name(self):
         return u"%s %s" % (self.first_name, self.last_name)
@@ -184,8 +248,26 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         self.publish_by('username')
 
     def delete(self, *args, **kwargs):
+        cached_emails = self.cached_emails()
+        if cached_emails.exists():
+            for email in cached_emails:
+                email.delete()
         super(BadgeUser, self).delete(*args, **kwargs)
         self.publish_delete('username')
+
+    @cachemodel.cached_method(auto_publish=True)
+    def cached_verified_urls(self):
+        return [
+            r.identifier for r in
+            self.userrecipientidentifier_set.filter(
+                verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)]
+
+    @cachemodel.cached_method(auto_publish=True)
+    def cached_verified_phone_numbers(self):
+        return [
+            r.identifier for r in
+            self.userrecipientidentifier_set.filter(
+                verified=True, type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE)]
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_emails(self):
@@ -206,6 +288,9 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         :param value: list(BadgeUserEmailSerializerV2)
         :return: None
         """
+        return self.set_email_items(value)
+
+    def set_email_items(self, value, send_confirmations=True, allow_verify=False):
         if len(value) < 1:
             raise ValidationError("Must have at least 1 email")
 
@@ -214,39 +299,71 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         primary_count = sum(1 if d.get('primary', False) else 0 for d in value)
         if primary_count != 1:
             raise ValidationError("Must have exactly 1 primary email")
+        requested_primary = [d for d in value if d.get('primary', False)][0]
 
         with transaction.atomic():
             # add or update existing items
             for email_data in value:
                 primary = email_data.get('primary', False)
+                verified = email_data.get('verified', False)
                 emailaddress, created = CachedEmailAddress.cached.get_or_create(
                     email=email_data['email'],
                     defaults={
                         'user': self,
                         'primary': primary
                     })
-                if created:
-                    # new email address send a confirmation
-                    emailaddress.send_confirmation()
-                else:
+                if not created:
+                    dirty = False
+
                     if emailaddress.user_id == self.id:
                         # existing email address owned by user
                         emailaddress.primary = primary
-                        emailaddress.save()
+                        dirty = True
                     elif not emailaddress.verified:
                         # existing unverified email address, handover to this user
                         emailaddress.user = self
                         emailaddress.primary = primary
-                        emailaddress.save()
+                        emailaddress.save()  # in this case, don't mark as dirty
                         emailaddress.send_confirmation()
                     else:
                         # existing email address used by someone else
                         raise ValidationError("Email '{}' may already be in use".format(email_data.get('email')))
 
+                    if allow_verify and verified != emailaddress.verified:
+                        emailaddress.verified = verified
+                        dirty = True
+
+                    if dirty:
+                        emailaddress.save()
+                else:
+                    # email is new
+                    if allow_verify and email_data.get('verified') is True:
+                        emailaddress.verified = True
+                        emailaddress.save()
+                    if emailaddress.verified is False and created is True and send_confirmations is True:
+                        # new email address send a confirmation
+                        emailaddress.send_confirmation()
+
+                if not emailaddress.verified:
+                    continue  # only verified email addresses may have variants. Don't bother trying otherwise.
+
+                requested_variants = email_data.get('cached_variant_emails', [])
+                existing_variant_emails = emailaddress.cached_variant_emails()
+                for requested_variant in requested_variants:
+                    if requested_variant not in existing_variant_emails:
+                        EmailAddressVariant.objects.create(
+                            canonical_email=emailaddress, email=requested_variant
+                        )
+
             # remove old items
             for emailaddress in self.email_items:
                 if emailaddress.email not in new_email_idx:
                     emailaddress.delete()
+
+        if self.email != requested_primary:
+            self.email = requested_primary['email']
+            self.save()
+
 
     def cached_email_variants(self):
         return chain.from_iterable(email.cached_variants() for email in self.cached_emails())
@@ -279,17 +396,27 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         if self.is_superuser:
             return True
 
-        if len(self.verified_emails) > 0:
+        if len(self.all_verified_recipient_identifiers) > 0:
             return True
 
         return False
 
     @property
     def all_recipient_identifiers(self):
-        return [e.email for e in self.cached_emails() if e.verified] + [e.email for e in self.cached_email_variants()]
+        return [e.email for e in self.cached_emails()] + \
+            [e.email for e in self.cached_email_variants()] + \
+            self.cached_verified_urls() + \
+            self.cached_verified_phone_numbers()
+
+    @property
+    def all_verified_recipient_identifiers(self):
+        return ([e.email for e in self.cached_emails() if e.verified]
+                + [e.email for e in self.cached_email_variants()]
+                + self.cached_verified_urls()
+                + self.cached_verified_phone_numbers())
 
     def is_email_verified(self, email):
-        if email in self.all_recipient_identifiers:
+        if email in self.all_verified_recipient_identifiers:
             return True
 
         try:
@@ -366,9 +493,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
 
     def save(self, *args, **kwargs):
         if not self.username:
-            # md5 hash the email and then encode as base64 to take up only 25 characters
-            hashed = md5(self.email + ''.join(random.choice(string.lowercase) for i in range(64))).digest().encode('base64')[:-1]  # strip last character because its a newline
-            self.username = "badgr{}".format(hashed[:25])
+            self.username = generate_badgr_username(self.email)
 
         if getattr(settings, 'BADGEUSER_SKIP_LAST_LOGIN_TIME', True):
             # skip saving last_login to the database
@@ -378,84 +503,6 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
                     # nothing to do, abort so we dont call .publish()
                     return
         return super(BadgeUser, self).save(*args, **kwargs)
-
-
-class BadgrAccessTokenManager(models.Manager):
-
-    def generate_new_token_for_user(self, user, scope='r:profile', application=None, expires=None, refresh_token=False):
-        with transaction.atomic():
-            if application is None:
-                application, created = Application.objects.get_or_create(
-                    client_id='public',
-                    client_type=Application.CLIENT_PUBLIC,
-                    authorization_grant_type=Application.GRANT_PASSWORD,
-                )
-                if created:
-                    ApplicationInfo.objects.create(application=application)
-
-            if expires is None:
-                access_token_expires_seconds = getattr(settings, 'OAUTH2_PROVIDER', {}).get('ACCESS_TOKEN_EXPIRE_SECONDS', 86400)
-                expires = timezone.now() + datetime.timedelta(seconds=access_token_expires_seconds)
-
-            accesstoken = self.create(
-                application=application,
-                user=user,
-                expires=expires,
-                token=generate_token(),
-                scope=scope
-            )
-
-        return accesstoken
-
-    def get_from_entity_id(self, entity_id):
-        # lookup by a faked
-        padding = len(entity_id) % 4
-        if padding > 0:
-            entity_id = '{}{}'.format(entity_id, (4-padding)*'=')
-        decoded = base64.urlsafe_b64decode(entity_id.encode('utf-8'))
-        id = re.sub(r'^{}'.format(self.model.fake_entity_id_prefix), '', decoded)
-        try:
-            pk = int(id)
-        except ValueError as e:
-            pass
-        else:
-            try:
-                obj = self.get(pk=pk)
-            except self.model.DoesNotExist:
-                pass
-            else:
-                return obj
-        raise self.model.DoesNotExist
-
-
-class BadgrAccessToken(AccessToken, cachemodel.CacheModel):
-    objects = BadgrAccessTokenManager()
-    fake_entity_id_prefix = "BadgrAccessToken.id="
-
-    class Meta:
-        proxy = True
-
-    @property
-    def entity_id(self):
-        # fake an entityId for this non-entity
-        digest = "{}{}".format(self.fake_entity_id_prefix, self.pk)
-        b64_string = base64.urlsafe_b64encode(digest)
-        b64_trimmed = re.sub(r'=+$', '', b64_string)
-        return b64_trimmed
-
-    def get_entity_class_name(self):
-        return 'AccessToken'
-
-    @property
-    def application_name(self):
-        return self.application.name
-
-    @property
-    def applicationinfo(self):
-        try:
-            return self.application.applicationinfo
-        except ApplicationInfo.DoesNotExist:
-            return ApplicationInfo()
 
 
 class TermsVersionManager(cachemodel.CacheModelManager):

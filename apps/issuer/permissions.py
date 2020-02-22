@@ -118,6 +118,23 @@ class IsEditor(permissions.BasePermission):
             return request.user.has_perm('issuer.is_editor', issuer)
 
 
+class IsEditorButOwnerForDelete(permissions.BasePermission):
+    """
+    Request.user is authorized to perform safe operations if they are staff or
+    perform unsafe operations if they are owner or editor of an issuer.
+    ---
+    model: Issuer
+    """
+
+    def has_object_permission(self, request, view, issuer):
+        if request.method in SAFE_METHODS:
+            return request.user.has_perm('issuer.is_staff', issuer)
+        elif request.method == 'DELETE':
+            return request.user.has_perm('issuer.is_owner', issuer)
+        else:
+            return request.user.has_perm('issuer.is_editor', issuer)
+
+
 class IsStaff(permissions.BasePermission):
     """
     Request user is authorized to perform operations if they are owner or on staff
@@ -134,6 +151,9 @@ class ApprovedIssuersOnly(permissions.BasePermission):
         if request.method == 'POST' and getattr(settings, 'BADGR_APPROVED_ISSUERS_ONLY', False):
             return request.user.has_perm('issuer.add_issuer')
         return True
+
+    def has_permission(self, request, view):
+        return self.has_object_permission(request, view, None)
 
 
 class IsIssuerEditor(IsEditor):
@@ -165,13 +185,23 @@ class AuditedModelOwner(permissions.BasePermission):
 
 class VerifiedEmailMatchesRecipientIdentifier(permissions.BasePermission):
     """
-    one of request user's verified emails matches obj.recipient_identifier
+    One of request user's verified emails matches obj.recipient_identifier.
+    For badges imported by this user, they can delete the badge.
     ---
     model: BadgeInstance
     """
     def has_object_permission(self, request, view, obj):
         recipient_identifier = getattr(obj, 'recipient_identifier', None)
-        return recipient_identifier and recipient_identifier in request.user.all_recipient_identifiers
+        if getattr(obj, 'pending', False):
+            return recipient_identifier and recipient_identifier in request.user.all_recipient_identifiers
+        return recipient_identifier and recipient_identifier in request.user.all_verified_recipient_identifiers
+
+
+class AuthorizationIsBadgrOAuthToken(permissions.BasePermission):
+    message = 'Invalid token'
+
+    def has_permission(self, request, view):
+        return isinstance(request.auth, oauth2_provider.models.AccessToken)
 
 
 class BadgrOAuthTokenHasScope(permissions.BasePermission):
@@ -217,11 +247,8 @@ class BadgrOAuthTokenHasEntityScope(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         token = request.auth
 
-        # Do not apply scope if using a non-oauth tokens
+        # This fails for authentication methods other than oauth2 token auth. Compose view permissions correctly.
         if not isinstance(token, oauth2_provider.models.AccessToken):
-            return True
-
-        if not token:
             return False
 
         # badgeclass/assertion objects defer to the issuer for permissions
@@ -231,6 +258,7 @@ class BadgrOAuthTokenHasEntityScope(permissions.BasePermission):
             entity_id = obj.entity_id
 
         valid_scopes = self._get_valid_scopes(request, view)
+        valid_scopes = [s for s in valid_scopes if '*' in s]
         valid_scopes = set([self._resolve_wildcard(scope, entity_id) for scope in valid_scopes])
         token_scopes = set(token.scope.split())
 

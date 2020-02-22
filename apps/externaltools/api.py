@@ -8,7 +8,7 @@ from entity.api import BaseEntityListView, BaseEntityDetailView
 from externaltools.models import ExternalTool, ExternalToolLaunchpoint
 from externaltools.serializers_v1 import ExternalToolSerializerV1, ExternalToolLaunchSerializerV1
 from externaltools.serializers_v2 import ExternalToolSerializerV2, ExternalToolLaunchSerializerV2
-from mainsite.permissions import AuthenticatedWithVerifiedEmail
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 
 
 class ExternalToolList(BaseEntityListView):
@@ -17,6 +17,7 @@ class ExternalToolList(BaseEntityListView):
     v2_serializer_class = ExternalToolSerializerV2
     permission_classes = ()
     http_method_names = ['get']
+    allow_any_unauthenticated_access = True
 
     def get_objects(self, request, **kwargs):
         tools = list(ExternalTool.cached.global_tools())
@@ -37,7 +38,7 @@ class ExternalToolLaunch(BaseEntityDetailView):
     model = ExternalTool  # used by VersionedObjectMixin
     v1_serializer_class = ExternalToolLaunchSerializerV1
     v2_serializer_class = ExternalToolLaunchSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedEmail,)
+    permission_classes = (AuthenticatedWithVerifiedIdentifier,)
     http_method_names = ['get']
 
     def get_context_data(self, **kwargs):

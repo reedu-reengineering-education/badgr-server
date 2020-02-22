@@ -6,9 +6,10 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.urlresolvers import reverse_lazy
 from django.db import IntegrityError
-from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFound
+from django.http import (HttpResponse, HttpResponseServerError,
+                         HttpResponseNotFound, HttpResponseRedirect)
 from django.shortcuts import redirect
-from django.template import loader, TemplateDoesNotExist, Context
+from django.template import loader, TemplateDoesNotExist
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import FormView, RedirectView
@@ -55,17 +56,33 @@ def info_view(request):
     return redirect(getattr(settings, 'LOGIN_REDIRECT_URL'))
 
 
+def email_unsubscribe_response(request, message, error=False):
+    badgr_app_pk = request.GET.get('a', None)
+
+    badgr_app = BadgrApp.objects.get_by_id_or_default(badgr_app_pk)
+
+    query_param = 'infoMessage' if error else 'authError'
+    redirect_url = "{url}?{query_param}={message}".format(
+        url=badgr_app.ui_login_redirect,
+        query_param=query_param,
+        message=message)
+    return HttpResponseRedirect(redirect_to=redirect_url)
+
+
 def email_unsubscribe(request, *args, **kwargs):
     if time.time() > int(kwargs['expiration']):
-        return HttpResponse('Your unsubscription link has expired.')
+        return email_unsubscribe_response(
+            request, 'Your unsubscription link has expired.', error=True)
 
     try:
         email = base64.b64decode(kwargs['email_encoded'])
     except TypeError:
-        return HttpResponse('Invalid unsubscribe link.')
+        return email_unsubscribe_response(request, 'Invalid unsubscribe link.',
+                                          error=True)
 
     if not EmailBlacklist.verify_email_signature(**kwargs):
-        return HttpResponse('Invalid unsubscribe link.')
+        return email_unsubscribe_response(request, 'Invalid unsubscribe link.',
+                                          error=True)
 
     blacklist_instance = EmailBlacklist(email=email)
     try:
@@ -73,8 +90,9 @@ def email_unsubscribe(request, *args, **kwargs):
     except IntegrityError:
         pass
 
-    return HttpResponse("You will no longer receive email notifications for \
-                        earned badges from this domain.")
+    return email_unsubscribe_response(
+        request, "You will no longer receive email notifications for earned"
+        " badges from this domain.")
 
 
 class AppleAppSiteAssociation(APIView):

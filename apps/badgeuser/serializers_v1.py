@@ -1,6 +1,7 @@
 from django.conf import settings
+from django.contrib.auth.hashers import is_password_usable
 from rest_framework import serializers
-
+from collections import OrderedDict
 from mainsite.models import BadgrApp
 from mainsite.serializers import StripTagsCharField
 from mainsite.validators import PasswordValidator
@@ -37,24 +38,40 @@ class VerifiedEmailsField(serializers.Field):
 class BadgeUserProfileSerializerV1(serializers.Serializer):
     first_name = StripTagsCharField(max_length=30, allow_blank=True)
     last_name = StripTagsCharField(max_length=30, allow_blank=True)
-    email = serializers.EmailField(source='primary_email', required=False)
+    email = serializers.EmailField(source='primary_email', required=False, allow_blank=True, allow_null=True)
+    url = serializers.ListField(read_only=True, source='cached_verified_urls')
+    telephone = serializers.ListField(read_only=True, source='cached_verified_phone_numbers')
     current_password = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False)
     password = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False, validators=[PasswordValidator()])
     slug = serializers.CharField(source='entity_id', read_only=True)
     agreed_terms_version = serializers.IntegerField(required=False)
     marketing_opt_in = serializers.BooleanField(required=False)
+    has_password_set = serializers.SerializerMethodField()
+    source = serializers.CharField(write_only=True, required=False)
+
+    def get_has_password_set(self, obj):
+        return is_password_usable(obj.password)
 
     class Meta:
-        apispec_definition = ('BadgeUser', {})
+        apispec_definition = ('BadgeUser', {
+            'properties': OrderedDict([
+                ('source', {
+                    'type': "string",
+                    'format': "string",
+                    'description': "Ex: mozilla",
+                }),
+            ])
+        })
 
     def create(self, validated_data):
         user = BadgeUser.objects.create(
-            email=validated_data['primary_email'],
+            email=validated_data.get('primary_email'),
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
             plaintext_password=validated_data['password'],
             marketing_opt_in=validated_data.get('marketing_opt_in', False),
             request=self.context.get('request', None),
+            source=validated_data.get('source', ''),
         )
         return user
 
@@ -71,12 +88,12 @@ class BadgeUserProfileSerializerV1(serializers.Serializer):
 
         if password:
             if not current_password:
-                raise serializers.ValidationError({'currrent_password': "Field is required"})
+                raise serializers.ValidationError({'current_password': "Field is required"})
             if user.check_password(current_password):
                 user.set_password(password)
                 notify_on_password_change(user)
             else:
-                raise serializers.ValidationError({'currrent_password': "Incorrect password"})
+                raise serializers.ValidationError({'current_password': "Incorrect password"})
 
         if 'agreed_terms_version' in validated_data:
             user.agreed_terms_version = validated_data.get('agreed_terms_version')

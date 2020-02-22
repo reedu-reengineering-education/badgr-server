@@ -5,7 +5,7 @@ import json
 
 from django.urls import reverse
 
-from badgeuser.models import BadgrAccessToken
+from mainsite.models import AccessTokenProxy
 from mainsite.tests import SetupIssuerHelper, BadgrTestCase, SetupOAuth2ApplicationHelper
 
 
@@ -61,7 +61,8 @@ class PublicAPITests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestC
         self.assertEqual(response.status_code, 200)
         result = response.json()
         # result should contain token_type and access_token
-        self.assertFalse(any(result.get(k, None) is None for k in ['token_type','access_token']))
+        self.assertIn('token_type', result)
+        self.assertIn('access_token', result)
         auth_headers = {
             'Authorization': "{type} {token}".format(type=result.get("token_type"), token=result.get("access_token"))
         }
@@ -83,7 +84,7 @@ class PublicAPITests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestC
         issuer_tokens = {r.get('issuer'): r.get('token') for r in result.get('result')}
         self.assertEqual(set(issuer_tokens.keys()), set(issuer_ids))
 
-        access_tokens = [BadgrAccessToken.objects.get(token=t) for t in issuer_tokens.values()]
+        access_tokens = [AccessTokenProxy.objects.get(token=t) for t in issuer_tokens.values()]
         self.assertEqual(len(access_tokens), len(issuer_tokens))
 
         # we should be able to use tokens to access the issuer
@@ -96,7 +97,7 @@ class PublicAPITests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestC
 
         # ensure that issuer tokens didnt change and still have same expiration
         for access_token in access_tokens:
-            updated_access_token = BadgrAccessToken.objects.get(pk=access_token.pk)
+            updated_access_token = AccessTokenProxy.objects.get(pk=access_token.pk)
             self.assertEqual(updated_access_token.token, access_token.token)
             self.assertEqual(updated_access_token.expires, access_token.expires)
 

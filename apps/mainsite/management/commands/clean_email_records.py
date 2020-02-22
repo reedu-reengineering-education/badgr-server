@@ -8,7 +8,6 @@ from allauth.account.models import EmailConfirmation
 from badgeuser.models import BadgeUser, CachedEmailAddress
 
 
-
 class Command(BaseCommand):
     args = ''
     help = 'Ensures users have the proper EmailAddress objects created for their accounts'
@@ -51,7 +50,7 @@ class Command(BaseCommand):
 
                     if new_primary.verified is False and not prior_confirmations.exists():
                         try:
-                            new_primary.send_confirmation(signup="canvas")
+                            new_primary.send_confirmation(signup=True)
                         except SMTPException as e:
                             raise e
                         except Exception as e:

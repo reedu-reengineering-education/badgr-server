@@ -2,6 +2,9 @@ from __future__ import unicode_literals
 
 import StringIO
 import datetime
+import urllib
+
+import dateutil
 import re
 import uuid
 from collections import OrderedDict
@@ -25,22 +28,31 @@ from jsonfield import JSONField
 from openbadges_bakery import bake
 from django.utils import timezone
 
+import badgrlog
 from entity.models import BaseVersionedEntity
 from issuer.managers import BadgeInstanceManager, IssuerManager, BadgeClassManager, BadgeInstanceEvidenceManager
 from mainsite.managers import SlugOrJsonIdCacheModelManager
 from mainsite.mixins import ResizeUploadedImage, ScrubUploadedSvgImage
-from mainsite.models import (BadgrApp, EmailBlacklist)
+from mainsite.models import BadgrApp, EmailBlacklist
+from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri
-from .utils import generate_sha256_hashstring, CURRENT_OBI_VERSION, get_obi_context, add_obi_version_ifneeded, \
-    UNVERSIONED_BAKED_VERSION
+from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_sha256_hashstring, get_obi_context,
+                    parse_original_datetime, UNVERSIONED_BAKED_VERSION)
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
+
+RECIPIENT_TYPE_EMAIL = 'email'
+RECIPIENT_TYPE_ID = 'openBadgeId'
+RECIPIENT_TYPE_TELEPHONE = 'telephone'
+RECIPIENT_TYPE_URL = 'url'
+
+logger = badgrlog.BadgrLogger()
 
 
 class BaseAuditedModel(cachemodel.CacheModel):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+")
-    updated_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
     updated_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+")
 
     class Meta:
@@ -73,13 +85,25 @@ class OriginalJsonMixin(models.Model):
 
 class BaseOpenBadgeObjectModel(OriginalJsonMixin, cachemodel.CacheModel):
     source = models.CharField(max_length=254, default='local')
-    source_url = models.CharField(max_length=254, blank=True, null=True, default=None)
+    source_url = models.CharField(max_length=254, blank=True, null=True, default=None, unique=True)
 
     class Meta:
         abstract = True
 
     def get_extensions_manager(self):
         raise NotImplementedError()
+
+    def __eq__(self, other):
+        UNUSABLE_DEFAULT = uuid.uuid4()
+
+        comparable_properties = getattr(self, 'COMPARABLE_PROPERTIES', None)
+        if comparable_properties is None:
+            return super(BaseOpenBadgeObjectModel, self).__eq__(other)
+
+        for prop in self.COMPARABLE_PROPERTIES:
+            if getattr(self, prop) != getattr(other, prop, UNUSABLE_DEFAULT):
+                return False
+        return True
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_extensions(self):
@@ -133,7 +157,8 @@ class Issuer(ResizeUploadedImage,
              BaseVersionedEntity,
              BaseOpenBadgeObjectModel):
     entity_class_name = 'Issuer'
-
+    COMPARABLE_PROPERTIES = ('badgrapp_id', 'description', 'email', 'entity_id', 'entity_version', 'name', 'pk',
+                            'updated_at', 'url',)
 
     staff = models.ManyToManyField(AUTH_USER_MODEL, through='IssuerStaff')
 
@@ -141,7 +166,7 @@ class Issuer(ResizeUploadedImage,
     slug = models.CharField(max_length=255, blank=True, null=True, default=None)
     #slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
 
-    badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None)
+    badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None, on_delete=models.SET_NULL)
 
     name = models.CharField(max_length=1024)
     image = models.FileField(upload_to='uploads/issuers', blank=True, null=True)
@@ -153,10 +178,11 @@ class Issuer(ResizeUploadedImage,
     objects = IssuerManager()
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
 
-    def publish(self, *args, **kwargs):
+    def publish(self, publish_staff=True, *args, **kwargs):
         super(Issuer, self).publish(*args, **kwargs)
-        for member in self.cached_issuerstaff():
-            member.cached_user.publish()
+        if publish_staff:
+            for member in self.cached_issuerstaff():
+                member.cached_user.publish()
 
     def delete(self, *args, **kwargs):
         if self.recipient_count > 0:
@@ -333,8 +359,8 @@ class Issuer(ResizeUploadedImage,
 
     @property
     def cached_badgrapp(self):
-        id = self.badgrapp_id if self.badgrapp_id else getattr(settings, 'BADGR_APP_ID', 1)
-        return BadgrApp.cached.get(id=id)
+        id = self.badgrapp_id if self.badgrapp_id else None
+        return BadgrApp.objects.get_by_id_or_default(badgrapp_id=id)
 
 
 
@@ -356,14 +382,14 @@ class IssuerStaff(cachemodel.CacheModel):
 
     def publish(self):
         super(IssuerStaff, self).publish()
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
         self.user.publish()
 
     def delete(self, *args, **kwargs):
         publish_issuer = kwargs.pop('publish_issuer', True)
         super(IssuerStaff, self).delete()
         if publish_issuer:
-            self.issuer.publish()
+            self.issuer.publish(publish_staff=False)
         self.user.publish()
 
     @property
@@ -375,6 +401,21 @@ class IssuerStaff(cachemodel.CacheModel):
     def cached_issuer(self):
         return Issuer.cached.get(pk=self.issuer_id)
 
+def get_user_or_none(recipient_id, recipient_type):
+    from badgeuser.models import UserRecipientIdentifier, CachedEmailAddress
+    user = None
+    if recipient_type=='email':
+        verified_email = CachedEmailAddress.objects.filter(verified=True, email=recipient_id).first()
+        if verified_email:
+            user = verified_email.user
+    else:
+        verified_recipient_id = UserRecipientIdentifier.objects.filter(verified=True,
+                                                                       identifier=recipient_id).first()
+        if verified_recipient_id:
+            user = verified_recipient_id.user
+
+    return user
+
 
 class BadgeClass(ResizeUploadedImage,
                  ScrubUploadedSvgImage,
@@ -382,6 +423,8 @@ class BadgeClass(ResizeUploadedImage,
                  BaseVersionedEntity,
                  BaseOpenBadgeObjectModel):
     entity_class_name = 'BadgeClass'
+    COMPARABLE_PROPERTIES = ('criteria_text', 'criteria_url', 'description', 'entity_id', 'entity_version',
+                             'expires_amount', 'expires_duration', 'name', 'pk', 'slug', 'updated_at',)
 
     EXPIRES_DURATION_DAYS = 'days'
     EXPIRES_DURATION_WEEKS = 'weeks'
@@ -419,11 +462,17 @@ class BadgeClass(ResizeUploadedImage,
         verbose_name_plural = "Badge classes"
 
     def publish(self):
+        if hasattr(self, '_issuer_cache'):
+            del self._issuer_cache
         super(BadgeClass, self).publish()
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
+        if self.created_by:
+            self.created_by.publish()
 
     def delete(self, *args, **kwargs):
-        if self.recipient_count() > 0:
+        # if there are some assertions and some have not expired
+        if self.recipient_count() > 0 and self.badgeinstances.filter(revoked=False).filter(
+                models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())).count() > 0:
             raise ProtectedError("BadgeClass may only be deleted if all BadgeInstances have been revoked.", self)
 
         if self.pathway_element_count() > 0:
@@ -434,7 +483,7 @@ class BadgeClass(ResizeUploadedImage,
 
         issuer = self.issuer
         super(BadgeClass, self).delete(*args, **kwargs)
-        issuer.publish()
+        issuer.publish(publish_staff=False)
 
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
@@ -561,11 +610,13 @@ class BadgeClass(ResizeUploadedImage,
     def cached_completion_elements(self):
         return [pce for pce in self.completion_elements.all()]
 
-    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, **kwargs):
+    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, recipient_type=RECIPIENT_TYPE_EMAIL, **kwargs):
         return BadgeInstance.objects.create(
-            badgeclass=self, recipient_identifier=recipient_id, narrative=narrative, evidence=evidence,
+            badgeclass=self, recipient_identifier=recipient_id, recipient_type=recipient_type,
+            narrative=narrative, evidence=evidence,
             notify=notify, created_by=created_by, allow_uppercase=allow_uppercase,
             badgr_app=badgr_app,
+            user=get_user_or_none(recipient_id, recipient_type),
             **kwargs
         )
 
@@ -642,28 +693,38 @@ class BadgeClass(ResizeUploadedImage,
     def cached_badgrapp(self):
         return self.cached_issuer.cached_badgrapp
 
+    def generate_expires_at(self, issued_on=None):
+        if not self.expires_duration or not self.expires_amount:
+            return None
+
+        if issued_on is None:
+            issued_on = timezone.now()
+
+        duration_kwargs = dict()
+        duration_kwargs[self.expires_duration] = self.expires_amount
+        return issued_on + dateutil.relativedelta.relativedelta(**duration_kwargs)
+
 
 class BadgeInstance(BaseAuditedModel,
                     BaseVersionedEntity,
                     BaseOpenBadgeObjectModel):
     entity_class_name = 'Assertion'
+    COMPARABLE_PROPERTIES = ('badgeclass_id', 'entity_id', 'entity_version', 'issued_on', 'pk', 'narrative',
+                             'recipient_identifier', 'recipient_type', 'revoked', 'revocation_reason', 'updated_at',)
 
     issued_on = models.DateTimeField(blank=False, null=False, default=timezone.now)
 
     badgeclass = models.ForeignKey(BadgeClass, blank=False, null=False, on_delete=models.CASCADE, related_name='badgeinstances')
     issuer = models.ForeignKey(Issuer, blank=False, null=False)
+    user = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, on_delete=models.SET_NULL)
 
-    RECIPIENT_TYPE_EMAIL = 'email'
-    RECIPIENT_TYPE_ID = 'openBadgeId'
-    RECIPIENT_TYPE_TELEPHONE = 'telephone'
-    RECIPIENT_TYPE_URL = 'url'
     RECIPIENT_TYPE_CHOICES = (
         (RECIPIENT_TYPE_EMAIL, 'email'),
         (RECIPIENT_TYPE_ID, 'openBadgeId'),
         (RECIPIENT_TYPE_TELEPHONE, 'telephone'),
         (RECIPIENT_TYPE_URL, 'url'),
     )
-    recipient_identifier = models.EmailField(max_length=768, blank=False, null=False, db_index=True)
+    recipient_identifier = models.CharField(max_length=768, blank=False, null=False, db_index=True)
     recipient_type = models.CharField(max_length=255, choices=RECIPIENT_TYPE_CHOICES, default=RECIPIENT_TYPE_EMAIL, blank=False, null=False)
 
     image = models.FileField(upload_to='uploads/badges', blank=True)
@@ -716,6 +777,12 @@ class BadgeInstance(BaseAuditedModel,
         else:
             return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
 
+    def get_share_url(self, include_identifier=False):
+        url = self.share_url
+        if include_identifier:
+            url = '%s?identity__%s=%s' % (url, self.recipient_type, urllib.quote(self.recipient_identifier))
+        return url
+
     @property
     def share_url(self):
         return self.public_url
@@ -754,8 +821,34 @@ class BadgeInstance(BaseAuditedModel,
     def owners(self):
         return self.issuer.owners
 
+    @property
+    def pending(self):
+        """
+            If the associated identifier for this BadgeInstance
+            does not exist or is unverified the BadgeInstance is
+            considered "pending"
+        """
+        from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
+        try:
+            if self.recipient_type == RECIPIENT_TYPE_EMAIL:
+                existing_identifier = CachedEmailAddress.cached.get(email=self.recipient_identifier)
+            else:
+                existing_identifier = UserRecipientIdentifier.cached.get(identifier=self.recipient_identifier)
+        except (UserRecipientIdentifier.DoesNotExist, CachedEmailAddress.DoesNotExist,):
+            return False
+
+        if not self.source_url:
+            return False
+
+        return not existing_identifier.verified
+
     def save(self, *args, **kwargs):
         if self.pk is None:
+            # First check if recipient is in the blacklist
+            if blacklist.api_query_is_in_blacklist(self.recipient_type, self.recipient_identifier):
+                logger.event(badgrlog.BlacklistAssertionNotCreatedEvent(self))
+                raise ValidationError("You may not award this badge to this recipient.")
+
             self.salt = uuid.uuid4().hex
             self.created_at = datetime.datetime.now()
 
@@ -788,10 +881,6 @@ class BadgeInstance(BaseAuditedModel,
         super(BadgeInstance, self).save(*args, **kwargs)
 
     def rebake(self, obi_version=CURRENT_OBI_VERSION, save=True):
-        if self.source_url:
-            # dont rebake imported assertions
-            return
-
         new_image = StringIO.StringIO()
         bake(
             image_file=self.cached_badgeclass.image.file,
@@ -804,6 +893,10 @@ class BadgeInstance(BaseAuditedModel,
             self.save()
 
     def publish(self):
+        if hasattr(self, '_issuer_cache'):
+            del self._issuer_cache
+        if hasattr(self, '_badgeclass_cache'):
+            del self._badgeclass_cache
         super(BadgeInstance, self).publish()
         self.badgeclass.publish()
         if self.cached_recipient_profile:
@@ -862,7 +955,7 @@ class BadgeInstance(BaseAuditedModel,
         TODO: consider making this an option on initial save and having a foreign key to
         the notification model instance (which would link through to the OpenBadge)
         """
-        if self.recipient_type != BadgeInstance.RECIPIENT_TYPE_EMAIL:
+        if self.recipient_type != RECIPIENT_TYPE_EMAIL:
             return
 
         try:
@@ -874,6 +967,8 @@ class BadgeInstance(BaseAuditedModel,
             return
             # TODO: Report email non-delivery somewhere.
 
+        if badgr_app is None:
+            badgr_app = self.cached_issuer.cached_badgrapp
         if badgr_app is None:
             badgr_app = BadgrApp.objects.get_current(None)
 
@@ -896,8 +991,6 @@ class BadgeInstance(BaseAuditedModel,
                 'badge_instance_url': self.public_url,
                 'image_url': self.public_url + '/image',
                 'download_url': self.public_url + "?action=download",
-                'unsubscribe_url': getattr(settings, 'HTTP_ORIGIN') + EmailBlacklist.generate_email_signature(
-                    self.recipient_identifier),
                 'site_name': badgr_app.name,
                 'site_url': badgr_app.signup_redirect,
                 'badgr_app': badgr_app,
@@ -935,12 +1028,18 @@ class BadgeInstance(BaseAuditedModel,
 
     @property
     def recipient_user(self):
-        from badgeuser.models import CachedEmailAddress
+        from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
         try:
             email_address = CachedEmailAddress.cached.get(email=self.recipient_identifier)
             if email_address.verified:
                 return email_address.user
         except CachedEmailAddress.DoesNotExist:
+            try:
+                identifier = UserRecipientIdentifier.cached.get(identifier=self.recipient_identifier)
+                if identifier.verified:
+                    return identifier.user
+            except UserRecipientIdentifier.DoesNotExist:
+                pass
             pass
         return None
 
@@ -1051,12 +1150,15 @@ class BadgeInstance(BaseAuditedModel,
         return self.get_json()
 
     def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'uid', 'recipient', 'badge', 'issuedOn', 'image', 'evidence', 'narrative', 'revoked', 'revocationReason', 'verify', 'verification')):
-        return super(BadgeInstance, self).get_filtered_json(excluded_fields=excluded_fields)
+        filtered = super(BadgeInstance, self).get_filtered_json(excluded_fields=excluded_fields)
+        # Ensure that the expires date string is in the expected ISO-85601 UTC format
+        if filtered is not None and filtered.get('expires', None) and not str(filtered.get('expires')).endswith('Z'):
+            filtered['expires'] = parse_original_datetime(filtered['expires'])
+        return filtered
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_evidence(self):
         return self.badgeinstanceevidence_set.all()
-
 
     @property
     def evidence_url(self):
@@ -1077,9 +1179,9 @@ class BadgeInstance(BaseAuditedModel,
     @evidence_items.setter
     def evidence_items(self, value):
         def _key(narrative, url):
-            return u'{}-{}'.format(narrative, url)
+            return u'{}-{}'.format(narrative or '', url or '')
         existing_evidence_idx = {_key(e.narrative, e.evidence_url): e for e in self.evidence_items}
-        new_evidence_idx = {_key(v.get('narrative',''), v.get('evidence_url','')): v for v in value}
+        new_evidence_idx = {_key(v.get('narrative', None), v.get('evidence_url', None)): v for v in value}
 
         with transaction.atomic():
             if not self.pk:
@@ -1087,7 +1189,7 @@ class BadgeInstance(BaseAuditedModel,
 
             # add missing
             for evidence_data in value:
-                key = _key(evidence_data.get('narrative',''), evidence_data.get('evidence_url',''))
+                key = _key(evidence_data.get('narrative', None), evidence_data.get('evidence_url', None))
                 if key not in existing_evidence_idx:
                     evidence_record, created = BadgeInstanceEvidence.cached.get_or_create(
                         badgeinstance=self,
@@ -1097,7 +1199,7 @@ class BadgeInstance(BaseAuditedModel,
 
             # remove old
             for evidence_record in self.evidence_items:
-                key = _key(evidence_record.narrative or '', evidence_record.evidence_url or '')
+                key = _key(evidence_record.narrative or None, evidence_record.evidence_url or None)
                 if key not in new_evidence_idx:
                     evidence_record.delete()
 
@@ -1244,11 +1346,11 @@ class IssuerExtension(BaseOpenBadgeExtension):
 
     def publish(self):
         super(IssuerExtension, self).publish()
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
 
     def delete(self, *args, **kwargs):
         super(IssuerExtension, self).delete(*args, **kwargs)
-        self.issuer.publish()
+        self.issuer.publish(publish_staff=False)
 
 
 class BadgeClassExtension(BaseOpenBadgeExtension):

@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 from django.core.exceptions import FieldError
 from django.http import Http404
+from rest_framework.exceptions import NotAuthenticated
 from rest_framework.response import Response
 from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_201_CREATED, HTTP_204_NO_CONTENT
 from rest_framework.views import APIView
@@ -46,6 +47,7 @@ class BaseEntityView(APIView):
 
 
 class BaseEntityListView(BaseEntityView):
+    allow_any_unauthenticated_access = False
 
     def get_objects(self, request, **kwargs):
         raise NotImplementedError
@@ -54,6 +56,9 @@ class BaseEntityListView(BaseEntityView):
         """
         GET a list of an entities the authenticated user is authorized for
         """
+        if self.allow_any_unauthenticated_access is False and not request.user.is_authenticated():
+            raise NotAuthenticated()
+
         objects = self.get_objects(request, **kwargs)
         context = self.get_context_data(**kwargs)
         serializer_class = self.get_serializer_class()
@@ -72,6 +77,8 @@ class BaseEntityListView(BaseEntityView):
         """
         POST a new entity to be owned by the authenticated user
         """
+        if not request.user or request.user.is_anonymous():
+            raise NotAuthenticated()
 
         context = self.get_context_data(**kwargs)
         serializer_class = self.get_serializer_class()
@@ -84,6 +91,7 @@ class BaseEntityListView(BaseEntityView):
 
 class VersionedObjectMixin(object):
     entity_id_field_name = 'entity_id'
+    allow_any_unauthenticated_access = False
 
     def has_object_permissions(self, request, obj):
         for permission in self.get_permissions():
@@ -92,6 +100,9 @@ class VersionedObjectMixin(object):
         return True
 
     def get_object(self, request, **kwargs):
+        if self.allow_any_unauthenticated_access is False and not request.user.is_authenticated():
+            raise NotAuthenticated()
+
         version = getattr(request, 'version', 'v1')
         if version == 'v1':
             identifier = kwargs.get('slug')
@@ -132,8 +143,6 @@ class BaseEntityDetailView(BaseEntityView, VersionedObjectMixin):
         GET a single entity by its identifier
         """
         obj = self.get_object(request, **kwargs)
-        if not self.has_object_permissions(request, obj):
-            return Response(status=HTTP_404_NOT_FOUND)
 
         context = self.get_context_data(**kwargs)
         serializer_class = self.get_serializer_class()
@@ -145,8 +154,6 @@ class BaseEntityDetailView(BaseEntityView, VersionedObjectMixin):
         PUT a new version of an entity
         """
         obj = self.get_object(request, **kwargs)
-        if not self.has_object_permissions(request, obj):
-            return Response(status=HTTP_404_NOT_FOUND)
 
         if data is None:
             data = request.data
@@ -163,8 +170,6 @@ class BaseEntityDetailView(BaseEntityView, VersionedObjectMixin):
         DELETE a single entity by identifier
         """
         obj = self.get_object(request, **kwargs)
-        if not self.has_object_permissions(request, obj):
-            return Response(status=HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=HTTP_204_NO_CONTENT)
 

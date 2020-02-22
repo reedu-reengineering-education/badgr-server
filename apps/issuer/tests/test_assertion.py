@@ -11,19 +11,27 @@ import pytz
 import re
 from urllib import quote_plus
 
-from django.apps import apps
 from django.core import mail
 from django.core.urlresolvers import reverse
 from django.utils import timezone
+from django.test import override_settings
 from oauth2_provider.models import Application
 
-from issuer.models import BadgeInstance, IssuerStaff
-from mainsite.models import ApplicationInfo
+from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
+from issuer.models import BadgeInstance, IssuerStaff, Issuer
+from issuer.utils import parse_original_datetime
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationHelper
 from mainsite.utils import OriginSetting
+from rest_framework import serializers
 
 
 class AssertionTests(SetupIssuerHelper, BadgrTestCase):
+    def test_local_pending(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        award = test_badgeclass.issue(recipient_id="nobody@example.com")
+        self.assertEqual(award.pending, False)
 
     def test_assertion_pagination(self):
         test_user = self.setup_user(authenticate=True)
@@ -110,7 +118,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         test_assertion = test_badgeclass.issue(recipient_id='test1@email.test')
 
         # v1 api
-        v1_backdate = datetime.datetime(year=2021, month=3, day=3, tzinfo=pytz.UTC)
+        v1_backdate = datetime.datetime(year=2021, month=3, day=3, tzinfo=pytz.utc)
         updated_data = dict(
             expires=v1_backdate.isoformat()
         )
@@ -197,6 +205,35 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
 
         self.assertEqual(image_data.get('evidence', {})[0].get('narrative'), v2_assertion_data['evidence'][0]['narrative'])
 
+    def test_can_update_assertion_issuer(self):
+        test_user = self.setup_user(authenticate=True)
+        email_two = CachedEmailAddress.objects.create(email='testemail2@example.com', verified=True, user=test_user)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        assertion_data = {
+            "email": "test@example.com",
+            "create_notification": False,
+        }
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ), assertion_data)
+        self.assertEqual(response.status_code, 201)
+        original_assertion = response.data
+
+        response = self.client.put(
+            '/v1/issuer/issuers/{issuer}'.format(issuer=test_issuer.entity_id),
+            json.dumps({
+                'email': email_two.email,
+                'url': test_issuer.url,
+                'name': test_issuer.name
+            }), content_type='application/json')
+
+        response = self.client.get('/public/assertions/{}?expand=badge&expand=badge.issuer'.format(original_assertion['slug']))
+        assertion_data = response.data
+        self.assertEqual(assertion_data['badge']['issuer']['email'], email_two.email)
+
     def test_can_issue_assertion_with_expiration(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -260,13 +297,135 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         assertion_slug = response.data.get('slug')
 
         # assert that the BadgeInstance was published to and fetched from cache
-        query_count = 1 if apps.is_installed('badgebook') else 0
+        query_count = 0
         with self.assertNumQueries(query_count):
             response = self.client.get('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions/{assertion}'.format(
                 issuer=test_issuer.entity_id,
                 badge=test_badgeclass.entity_id,
                 assertion=assertion_slug))
             self.assertEqual(response.status_code, 200)
+
+    def test_can_issue_badge_by_class_name_success(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "test@example.com"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertEqual(response.status_code, 201)
+
+    def test_can_issue_badge_by_class_name_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "test@example.com"
+            },
+            "badgeclassName": "does not exist",
+        }
+
+        self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertRaises(serializers.ValidationError)
+
+    def test_can_issue_badge_by_class_name_cached_issuer_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "test@example.com"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        # Cause issuer to be published to cache.
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertEqual(response.status_code, 201)
+
+        # Update issuer without re-publishing to cache.
+        Issuer.objects.filter(pk=test_issuer.pk).update(
+            description='Using update method will not cause cache to be updated')
+
+        # Error condition would instead produce a
+        # 400 "Could not find matching badgeclass for this issuer."
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertEqual(response.status_code, 201)
+
+    def test_can_issue_badge_by_class_ambiguity_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "test@example.com"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertRaises(serializers.ValidationError)
+
+    def test_cannot_issue_badge_to_invalid_email_error(self):
+        badgeclass_name = "A Badge"
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+        self.setup_badgeclass(issuer=test_issuer, name=badgeclass_name)
+
+        assertion = {
+            "recipient": {
+                "identity": "example.com",
+                "type": "email"
+            },
+            "badgeclassName": badgeclass_name,
+        }
+
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), assertion, format="json")
+        self.assertRaises(serializers.ValidationError)
+        self.assertEqual(response.status_code, 400)
+
+    def test_cannot_issue_email_assertion_to_non_email(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        assertion = {
+            "recipient_identifier": "example.com",
+            "recipient_type": "email",
+            "create_notification": True
+        }
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ), assertion)
+        self.assertEqual(response.status_code, 400)
 
     def test_issue_badge_with_ob1_evidence(self):
         test_user = self.setup_user(authenticate=True)
@@ -588,6 +747,85 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)
 
+    def test_issuer_instance_list_assertions_with_expired(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        expired_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        expired_assertion.expires_at = datetime.datetime.now() - datetime.timedelta(days=1)
+        expired_assertion.save()
+        test_badgeclass.issue(recipient_id='second.recipient@email.test')
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_expired=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+    def test_issuer_instance_list_assertions_with_revoked(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        revoked_assertion = test_badgeclass.issue(recipient_id='second.recipient@email.test')
+        revoked_assertion.revoked = True
+        revoked_assertion.save()
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_revoked=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+
+
+    def test_issuer_instance_list_assertions_with_revoked_and_expired(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        revoked_assertion = test_badgeclass.issue(recipient_id='second.recipient@email.test')
+        revoked_assertion.revoked = True
+        revoked_assertion.save()
+        expired_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        expired_assertion.expires_at = datetime.datetime.now() - datetime.timedelta(days=1)
+        expired_assertion.save()
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_revoked=1&include_expired=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 3)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_revoked=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions?include_expired=1'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 2)
+
+        response = self.client.get('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['result']), 1)
+
     def test_issuer_instance_list_assertions_with_id(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -621,6 +859,28 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         assertion_obo = json.loads(response.content)
         self.assertDictContainsSubset(dict(
             revocationReason=revocation_reason,
+            revoked=True
+        ), assertion_obo)
+
+    def test_can_revoke_assertion_bulk(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        revocation_data = [{
+            'entityId': test_assertion.entity_id,
+            'revocationReason': 'Earner kind of sucked, after all.'
+        }]
+
+        response = self.client.post(reverse('v2_api_assertion_revoke'), data=revocation_data, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get('/public/assertions/{assertion}.json'.format(assertion=test_assertion.entity_id))
+        self.assertEqual(response.status_code, 200)
+        assertion_obo = json.loads(response.content)
+        self.assertDictContainsSubset(dict(
+            revocationReason=revocation_data[0]['revocationReason'],
             revoked=True
         ), assertion_obo)
 
@@ -733,6 +993,33 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         ), invalid_batch_assertion_props, format='json')
         self.assertEqual(response.status_code, 400)
 
+    def test_issue_assertion_with_unacceptable_issuedOn(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        issue_time = timezone.now() + timezone.timedelta(days=1)
+        assertion_data = {
+            'recipient': {
+                "identity": "bar@baz.com",
+                "type": "email"
+            },
+            'issuedOn': issue_time.isoformat()
+        }
+
+        response = self.client.post('/v2/badgeclasses/{badge}/assertions'.format(
+            badge=test_badgeclass.entity_id
+        ), assertion_data, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['fieldErrors']['issuedOn'][0], 'Only issuedOn dates in the past are acceptable.')
+
+        assertion_data['issuedOn'] = '1492-01-01T13:00:00Z'  # A time prior to introduction of the Gregorian calendar.
+        response = self.client.post('/v2/badgeclasses/{badge}/assertions'.format(
+            badge=test_badgeclass.entity_id
+        ), assertion_data, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['fieldErrors']['issuedOn'][0], 'Only issuedOn dates after the introduction of the Gregorian calendar are allowed.')
+
     def test_batch_assertions_with_evidence(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -748,10 +1035,10 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
                 "narrative": "foo@bar's test narrative",
                 "evidence": [
                     {
-                        "url": "http://google.com?evidence=foo.bar",
+                        "url": "http://example.com?evidence=foo.bar",
                     },
                     {
-                        "url": "http://google.com?evidence=bar.baz",
+                        "url": "http://example.com?evidence=bar.baz",
                         "narrative": "barbaz"
                     }
                 ]
@@ -793,6 +1080,43 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             a = expected[i]
             b = actual[i]
             self.assertDictContainsSubset(a, b)
+
+    def test_get_share_url(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+        test_assertion2 = test_badgeclass.issue(recipient_id='+15035555555', recipient_type='telephone')
+        test_assertion3 = test_badgeclass.issue(recipient_id='test.example.com/foo?bar=1', recipient_type='url')
+
+        url = test_assertion.get_share_url()
+        self.assertEqual(test_assertion.jsonld_id, url)
+        url = test_assertion.get_share_url(include_identifier=True)
+        self.assertEqual(test_assertion.jsonld_id + '?identifier__email=new.recipient%40email.test', url)
+        url = test_assertion2.get_share_url(include_identifier=True)
+        self.assertEqual(test_assertion2.jsonld_id + '?identifier__telephone=%2B15035555555', url)
+        url = test_assertion3.get_share_url(include_identifier=True)
+        self.assertEqual(test_assertion3.jsonld_id + '?identifier__url=test.example.com/foo%3Fbar%3D1', url)
+
+    def test_parse_original_datetime(self):
+        result = parse_original_datetime('1577232000')
+        self.assertEqual(result, '2019-12-25T00:00:00Z')
+        result = parse_original_datetime('2018-12-23')
+        self.assertEqual(result, '2018-12-23T00:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00')
+        self.assertEqual(result, '2018-12-23T00:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00Z')
+        self.assertEqual(result, '2018-12-23T00:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00-05:00')
+        self.assertEqual(result, '2018-12-23T05:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00+05:00')
+        self.assertEqual(result, '2018-12-22T19:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00+00:00')
+        self.assertEqual(result, '2018-12-23T00:00:00Z')
+        result = parse_original_datetime('2018-12-23T00:00:00+12:34')
+        self.assertEqual(result, '2018-12-22T11:26:00Z')
+        result = parse_original_datetime('2018-12-23T13:37:00+12:34')
+        self.assertEqual(result, '2018-12-23T01:03:00Z')
 
 
 class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
@@ -853,6 +1177,33 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
             badgeclass=other_badgeclass.entity_id), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 404)
 
+    def test_can_revoke_assertion(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        revocation_reason = "I take it all back. I don't mean what I said when I was hungry."
+
+        response = self.client.delete('/v2/assertions/{assertion}'.format(
+            assertion=test_assertion.entity_id,
+        ), {'revocation_reason': revocation_reason})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['result'][0]['revocationReason'], revocation_reason)
+
+        response = self.client.get('/public/assertions/{assertion}.json'.format(assertion=test_assertion.entity_id))
+        self.assertEqual(response.status_code, 200)
+        assertion_obo = json.loads(response.content)
+        self.assertDictContainsSubset(dict(
+            revocationReason=revocation_reason,
+            revoked=True
+        ), assertion_obo)
+
+        response = self.client.delete('/v2/assertions/{assertion}'.format(
+            assertion=test_assertion.entity_id,
+        ), {'revocation_reason': revocation_reason})
+        self.assertEqual(response.status_code, 400)
+
 
 class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_assertions(self):
@@ -906,3 +1257,201 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
         response = self.client.get('/v2/assertions/changed?since={}'.format(quote_plus(timestamp)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 0)
+
+@override_settings(
+    CELERY_ALWAYS_EAGER=True
+)
+class AssertionWithUserTests(SetupIssuerHelper, BadgrTestCase):
+    def setUp(self):
+        super(AssertionWithUserTests, self).setUp()
+        self.issuer = self.setup_issuer(owner=self.setup_user(email='staff@example.com'))
+
+    def test_award_to_missing_email(self):
+        email = 'idonotexistyet@example.com'
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        award = badgeclass.issue(recipient_id=email)
+        self.assertEqual(award.user, None)
+        recipient = self.setup_user(email=email, authenticate=False)
+        award2 = BadgeInstance.objects.get(recipient_identifier=email)
+        self.assertEqual(award2.user, recipient)
+
+    def test_verification_change_owns_badge(self):
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False, verified=False)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        award = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award.user, None)
+
+        email = recipient.cached_emails()[0]
+        email.verified = True
+        email.save()
+        award2 = BadgeInstance.objects.get(recipient_identifier=recipient.email)
+        self.assertEqual(award2.user, recipient)
+
+        my_id = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+                                                       identifier='http://example123.com',
+                                                       user=recipient, verified=False)
+        badgeclass.issue(recipient_id=my_id.identifier, recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        award2 = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
+        self.assertEqual(award2.user, None)
+        my_id.verified = True
+        my_id.save()
+        award3 = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
+        self.assertEqual(award3.user, recipient)
+
+        badgeclass.issue(recipient_id='+15555555555', recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE)
+        award = BadgeInstance.objects.get(recipient_identifier='+15555555555')
+        self.assertEqual(award.user, None)
+        my_id = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
+                                                       identifier='+15555555555',
+                                                       user=recipient, verified=True)
+        award = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
+        self.assertEqual(award.user, recipient)
+
+
+    def test_verification_change_disowns_badge(self):
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        award = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award.user.pk, recipient.pk)
+
+        my_id = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+                                                       identifier='http://example.com',
+                                                       user=recipient, verified=True)
+        badgeclass.issue(recipient_id='http://example.com', recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        award = BadgeInstance.objects.get(recipient_identifier='http://example.com')
+        self.assertEqual(award.user, recipient)
+        my_id.verified = False
+        my_id.save()
+        award = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
+        self.assertEqual(award.user, None)
+
+        email = recipient.cached_emails()[0]
+        email.verified = False
+        email.save()
+        award2 = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award2.user, None)
+
+
+    def test_assertion_has_user_post_issue(self):
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        award = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award.user.pk, recipient.pk)
+
+    def test_assertion_user_with_verification(self):
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False, verified=False)
+        award = badgeclass.issue(recipient_id=recipient.email)
+        self.assertEqual(award.user, None)
+        recipient2 = self.setup_user(email='recipient2example.com', authenticate=False)
+        award2 = badgeclass.issue(recipient_id=recipient2.email)
+        self.assertEqual(award2.user.pk, recipient2.pk)
+
+    def test_assertion_user_none_post_email_or_identifier_delete(self):
+        recipient = self.setup_user(email='recipient@example.com', authenticate=False)
+        badgeclass = self.setup_badgeclass(issuer=self.issuer)
+        badgeclass.issue(recipient_id=recipient.email)
+        award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
+        self.assertEqual(award.user, recipient)
+        CachedEmailAddress.objects.get(email='recipient@example.com').delete()
+        award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
+        self.assertEqual(award.user, None)
+        my_id = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL,
+                                                       identifier='http://example.com',
+                                                       user=recipient, verified=True)
+        badgeclass.issue(recipient_id='http://example.com', recipient_type=UserRecipientIdentifier.IDENTIFIER_TYPE_URL)
+        award = BadgeInstance.objects.get(recipient_identifier='http://example.com')
+        self.assertEqual(award.user, recipient)
+        my_id.delete()
+        award = BadgeInstance.objects.get(recipient_identifier=recipient.email)
+        self.assertEqual(award.user, None)
+
+
+class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
+    def test_single_award_allow_duplicates(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        existing_assertion = test_badgeclass.issue('test3@example.com')
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'test3@example.com'
+            },
+            'allowDuplicateAwards': False
+        }
+        response = self.client.post('/v2/badgeclasses/{}/assertions'.format(
+            test_badgeclass.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 400)
+
+        # can issue assertion with expiration
+        new_assertion_props_v1 = {
+            "email": 'test3@example.com',
+            "create_notification": False,
+            "allow_duplicate_awards": False
+        }
+        response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
+            issuer=test_issuer.entity_id,
+            badge=test_badgeclass.entity_id
+        ), new_assertion_props_v1)
+        self.assertEqual(response.status_code, 400)
+
+        existing_assertion.revoked = True
+        existing_assertion.save()
+        response = self.client.post('/v2/badgeclasses/{}/assertions'.format(
+            test_badgeclass.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 201, "Assertion should be allowed if existing award is revoked")
+
+    def test_single_award_allow_duplicates_against_not_expired(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        existing_assertion = test_badgeclass.issue(
+            'test3@example.com', expires_at=timezone.now() + timezone.timedelta(days=1)
+        )
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'test3@example.com'
+            },
+            'allowDuplicateAwards': False
+        }
+        response = self.client.post('/v2/badgeclasses/{}/assertions'.format(
+            test_badgeclass.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 400, "The badge should not award, given a unexpired existing award")
+
+    def test_single_award_allow_duplicates_against_expired(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        existing_assertion = test_badgeclass.issue(
+            'test3@example.com', expires_at=timezone.now() - timezone.timedelta(days=1)
+        )
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'test3@example.com'
+            },
+            'allowDuplicateAwards': False
+        }
+        response = self.client.post('/v2/badgeclasses/{}/assertions'.format(
+            test_badgeclass.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 201, "The badge should award, given an expired prior award.")
+
+    def test_badgeclass_and_issuer_not_in_assertion_cache_record(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(
+            'test3@example.com', expires_at=timezone.now() - timezone.timedelta(days=1)
+        )
+        _ = assertion.badgeclass
+        self.assertTrue(hasattr(assertion, '_badgeclass_cache'))
+
+        cached_assertion = BadgeInstance.cached.get(entity_id=assertion.entity_id)
+        self.assertFalse(hasattr(cached_assertion, '_badgeclass_cache'))
+        self.assertFalse(hasattr(cached_assertion, '_issuer_cache'))

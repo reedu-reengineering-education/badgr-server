@@ -3,15 +3,15 @@ from __future__ import unicode_literals
 
 import datetime
 
+from apispec_drf.decorators import apispec_list_operation, apispec_operation, \
+    apispec_get_operation, apispec_delete_operation, apispec_put_operation
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from badgeuser.models import CachedEmailAddress
 from badgeuser.serializers_v1 import EmailSerializerV1
-from apispec_drf.decorators import apispec_list_operation, apispec_post_operation, apispec_operation, \
-    apispec_get_operation, apispec_delete_operation, apispec_put_operation
-
+from mainsite.utils import throttleable
 
 RATE_LIMIT_DELTA = datetime.timedelta(minutes=5)
 
@@ -40,6 +40,7 @@ class BadgeUserEmailList(APIView):
             }
         ]
     )
+    @throttleable
     def post(self, request, **kwargs):
         serializer = EmailSerializerV1(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)

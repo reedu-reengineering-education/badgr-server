@@ -9,6 +9,7 @@ from basic_models.models import CreatedUpdatedAt
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.db import models, transaction
+from django.db.models import Q
 
 from entity.models import BaseVersionedEntity
 from issuer.models import BaseAuditedModel, BadgeInstance
@@ -41,6 +42,13 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
         super(BackpackCollection, self).delete(*args, **kwargs)
         self.publish_delete('share_hash')
         self.created_by.publish()
+
+    def save(self, **kwargs):
+        if self.pk:
+            BackpackCollectionBadgeInstance.objects.filter(
+                Q(badgeinstance__acceptance=BadgeInstance.ACCEPTANCE_REJECTED) | Q(badgeinstance__revoked=True)
+            ).delete()
+        super(BackpackCollection, self).save(**kwargs)
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_badgeinstances(self):
@@ -79,6 +87,9 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
         if self.published:
             return OriginSetting.HTTP+reverse('collection_json', kwargs={'entity_id': self.share_hash})
 
+    def get_share_url(self, **kwargs):
+        return self.share_url
+
     @property
     def badge_items(self):
         return self.cached_badgeinstances()
@@ -87,17 +98,31 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
     def badge_items(self, value):
         """
         Update this collection's list of BackpackCollectionBadgeInstance from a list of BadgeInstance EntityRelatedFieldV2 serializer data
+        :param value: list of BadgeInstance instances or list of BadgeInstance entity_id strings.
         """
+        def _is_in_requested_badges(entity_id):
+            if entity_id in value:
+                return True
+            try:
+                if entity_id in [i.entity_id for i in value]:
+                    return True
+            except AttributeError:
+                pass
+            return False
+
         with transaction.atomic():
             existing_badges = {b.entity_id: b for b in self.badge_items}
             # add missing badges
-            for badge_entity_id in value:
+            for badge_reference in value:
                 try:
-                    badgeinstance = BadgeInstance.cached.get(entity_id=badge_entity_id)
+                    if isinstance(badge_reference, BadgeInstance):
+                        badgeinstance = badge_reference
+                    else:
+                        badgeinstance = BadgeInstance.cached.get(entity_id=badge_reference)
                 except BadgeInstance.DoesNotExist:
                     pass
                 else:
-                    if badge_entity_id not in existing_badges.keys():
+                    if badgeinstance.entity_id not in existing_badges.keys():
                         BackpackCollectionBadgeInstance.cached.get_or_create(
                             collection=self,
                             badgeinstance=badgeinstance
@@ -105,7 +130,7 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
 
             # remove badges no longer in collection
             for badge_entity_id, badgeinstance in existing_badges.items():
-                if badge_entity_id not in value:
+                if not _is_in_requested_badges(badge_entity_id):
                     BackpackCollectionBadgeInstance.objects.filter(
                         collection=self,
                         badgeinstance=badgeinstance
@@ -120,6 +145,7 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
             ('id', add_obi_version_ifneeded(self.share_url, obi_version)),
             ('name', self.name),
             ('description', self.description),
+            ('entityId', self.entity_id),
             ('owner', OrderedDict([
                 ('firstName', self.cached_creator.first_name),
                 ('lastName', self.cached_creator.last_name),
@@ -134,8 +160,10 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
 
     @property
     def cached_badgrapp(self):
-        id = self.cached_creator.badgrapp_id if self.cached_creator.badgrapp_id else getattr(settings, 'BADGR_APP_ID', 1)
-        return BadgrApp.cached.get(id=id)
+        creator = self.cached_creator
+        if creator and creator.badgrapp_id:
+            return BadgrApp.objects.get(pk=creator.badgrapp_id)
+        return BadgrApp.objects.get_current(None)
 
 
 class BackpackCollectionBadgeInstance(cachemodel.CacheModel):

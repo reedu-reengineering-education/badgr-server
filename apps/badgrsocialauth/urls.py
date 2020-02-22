@@ -1,10 +1,11 @@
 import importlib
+import logging
 
 from allauth.socialaccount import providers
 from django.conf.urls import url
 
 from badgrsocialauth.views import BadgrSocialLogin, BadgrSocialEmailExists, BadgrSocialAccountVerifyEmail, \
-    BadgrSocialLoginCancel, BadgrAccountConnected
+    BadgrSocialLoginCancel, BadgrAccountConnected, saml2_redirect, assertion_consumer_service
 
 urlpatterns = [
     url(r'^sociallogin', BadgrSocialLogin.as_view(permanent=False), name='socialaccount_login'),
@@ -20,6 +21,10 @@ urlpatterns = [
 
     # Intercept allauth connections view (attached a new social account)
     url(r'^connected', BadgrAccountConnected.as_view(permanent=False), name='socialaccount_connections'),
+
+    # SAML2 Identity Provider
+    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/$', saml2_redirect, name='saml2login'),
+    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/acs/', assertion_consumer_service, name='assertion_consumer_service'),
 ]
 
 
@@ -27,6 +32,9 @@ for provider in providers.registry.get_list():
     try:
         prov_mod = importlib.import_module(provider.get_package() + '.urls')
     except ImportError:
+        logging.getLogger(__name__).warning(
+            'url import failed for %s socialaccount provider' % provider.id,
+            exc_info=True)
         continue
     prov_urlpatterns = getattr(prov_mod, 'urlpatterns', None)
     if prov_urlpatterns:

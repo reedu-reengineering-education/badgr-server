@@ -8,12 +8,19 @@ import openbadges
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import transaction, IntegrityError
+
+import requests_cache
 from requests_cache.backends import BaseCache
 
+import logging
 from issuer.models import Issuer, BadgeClass, BadgeInstance
+from issuer.utils import OBI_VERSION_CONTEXT_IRIS
 from mainsite.utils import first_node_match
+import json
 
+
+logger = logging.getLogger(__name__)
 
 class DjangoCacheDict(MutableMapping):
     """TODO: Fix this class, its broken!"""
@@ -85,6 +92,43 @@ class DjangoCacheDict(MutableMapping):
         self.keymap_cache_key = self._keymap_cache_key+"_"+self._id
 
 
+class OpenBadgesContextCache(BaseCache):
+    OPEN_BADGES_CONTEXT_V2_URI = OBI_VERSION_CONTEXT_IRIS.get('2_0')
+    OPEN_BADGE_CONTEXT_CACHE_KEY = 'OPEN_BADGE_CONTEXT_CACHE_KEY'
+    FORTY_EIGHT_HOURS_IN_SECONDS = 60 * 60 * 24 * 2
+
+    def __init__(self, *args, **kwargs):
+        super(OpenBadgesContextCache, self).__init__(*args, **kwargs)
+
+        cached_context = self._get_cached_content()
+
+        if cached_context:
+            self._intialize_instance_attributes(cached_context)
+        else:
+            self._set_cached_content()
+            self._intialize_instance_attributes(self._get_cached_content())
+
+    def _get_cached_content(self):
+        return cache.get(self.OPEN_BADGE_CONTEXT_CACHE_KEY, None)
+
+    def _set_cached_content(self):
+        self.session = requests_cache.CachedSession(backend='memory', expire_after=300)
+        response = self.session.get(self.OPEN_BADGES_CONTEXT_V2_URI, headers={'Accept': 'application/ld+json, application/json'})
+        if response.status_code == 200:
+            cache.set(
+                self.OPEN_BADGE_CONTEXT_CACHE_KEY,
+                {
+                    'keys_map': self.session.cache.keys_map.copy(),
+                    'response': self.session.cache.responses.copy()
+                },
+                timeout=self.FORTY_EIGHT_HOURS_IN_SECONDS
+            )
+
+    def _intialize_instance_attributes(self, cached):
+        self.keys_map = cached.get('keys_map', None)
+        self.responses = cached.get('response', None)
+
+
 class DjangoCacheRequestsCacheBackend(BaseCache):
     def __init__(self, namespace='requests-cache', **options):
         super(DjangoCacheRequestsCacheBackend, self).__init__(**options)
@@ -146,15 +190,23 @@ class BadgeCheckHelper(object):
         if len(query) != 1:
             raise ValueError("Must provide only 1 of: url, imagefile or assertion_obo")
         query = query[0]
-
+        
         if created_by:
+            emails = [d.email for d in created_by.email_items.all()]
             badgecheck_recipient_profile = {
-                'email': created_by.all_recipient_identifiers
+                'email': emails + [v.email for v in created_by.cached_email_variants()],
+                'telephone': created_by.cached_verified_phone_numbers(),
+                'url': created_by.cached_verified_urls()
             }
         else:
             badgecheck_recipient_profile = None
 
         try:
+            if type(query) is dict:
+                try:
+                    query = json.dumps(query)
+                except (TypeError, ValueError):
+                    raise ValidationError("Could not parse dict to json")
             response = openbadges.verify(query, recipient_profile=badgecheck_recipient_profile, **cls.badgecheck_options())
         except ValueError as e:
             raise ValidationError([{'name': "INVALID_BADGE", 'description': str(e)}])
@@ -185,12 +237,29 @@ class BadgeCheckHelper(object):
 
         original_json = response.get('input').get('original_json', {})
 
-        recipient_identifier = report.get('recipientProfile', {}).get('email', None)
+        recipient_profile = report.get('recipientProfile', {})
+        recipient_type, recipient_identifier = recipient_profile.items()[0]
 
-        with transaction.atomic():
-            issuer, issuer_created = Issuer.objects.get_or_create_from_ob2(issuer_obo, original_json=original_json.get(issuer_obo.get('id')))
-            badgeclass, badgeclass_created = BadgeClass.objects.get_or_create_from_ob2(issuer, badgeclass_obo, original_json=original_json.get(badgeclass_obo.get('id')))
-            return BadgeInstance.objects.get_or_create_from_ob2(badgeclass, assertion_obo, recipient_identifier=recipient_identifier, original_json=original_json.get(assertion_obo.get('id')))
+        def commit_new_badge():
+            with transaction.atomic():
+                issuer, issuer_created = Issuer.objects.get_or_create_from_ob2(issuer_obo, original_json=original_json.get(issuer_obo.get('id')))
+                badgeclass, badgeclass_created = BadgeClass.objects.get_or_create_from_ob2(issuer, badgeclass_obo, original_json=original_json.get(badgeclass_obo.get('id')))
+                if badgeclass_created and (
+                        getattr(settings, 'BADGERANK_NOTIFY_ON_BADGECLASS_CREATE', True) or
+                        getattr(settings, 'BADGERANK_NOTIFY_ON_FIRST_ASSERTION', True)
+                ):
+                    from issuer.tasks import notify_badgerank_of_badgeclass
+                    notify_badgerank_of_badgeclass.delay(badgeclass_pk=badgeclass.pk)
+                return BadgeInstance.objects.get_or_create_from_ob2(
+                    badgeclass, assertion_obo,
+                    recipient_identifier=recipient_identifier, recipient_type=recipient_type,
+                    original_json=original_json.get(assertion_obo.get('id'))
+                )
+        try:
+            return commit_new_badge()
+        except IntegrityError:
+            logger.error("Race condition caught when saving new assertion: {}".format(query))
+            return commit_new_badge()
 
     @classmethod
     def get_assertion_obo(cls, badge_instance):

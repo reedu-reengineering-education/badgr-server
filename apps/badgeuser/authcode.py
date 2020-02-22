@@ -7,8 +7,8 @@ import json
 import dateutil
 import cryptography.fernet
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
-from oauth2_provider.models import AccessToken
 
 
 def authcode_for_accesstoken(accesstoken, expires_seconds=None, secret_key=None):
@@ -18,10 +18,10 @@ def authcode_for_accesstoken(accesstoken, expires_seconds=None, secret_key=None)
 
 def accesstoken_for_authcode(authcode, secret_key=None):
     accesstoken_pk = decrypt_authcode(authcode, secret_key=secret_key)
-    from badgeuser.models import BadgrAccessToken
+    from mainsite.models import AccessTokenProxy
     try:
-        return BadgrAccessToken.objects.get(pk=accesstoken_pk)
-    except AccessToken.DoesNotExist:
+        return AccessTokenProxy.objects.get(pk=accesstoken_pk)
+    except ObjectDoesNotExist:
         return None
 
 

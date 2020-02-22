@@ -21,11 +21,7 @@ from pathway.serializers import PathwaySerializer, PathwayElementSerializer
 from recipient.models import RecipientProfile, RecipientGroupMembership, RecipientGroup
 
 
-@override_settings(
-    BADGR_APP_ID=1
-)
 class PathwayApiTests(SetupIssuerHelper, BadgrTestCase):
-
     def setUp(self):
         cache.clear()
         super(PathwayApiTests, self).setUp()
@@ -248,11 +244,11 @@ class PathwayApiTests(SetupIssuerHelper, BadgrTestCase):
 
 
 @override_settings(
-    ISSUER_NOTIFY_DEFAULT=False,
-    BADGR_APP_ID=1
+    ISSUER_NOTIFY_DEFAULT=False
 )
 class PathwayCompletionTests(SetupIssuerHelper, BadgrTestCase):
     def setUp(self):
+        cache.clear()
         self.test_user, _ = BadgeUser.objects.get_or_create(email='test@example.com')
         self.test_user.user_permissions.add(Permission.objects.get(codename="add_issuer"))
         CachedEmailAddress.objects.get_or_create(user=self.test_user, email='test@example.com', verified=True, primary=True)
@@ -464,11 +460,12 @@ class PathwayCompletionTests(SetupIssuerHelper, BadgrTestCase):
 
         # award badge to recipient, should complete pathway and get a completion badge
         badge_instance = self.test_badgeclass.issue(recipient, created_by=self.test_user)
+        issuer = badge_instance.cached_issuer
 
         # get completion detail to force badge awarding
         with self.assertNumQueries(0):
             response = self.client.get(reverse('pathway_completion_detail', kwargs={
-                'issuer_slug': badge_instance.issuer.entity_id,
+                'issuer_slug': issuer.entity_id,
                 'pathway_slug': pathway.slug,
                 'element_slug': pathway.root_element.slug
             }) + '?recipient%5B%5D={}'.format(profile.entity_id))

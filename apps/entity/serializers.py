@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
-
 from rest_framework.exceptions import ValidationError as RestframeworkValidationError
 
 
@@ -18,9 +17,11 @@ class EntityRelatedFieldV2(serializers.RelatedField):
             obj = self.get_queryset().get(**{self.rel_source: data})
             return obj
         except ObjectDoesNotExist:
-            self.fail('Invalid {rel_source} "{rel_value}" - object does not exist.', rel_source=self.rel_source, rel_value=data)
+            raise RestframeworkValidationError('Invalid {rel_source} "{rel_value}" - object does not exist.'.format(
+                rel_source=self.rel_source, rel_value=data))
         except (TypeError, ValueError):
-            self.fail('Incorrect type. Expected {rel_source} value, received {data_type}.', rel_source=self.rel_source, data_type=type(data).__name__)
+            raise RestframeworkValidationError('Incorrect type. Expected {rel_source} value, got {data_type}.'.format(
+                rel_source=self.rel_source, data_type=type(data).__name__))
 
     def to_representation(self, value):
         return getattr(value, self.rel_source)
@@ -95,6 +96,26 @@ class ListSerializerV2(serializers.ListSerializer, BaseSerializerV2):
     def data(self):
         return super(serializers.ListSerializer, self).data
 
+    @property
+    def errors(self):
+        if not hasattr(self, '_errors'):
+            msg = 'You must call `.is_valid()` before accessing `.errors`.'
+            raise AssertionError(msg)
+        base_errors_list = self._errors
+
+        return_errors = {}
+        try:
+            for field_errors in base_errors_list:
+                for fe_key, fe_value in field_errors.items():
+                    if return_errors.get(fe_key) is None:
+                        return_errors[fe_key] = field_errors[fe_key]
+                    else:
+                        return_errors[fe_key] += field_errors[fe_key]
+
+            return return_errors
+        except TypeError:
+            return base_errors_list
+
 
 class DetailSerializerV2(BaseSerializerV2):
     entityType = serializers.CharField(source='get_entity_class_name', max_length=254, read_only=True)
@@ -149,6 +170,13 @@ class V2ErrorSerializer(BaseSerializerV2):
         super(V2ErrorSerializer, self).__init__(*args, **kwargs)
 
     def to_representation(self, instance):
+        try:
+            self.validation_errors = self.validation_errors + self.field_errors.pop('non_field_errors', [])
+        except (TypeError, AttributeError):
+            # In the case where field_errors is a list of dicts, we keep non_field_errors grouped with other field
+            # errors for that object
+            pass
+
         return BaseSerializerV2.response_envelope(result=[],
                                                   success=self.success,
                                                   description=self.description,
