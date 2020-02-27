@@ -38,6 +38,22 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         response = self.client.post('/v1/issuer/issuers', self.example_issuer_props)
         self.assertIn(response.status_code, (401, 403))
 
+    def test_v2_issuers_badgeclasses_can_paginate(self):
+        NUM_BADGE_CLASSES = 5
+        PAGINATE = 2
+
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclasses = list(self.setup_badgeclasses(issuer=test_issuer, how_many=NUM_BADGE_CLASSES))
+
+        response = self.client.get('/v2/issuers/{slug}/badgeclasses?num={num}'.format(
+            slug=test_issuer.entity_id,
+            num=PAGINATE)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(test_badgeclasses), NUM_BADGE_CLASSES)
+        self.assertEqual(len(response.data.get('result')), PAGINATE)
+
     def test_create_issuer_if_authenticated(self):
         test_user = self.setup_user(authenticate=True)
         issuer_email = CachedEmailAddress.objects.create(

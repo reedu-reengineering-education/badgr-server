@@ -101,7 +101,7 @@ class IssuerDetail(BaseEntityDetailView):
         return super(IssuerDetail, self).delete(request, **kwargs)
 
 
-class AllBadgeClassesList(BaseEntityListView):
+class AllBadgeClassesList(UncachedPaginatedViewMixin, BaseEntityListView):
     """
     GET a list of badgeclasses within one issuer context or
     POST to create a new badgeclass within the issuer context
@@ -116,8 +116,8 @@ class AllBadgeClassesList(BaseEntityListView):
     v2_serializer_class = BadgeClassSerializerV2
     valid_scopes = ["rw:issuer"]
 
-    def get_objects(self, request, **kwargs):
-        return request.user.cached_badgeclasses()
+    def get_queryset(self, request, **kwargs):
+        return BadgeClass.objects.filter(issuer__staff=request.user).order_by('created_at')
 
     @apispec_list_operation('BadgeClass',
         summary="Get a list of BadgeClasses for authenticated user",
@@ -129,12 +129,20 @@ class AllBadgeClassesList(BaseEntityListView):
     @apispec_post_operation('BadgeClass',
         summary="Create a new BadgeClass",
         tags=["BadgeClasses"],
+        parameters=[
+            {
+                'in': 'query',
+                'name': "num",
+                'type': "string",
+                'description': 'Request pagination of results'
+            },
+        ]
     )
     def post(self, request, **kwargs):
         return super(AllBadgeClassesList, self).post(request, **kwargs)
 
 
-class IssuerBadgeClassList(VersionedObjectMixin, BaseEntityListView):
+class IssuerBadgeClassList(UncachedPaginatedViewMixin, VersionedObjectMixin, BaseEntityListView):
     """
     GET a list of badgeclasses within one issuer context or
     POST to create a new badgeclass within the issuer context
@@ -150,9 +158,9 @@ class IssuerBadgeClassList(VersionedObjectMixin, BaseEntityListView):
     create_event = badgrlog.BadgeClassCreatedEvent
     valid_scopes = ["rw:issuer", "rw:issuer:*"]
 
-    def get_objects(self, request, **kwargs):
+    def get_queryset(self, request=None, **kwargs):
         issuer = self.get_object(request, **kwargs)
-        return issuer.cached_badgeclasses()
+        return BadgeClass.objects.filter(issuer=issuer)
 
     def get_context_data(self, **kwargs):
         context = super(IssuerBadgeClassList, self).get_context_data(**kwargs)
@@ -163,6 +171,14 @@ class IssuerBadgeClassList(VersionedObjectMixin, BaseEntityListView):
         summary="Get a list of BadgeClasses for a single Issuer",
         description="Authenticated user must have owner, editor, or staff status on the Issuer",
         tags=["Issuers", "BadgeClasses"],
+        parameters=[
+            {
+                'in': 'query',
+                'name': "num",
+                'type': "string",
+                'description': 'Request pagination of results'
+            },
+        ]
     )
     def get(self, request, **kwargs):
         return super(IssuerBadgeClassList, self).get(request, **kwargs)
