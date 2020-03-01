@@ -173,6 +173,30 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
         self.assertEqual(response.status_code, 400)
 
+    def test_v2_badgeclasses_can_paginate(self):
+        NUM_BADGE_CLASSES = 5
+        PAGINATE = 2
+
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclasses = list(self.setup_badgeclasses(issuer=test_issuer, how_many=NUM_BADGE_CLASSES))
+
+        test_user2 = self.setup_user(authenticate=True)
+        test_issuer2 = self.setup_issuer(owner=test_user2)
+        test_badgeclass2 = list(self.setup_badgeclasses(issuer=test_issuer2, how_many=NUM_BADGE_CLASSES))
+
+        response = self.client.get('/v2/badgeclasses?num={num}'.format(num=PAGINATE))
+
+        for badge_class in test_badgeclass2:
+            for staff_record in badge_class.cached_issuer.cached_issuerstaff():
+                self.assertTrue(staff_record.user_id == test_user2.id)
+                self.assertTrue(staff_record.user_id != test_user.id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(test_badgeclass2), NUM_BADGE_CLASSES)
+        self.assertEqual(len(response.data.get('result')), PAGINATE)
+
+
     def test_badgeclass_with_expires_in_days_v1(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
