@@ -117,6 +117,8 @@ class AllBadgeClassesList(UncachedPaginatedViewMixin, BaseEntityListView):
     valid_scopes = ["rw:issuer"]
 
     def get_queryset(self, request, **kwargs):
+        if self.get_page_size(request) is None:
+            return request.user.cached_badgeclasses()
         return BadgeClass.objects.filter(issuer__staff=request.user).order_by('created_at')
 
     @apispec_list_operation('BadgeClass',
@@ -160,6 +162,9 @@ class IssuerBadgeClassList(UncachedPaginatedViewMixin, VersionedObjectMixin, Bas
 
     def get_queryset(self, request=None, **kwargs):
         issuer = self.get_object(request, **kwargs)
+
+        if self.get_page_size(request) is None:
+            return issuer.cached_badgeclasses()
         return BadgeClass.objects.filter(issuer=issuer)
 
     def get_context_data(self, **kwargs):
