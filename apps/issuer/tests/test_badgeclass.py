@@ -342,6 +342,13 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
     def test_can_create_badgeclass_with_svg(self):
         self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path(), image_mimetype='image/svg+xml')
 
+    def test_can_get_png_preview_for_svg_badgeclass(self):
+        badgeclass_data = self._create_badgeclass_for_issuer_authenticated(self.get_test_svg_image_path(), image_mimetype='image/svg+xml')
+
+        response = self.client.get('/public/badges/{}/image?type=png'.format(badgeclass_data.get('slug')))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response._headers.get('location')[1].endswith('.png'))
+
     def test_create_badgeclass_scrubs_svg(self):
         with open(self.get_testfiles_path('hacked-svg-with-embedded-script-tags.svg'), 'r') as attack_badge_image:
 
