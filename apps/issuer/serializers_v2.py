@@ -407,6 +407,30 @@ class BadgeRecipientSerializerV2(BaseSerializerV2):
 
     }
 
+    class Meta:
+        apispec_definition = ('BadgeRecipient', {
+            'properties': OrderedDict([
+                ('identity', {
+                    'type': 'string',
+                    'format': 'string',
+                    'description': 'Either the hash of the identity or the plaintext value'
+                }),
+                ('type', {
+                    'type': 'string',
+                    'enum': [c[0] for c in BadgeInstance.RECIPIENT_TYPE_CHOICES],
+                    'description': "Type of identifier used to identify recipient"
+                }),
+                ('hashed', {
+                    'type': 'boolean',
+                    'description': "Whether or not the identity value is hashed."
+                }),
+                ('plaintextIdentity', {
+                    'type': 'string',
+                    'description': "The plaintext identity"
+                }),
+            ]),
+        })
+
     def validate(self, attrs):
         recipient_type = attrs.get('recipient_type')
         recipient_identifier = attrs.get('recipient_identifier')
@@ -584,30 +608,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                 }),
                 ('recipient', {
                     'type': 'object',
-                    'properties': OrderedDict([
-                        ('identity', {
-                            'type': 'string',
-                            'format': 'string',
-                            'description': 'Either the hash of the identity or the plaintext value',
-                            'required': True,
-                        }),
-                        ('type', {
-                            'type': 'string',
-                            'enum': [c[0] for c in BadgeInstance.RECIPIENT_TYPE_CHOICES],
-                            'description': "Type of identifier used to identify recipient",
-                            'required': False,
-                        }),
-                        ('hashed', {
-                            'type': 'boolean',
-                            'description': "Whether or not the identity value is hashed.",
-                            'required': False,
-                        }),
-                        ('plaintextIdentity', {
-                            'type': 'string',
-                            'description': "The plaintext identity",
-                            'required': False,
-                        }),
-                    ]),
+                    '$ref': '#/definitions/BadgeRecipient',
                     'description': "Recipient that was issued the Assertion",
                     'required': False,
                 }),

@@ -5,7 +5,7 @@ from django.db.models import ProtectedError
 from rest_framework import views, exceptions, status
 from rest_framework.response import Response
 
-from backpack.badge_connect_serializers import BCErrorSerializer
+from backpack.serializers_bcv1 import BadgeConnectErrorSerializer
 from entity.serializers import V2ErrorSerializer
 from entity.authentication import CSRFPermissionDenied
 
@@ -95,9 +95,9 @@ def exception_handler(exc, context):
             status_code = status.HTTP_405_METHOD_NOT_ALLOWED
             status_text = 'METHOD_NOT_ALLOWED'
 
-        serializer = BCErrorSerializer(instance={},
-                                       error=error,
-                                       status_text=status_text,
-                                       status_code=status_code)
+        serializer = BadgeConnectErrorSerializer(instance={},
+                                                 error=error,
+                                                 status_text=status_text,
+                                                 status_code=status_code)
         return Response(serializer.data, status=status_code)
                         

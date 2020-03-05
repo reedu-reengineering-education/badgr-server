@@ -207,26 +207,3 @@ class CursorPaginatedListSerializer(serializers.ListSerializer):
 class DateTimeWithUtcZAtEndField(serializers.DateTimeField):
     timezone = pytz.utc
 
-
-class BadgeConnectApiInfoSerializer(serializers.Serializer):
-    name = serializers.CharField(read_only=True)
-    image = serializers.URLField(read_only=True)
-    apiBase = serializers.URLField(read_only=True)
-    version = serializers.CharField(read_only=True)
-    termsOfServiceUrl = serializers.URLField(read_only=True)
-    privacyPolicyUrl = serializers.URLField(read_only=True)
-    scopesOffered = serializers.ListField(read_only=True, child=serializers.URLField())
-    scopesRequested = serializers.ListField(read_only=True, child=serializers.URLField())
-    registrationUrl = serializers.URLField(read_only=True)
-    authorizationUrl = serializers.URLField(read_only=True)
-    tokenUrl = serializers.URLField(read_only=True)
-
-
-class BadgeConnectManifestSerializer(serializers.Serializer):
-    id = serializers.URLField(read_only=True)
-    badgeConnectAPI = BadgeConnectApiInfoSerializer(read_only=True, many=True)
-
-    def to_representation(self, instance):
-        data = super(BadgeConnectManifestSerializer, self).to_representation(instance)
-        data['@context'] = 'https://w3id.org/openbadges/badgeconnect/v1'
-        return data

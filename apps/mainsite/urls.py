@@ -36,9 +36,9 @@ urlpatterns = [
     url(r'^o/', include(oauth2_provider_base_urlpatterns, namespace='oauth2_provider')),
 
     # Badge Connect URLs
-    url(r'^bc/v1/manifest/(?P<domain>[^/]+)$', BadgeConnectManifestView.as_view(), name='badge_connect_manifest'),
+    url(r'^bcv1/manifest/(?P<domain>[^/]+)$', BadgeConnectManifestView.as_view(), name='badge_connect_manifest'),
     url(r'^\.well-known/badgeconnect.json$', BadgeConnectManifestRedirectView.as_view(), name='default_bc_manifest_redirect'),
-    url(r'^bc/v1/', include('backpack.badge_connect_urls'), kwargs={'version': 'bcv1'}),
+    url(r'^bcv1/', include('backpack.badge_connect_urls'), kwargs={'version': 'bcv1'}),
 
     # Home
     url(r'^$', info_view, name='index'),

@@ -1,24 +1,26 @@
+from collections import OrderedDict
+
+from apispec_drf.decorators import apispec_get_operation, apispec_post_operation
 from django.conf import settings
 from django.shortcuts import reverse
 from django.utils.dateparse import parse_datetime
 from django.views.generic.base import RedirectView
 from rest_framework import status
-from rest_framework.generics import ListCreateAPIView
+from rest_framework.generics import ListCreateAPIView, GenericAPIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
 from rest_framework.views import APIView
 
-from backpack.badge_connect_serializers import ProfileSerializerBC, BackpackAssertionSerializerBC, \
-    BackpackImportSerializerBC
+from backpack.serializers_bcv1 import BackpackProfilesSerializerBC, BadgeConnectAssertionsSerializer, \
+    BadgeConnectImportSerializer, BadgeConnectManifestSerializer
 from badgeuser.models import BadgeUser
-from entity.api import BaseEntityDetailView
+from entity.api import BaseEntityDetailView, BaseEntityListView
 from issuer.models import BadgeInstance
 from issuer.permissions import BadgrOAuthTokenHasScope, VerifiedEmailMatchesRecipientIdentifier
 from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 from mainsite.models import BadgrApp
-from mainsite.serializers import BadgeConnectManifestSerializer
 
 
 BADGE_CONNECT_SCOPES = [
@@ -42,7 +44,7 @@ def badge_connect_api_info(domain):
         "badgeConnectAPI": [{
             "name": badgr_app.name,
             "image": "https://placekitten.com/300/300", # TODO
-            "apiBase": '{}{}'.format(settings.HTTP_ORIGIN, '/bc/v1'),
+            "apiBase": '{}{}'.format(settings.HTTP_ORIGIN, '/bcv1'),
             "version": "v1p0",
             "termsOfServiceUrl": "https://badgr.com/terms-of-service.html",
             "privacyPolicyUrl": "https://badgr.com/privacy-policy.html",
@@ -63,6 +65,18 @@ def badge_connect_api_info(domain):
 class BadgeConnectManifestView(APIView):
     permission_classes = [AllowAny]
 
+    @apispec_get_operation('BadgeConnectManifest',
+        summary='Fetch Badge Connect Manifest',
+        tags=['BadgeConnect'],
+        parameters=[
+            {
+                "in": "query",
+                'name': 'domain',
+                'type': 'string',
+                'description': 'The CORS domain for the BadgrApp'
+            }
+        ]
+    )
     def get(self, request, **kwargs):
         data = badge_connect_api_info(kwargs.get('domain'))
         if data is None:
@@ -116,7 +130,7 @@ class BadgeConnectPagination(LimitOffsetPagination):
 
 class BadgeConnectAssertionListView(ListCreateAPIView):
     model = BadgeInstance
-    serializer_class = BackpackAssertionSerializerBC
+    serializer_class = BadgeConnectAssertionsSerializer
     permission_classes = (AuthenticatedWithVerifiedIdentifier, VerifiedEmailMatchesRecipientIdentifier, BadgrOAuthTokenHasScope)
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack', 'https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly'],
@@ -133,19 +147,71 @@ class BadgeConnectAssertionListView(ListCreateAPIView):
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
-            return BackpackImportSerializerBC
+            return BadgeConnectImportSerializer
         return super(BadgeConnectAssertionListView, self).get_serializer_class()
+
+    @apispec_get_operation('BadgeConnectAssertions',
+       summary='Get a list of Assertions',
+       tags=['BadgeConnect'],
+       parameters=[
+           {
+               "in": "query",
+               'name': 'limit',
+               'type': 'integer',
+               'description': 'Indicate how many results should be retrieved in a single page.'
+           },
+           {
+               "in": "query",
+               'name': 'offset',
+               'type': 'integer',
+               'description': 'Indicate the index of the first record to return (zero indexed).'
+           },
+           {
+               "in": "query",
+               'name': 'limit',
+               'type': 'string',
+               'format': 'date-time',
+               'description': 'Retrieve Assertions that were created or updated after the provided timestamp. Must be an ISO 8601 compatible timestamp with a time zone indicator.'
+           },
+       ]
+    )
+    def get(self, request, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset)
+        return Response(serializer.data)
+
+    @apispec_post_operation('BadgeConnectImport',
+        summary='Import a Badge Assertion',
+        tags=['BadgeConnect'],
+        responses=OrderedDict([
+            ("201", {
+                'schema': {'$ref': '#/definitions/BadgeConnectImportResult'},
+                'description': "Successfully created"
+            }),
+        ])
+    )
+    def post(self, request, **kwargs):
+        return super(BadgeConnectAssertionListView, self).post(request, **kwargs)
 
 
 class BadgeConnectProfileView(BaseEntityDetailView):
     model = BadgeUser
-    bc_serializer_class = ProfileSerializerBC
+    bc_serializer_class = BackpackProfilesSerializerBC
     permission_classes = (AuthenticatedWithVerifiedIdentifier, BadgrOAuthTokenHasScope)
     http_method_names = ('get',)
     valid_scopes = {
         'get': ['r:backpack', 'rw:backpack', 'https://purl.imsglobal.org/spec/ob/v2p1/scope/profile.readonly'],
     }
 
+    @apispec_get_operation('BadgeConnectProfiles',
+        summary='Get Badge Connect user profile',
+        tags=['BadgeConnect']
+    )
     def get(self, request, **kwargs):
         """
         GET a single entity by its identifier
@@ -154,7 +220,7 @@ class BadgeConnectProfileView(BaseEntityDetailView):
 
         context = self.get_context_data(**kwargs)
         serializer_class = self.bc_serializer_class
-        serializer = serializer_class(obj, context=context)
+        serializer = serializer_class([obj], context=context)
         return Response(serializer.data)
 
     def get_context_data(self, **kwargs):

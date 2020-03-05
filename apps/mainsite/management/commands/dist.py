@@ -22,6 +22,6 @@ class Command(BaseCommand):
         call_command('generate_swagger_spec',
             output=os.path.join(dirname, 'api_spec_{version}.json'),
             preamble=os.path.join(dirname, "API_DESCRIPTION_{version}.md"),
-            versions=['v1', 'v2'],
+            versions=['v1', 'v2', 'bcv1'],
             include_oauth2_security=True
         )

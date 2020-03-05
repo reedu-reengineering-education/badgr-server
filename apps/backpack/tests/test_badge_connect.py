@@ -19,24 +19,24 @@ from mainsite.tests import BadgrTestCase, SetupIssuerHelper
 class ManifestFileTests(BadgrTestCase):
     def test_can_retrieve_manifest_files(self):
         ba = BadgrApp.objects.create(name='test', cors='some.domain.com')
-        response = self.client.get('/bc/v1/manifest/some.domain.com', headers={'Accept': 'application/json'})
+        response = self.client.get('/bcv1/manifest/some.domain.com', headers={'Accept': 'application/json'})
         self.assertEqual(response.status_code, 200)
         data = response.data
         self.assertEqual(data['@context'], 'https://w3id.org/openbadges/badgeconnect/v1')
         self.assertIn('https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly', data['badgeConnectAPI'][0]['scopesOffered'])
 
-        response = self.client.get('/bc/v1/manifest/some.otherdomain.com', headers={'Accept': 'application/json'})
+        response = self.client.get('/bcv1/manifest/some.otherdomain.com', headers={'Accept': 'application/json'})
         self.assertEqual(response.status_code, 404)
 
         response = self.client.get('/.well-known/badgeconnect.json')
         self.assertEqual(response.status_code, 302)
 
         url = urlparse.urlparse(response._headers['location'][1])
-        self.assertIn('/bc/v1/manifest/', url.path)
+        self.assertIn('/bcv1/manifest/', url.path)
 
     def test_manifest_file_is_theme_appropriate(self):
         ba = BadgrApp.objects.create(name='test', cors='some.domain.com')
-        response = self.client.get('/bc/v1/manifest/some.domain.com', headers={'Accept': 'application/json'})
+        response = self.client.get('/bcv1/manifest/some.domain.com', headers={'Accept': 'application/json'})
         data = response.data
         self.assertEqual(data['badgeConnectAPI'][0]['name'], ba.name)
 
@@ -113,7 +113,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
 
         # Get the assertion
         self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(access_token))
-        response = self.client.get('/bc/v1/assertions')
+        response = self.client.get('/bcv1/assertions')
         self.assertEqual(response.status_code, 200)
 
         REMOTE_BADGE_URI = 'http://a.com/assertion-embedded1'
@@ -131,13 +131,13 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
             "statusText": 'OK'
         }
 
-        response = self.client.post('/bc/v1/assertions', data={'id': REMOTE_BADGE_URI}, format='json')
+        response = self.client.post('/bcv1/assertions', data={'id': REMOTE_BADGE_URI}, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertJSONEqual(force_text(response.content), {
             "status": expected_status
         })
 
-        response = self.client.get('/bc/v1/assertions')
+        response = self.client.get('/bcv1/assertions')
         self.assertEqual(response.status_code, 200)
         self.assertJSONEqual(force_text(json.dumps(response.data['status'])), expected_status)
         self.assertEqual(len(response.data['results']), 2)
@@ -148,7 +148,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
             self.assertEqual(result['@context'], OPENBADGES_CONTEXT_V2_URI)
             self.assertEqual(result['type'], 'Assertion')
 
-        response = self.client.get('/bc/v1/profile')
+        response = self.client.get('/bcv1/profile')
         self.assertEqual(response.status_code, 200)
         self.assertJSONEqual(force_text(response.content), {
             "status": expected_status,
@@ -348,15 +348,15 @@ class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
             }
         }
         
-        response = self.client.get('/bc/v1/assertions')
+        response = self.client.get('/bcv1/assertions')
         self.assertEquals(response.status_code, 401)
         self.assertJSONEqual(force_text(response.content), expected_response)
 
-        response = self.client.post('/bc/v1/assertions', data={'id': 'http://a.com/assertion-embedded1'}, format='json')
+        response = self.client.post('/bcv1/assertions', data={'id': 'http://a.com/assertion-embedded1'}, format='json')
         self.assertEquals(response.status_code, 401)
         self.assertJSONEqual(force_text(response.content), expected_response)
 
-        response = self.client.get('/bc/v1/profile')
+        response = self.client.get('/bcv1/profile')
         self.assertEqual(response.status_code, 401)
         self.assertJSONEqual(force_text(response.content), expected_response)
 
@@ -370,48 +370,48 @@ class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
         for _ in range(25):
             test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
             assertions.append(test_badgeclass.issue(self.user.email, notify=False))
-        response = self.client.get('/bc/v1/assertions?limit=10&offset=0')
+        response = self.client.get('/bcv1/assertions?limit=10&offset=0')
         self.assertEqual(len(response.data['results']), 10)
         self.assertTrue(response.has_header('Link'))
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=10>; rel="next"' in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=20>; rel="last"' in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=0>; rel="first"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=10>; rel="next"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=20>; rel="last"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=0>; rel="first"' in response['Link'])
         for x in range(0, 10):
             self.assertEqual(response.data['results'][x]['id'], assertions[24 - x].jsonld_id)
 
-        response = self.client.get('/bc/v1/assertions?limit=10&offset=10')
+        response = self.client.get('/bcv1/assertions?limit=10&offset=10')
         self.assertEqual(len(response.data['results']), 10)
         self.assertTrue(response.has_header('Link'))
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=20>; rel="next"' in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=20>; rel="last"' in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=0>; rel="first"' in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=0>; rel="prev"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=20>; rel="next"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=20>; rel="last"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=0>; rel="first"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=0>; rel="prev"' in response['Link'])
         for x in range(0, 10):
             self.assertEqual(response.data['results'][x]['id'], assertions[24 - (x + 10)].jsonld_id)
 
-        response = self.client.get('/bc/v1/assertions?limit=10&offset=20')
+        response = self.client.get('/bcv1/assertions?limit=10&offset=20')
         self.assertEqual(len(response.data['results']), 5)
         self.assertTrue(response.has_header('Link'))
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=20>; rel="last"' in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=0>; rel="first"' in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=10>; rel="prev"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=20>; rel="last"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=0>; rel="first"' in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=10>; rel="prev"' in response['Link'])
         for x in range(0, 5):
             self.assertEqual(response.data['results'][x]['id'], assertions[24 - (x + 20)].jsonld_id)
 
         since = quote(DateTimeField().to_representation(assertions[5].created_at))
-        response = self.client.get('/bc/v1/assertions?limit=10&offset=0&since=' + since)
+        response = self.client.get('/bcv1/assertions?limit=10&offset=0&since=' + since)
         self.assertEqual(len(response.data['results']), 10)
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=10&since=%s>; rel="next"' % since in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=10&since=%s>; rel="last"' % since in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=0&since=%s>; rel="first"' % since in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=10&since=%s>; rel="next"' % since in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=10&since=%s>; rel="last"' % since in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=0&since=%s>; rel="first"' % since in response['Link'])
         for x in range(0, 10):
             self.assertEqual(response.data['results'][x]['id'], assertions[24 - x].jsonld_id)
 
-        response = self.client.get('/bc/v1/assertions?limit=10&offset=10&since=' + since)
+        response = self.client.get('/bcv1/assertions?limit=10&offset=10&since=' + since)
         self.assertEqual(len(response.data['results']), 10)
         self.assertTrue(response.has_header('Link'))
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=10&since=%s>; rel="last"' % since in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=0&since=%s>; rel="first"' % since in response['Link'])
-        self.assertTrue('<http://testserver/bc/v1/assertions?limit=10&offset=0&since=%s>; rel="prev"' % since in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=10&since=%s>; rel="last"' % since in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=0&since=%s>; rel="first"' % since in response['Link'])
+        self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=0&since=%s>; rel="prev"' % since in response['Link'])
         for x in range(0, 10):
             self.assertEqual(response.data['results'][x]['id'], assertions[24 - (x + 10)].jsonld_id)
