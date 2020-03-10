@@ -662,6 +662,40 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         encoded = base64.b64encode(file.read())
         return "data:{};base64,{}".format(mime, encoded)
 
+
+    def test_badgeclass_put_image_data_uri_resized_from_450_to_400(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+
+        with open(self.get_test_image_path(), 'r') as badge_image:
+            badgeclass_props = {
+                'name': 'Badge of Awesome',
+                'description': 'An awesome badge only awarded to awesome people or non-existent test entities',
+                'criteria': 'http://wikipedia.org/Awesome',
+            }
+
+            response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
+                                        dict(badgeclass_props, image=badge_image),
+                                        )
+            self.assertEqual(response.status_code, 201)
+            self.assertIn('slug', response.data)
+            badgeclass_slug = response.data.get('slug')
+
+        with open(self.get_testfiles_path('450x450.png'), 'r') as new_badge_image:
+            put_response = self.client.put(
+                '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(issuer=test_issuer.entity_id, badge=badgeclass_slug),
+                dict(badgeclass_props, image=self._base64_data_uri_encode(new_badge_image, 'image/png'))
+            )
+            self.assertEqual(put_response.status_code, 200)
+
+            new_badgeclass = BadgeClass.objects.get(entity_id=badgeclass_slug)
+            image_width, image_height = get_image_dimensions(new_badgeclass.image.file)
+
+            # 450x450 images should be resized to 400x400
+            self.assertEqual(image_width, 400)
+            self.assertEqual(image_height, 400)
+
+
     def test_badgeclass_put_image_data_uri(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -680,7 +714,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             self.assertIn('slug', response.data)
             badgeclass_slug = response.data.get('slug')
 
-        with open(self.get_testfiles_path('450x450.png'), 'r') as new_badge_image:
+        with open(self.get_testfiles_path('400x400.png'), 'r') as new_badge_image:
             put_response = self.client.put(
                 '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(issuer=test_issuer.entity_id, badge=badgeclass_slug),
                 dict(badgeclass_props, image=self._base64_data_uri_encode(new_badge_image, 'image/png'))
@@ -690,9 +724,9 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             new_badgeclass = BadgeClass.objects.get(entity_id=badgeclass_slug)
             image_width, image_height = get_image_dimensions(new_badgeclass.image.file)
 
-            # File should be changed to new 450x450 image
-            self.assertEqual(image_width, 450)
-            self.assertEqual(image_height, 450)
+            # File should be changed to new 400x400 image
+            self.assertEqual(image_width, 400)
+            self.assertEqual(image_height, 400)
 
     def test_badgeclass_put_image_non_data_uri(self):
         test_user = self.setup_user(authenticate=True)
@@ -740,7 +774,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(post_response.status_code, 201)
             slug = post_response.data.get('slug')
 
-        with open(self.get_testfiles_path('450x450.png'), 'r') as new_badge_image:
+        with open(self.get_testfiles_path('400x400.png'), 'r') as new_badge_image:
             put_response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(issuer=test_issuer.entity_id, badge=slug),
                 dict(badgeclass_props, image=new_badge_image),
                 format='multipart'
@@ -750,9 +784,9 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             new_badgeclass = BadgeClass.objects.get(entity_id=slug)
             image_width, image_height = get_image_dimensions(new_badgeclass.image.file)
 
-            # File should be changed to new 450x450 image
-            self.assertEqual(image_width, 450)
-            self.assertEqual(image_height, 450)
+            # File should be changed to new 400 X 400 image
+            self.assertEqual(image_width, 400)
+            self.assertEqual(image_height, 400)
 
     def test_badgeclass_post_get_put_roundtrip(self):
         test_user = self.setup_user(authenticate=True)

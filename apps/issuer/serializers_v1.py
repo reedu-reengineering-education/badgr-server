@@ -83,10 +83,12 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
         return new_issuer
 
     def update(self, instance, validated_data):
+        force_image_resize = False
         instance.name = validated_data.get('name')
 
         if 'image' in validated_data:
             instance.image = validated_data.get('image')
+            force_image_resize = True
 
         instance.email = validated_data.get('email')
         instance.description = validated_data.get('description')
@@ -96,7 +98,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
         if not instance.badgrapp_id:
             instance.badgrapp = BadgrApp.objects.get_current(self.context.get('request', None))
 
-        instance.save()
+        instance.save(force_image_resize)
         return instance
 
     def to_representation(self, obj):
@@ -200,6 +202,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
             return None
 
     def update(self, instance, validated_data):
+        force_image_resize = False
 
         new_name = validated_data.get('name')
         if new_name:
@@ -217,6 +220,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
 
         if 'image' in validated_data:
             instance.image = validated_data.get('image')
+            force_image_resize = True
 
         instance.alignment_items = validated_data.get('alignment_items')
         instance.tag_items = validated_data.get('tag_items')
@@ -225,7 +229,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
         instance.expires_amount = validated_data.get('expires_amount', None)
         instance.expires_duration = validated_data.get('expires_duration', None)
 
-        instance.save()
+        instance.save(force_image_resize)
 
         return instance
 
