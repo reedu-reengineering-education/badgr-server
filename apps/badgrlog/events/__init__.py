@@ -1,4 +1,5 @@
 from .badgeuser import *
+from .backpack import *
 from .blacklist import *
 from .composition import *
 from .email import *
