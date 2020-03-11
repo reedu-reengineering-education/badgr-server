@@ -1,3 +1,2 @@
 User-agent: *
 Disallow: /staff/
-Disallow: /badgr-server/docs/
