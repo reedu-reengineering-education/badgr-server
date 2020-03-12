@@ -1,0 +1,46 @@
+version: '3.3'
+services:
+  api:
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile.api
+    depends_on:
+      - "db"
+      - "memcached"
+    command: uwsgi --ini uwsgi.ini
+    volumes:
+      - badgr_server_api:/badgr_server
+
+  memcached:
+    image: 'bitnami/memcached:latest'
+    ports:
+      - "11211:11211"
+    expose:
+      - "11211"
+
+  db:
+    image: mysql:5.6.39
+    volumes:
+      - badgr_server_db:/var/lib/mysql:rw
+      - ./.docker/etc/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - "MYSQL_PASSWORD=password"
+      - "MYSQL_HOST=db"
+      - "MYSQL_ROOT_PASSWORD=password"
+    expose:
+      - "3306"
+
+  nginx:
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile.nginx
+    volumes:
+      - badgr_server_api:/badgr_server
+    depends_on:
+      - "api"
+    ports:
+      - "8080:80"
+
+volumes:
+  badgr_server_api:
+  badgr_server_db:
