@@ -98,7 +98,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
         if not instance.badgrapp_id:
             instance.badgrapp = BadgrApp.objects.get_current(self.context.get('request', None))
 
-        instance.save(force_image_resize)
+        instance.save(force_resize=force_image_resize)
         return instance
 
     def to_representation(self, obj):
