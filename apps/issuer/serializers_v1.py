@@ -229,7 +229,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
         instance.expires_amount = validated_data.get('expires_amount', None)
         instance.expires_duration = validated_data.get('expires_duration', None)
 
-        instance.save(force_image_resize)
+        instance.save(force_resize=force_image_resize)
 
         return instance
 
