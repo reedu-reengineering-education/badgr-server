@@ -184,6 +184,9 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     def update(self, instance, validated_data):
         validated_data.pop('cached_creator', None)
 
+        if 'image' in validated_data:
+            self.context['save_kwargs'] = dict(force_resize=True)
+
         return super(IssuerSerializerV2, self).update(instance, validated_data)
 
 
@@ -326,6 +329,9 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     def update(self, instance, validated_data):
         if 'cached_issuer' in validated_data:
             validated_data.pop('cached_issuer')  # issuer is not updatable
+
+        if 'image' in validated_data:
+            self.context['save_kwargs'] = dict(force_resize=True)
 
         if not IsEditor().has_object_permission(self.context.get('request'), None, instance.issuer):
             raise serializers.ValidationError(

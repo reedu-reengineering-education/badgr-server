@@ -18,8 +18,8 @@ def _decompression_bomb_check(image, max_pixels=Image.MAX_IMAGE_PIXELS):
 
 class ResizeUploadedImage(object):
 
-    def save(self, *args, **kwargs):
-        if self.pk is None and self.image:
+    def save(self, force_resize=False, *args, **kwargs):
+        if (self.pk is None and self.image) or force_resize:
             try:
                 image = Image.open(self.image)
                 if _decompression_bomb_check(image):
