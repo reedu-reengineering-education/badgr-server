@@ -70,7 +70,7 @@ class BaseEntityListView(BaseEntityView):
             link_header = paginator.get_link_header()
             if link_header:
                 headers['Link'] = link_header
-                
+
         return Response(serializer.data, headers=headers)
 
     def post(self, request, **kwargs):
@@ -184,18 +184,22 @@ class UncachedPaginatedViewMixin(object):
     def get_ordering(self):
         return self.ordering
 
+    def get_page_size(self, request=None):
+        if request is None:
+            return self.default_per_page
+        try:
+            per_page = int(request.query_params.get(self.per_page_query_parameter_name, self.default_per_page))
+            per_page = max(self.min_per_page, per_page)
+            return min(self.max_per_page, per_page)
+        except (TypeError, ValueError):
+            return None
+
     def get_queryset(self, request, **kwargs):
         raise NotImplementedError
 
     def get_objects(self, request, **kwargs):
         queryset = self.get_queryset(request=request, **kwargs)
-
-        try:
-            per_page = int(request.query_params.get(self.per_page_query_parameter_name, self.default_per_page))
-            per_page = max(self.min_per_page, per_page)
-            per_page = min(self.max_per_page, per_page)
-        except (TypeError, ValueError):
-            per_page = None
+        per_page = self.get_page_size(request)
 
         # only paginate on request
         if per_page:

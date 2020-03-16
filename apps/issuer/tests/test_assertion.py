@@ -1092,11 +1092,11 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         url = test_assertion.get_share_url()
         self.assertEqual(test_assertion.jsonld_id, url)
         url = test_assertion.get_share_url(include_identifier=True)
-        self.assertEqual(test_assertion.jsonld_id + '?identifier__email=new.recipient%40email.test', url)
+        self.assertEqual(test_assertion.jsonld_id + '?identity__email=new.recipient%40email.test', url)
         url = test_assertion2.get_share_url(include_identifier=True)
-        self.assertEqual(test_assertion2.jsonld_id + '?identifier__telephone=%2B15035555555', url)
+        self.assertEqual(test_assertion2.jsonld_id + '?identity__telephone=%2B15035555555', url)
         url = test_assertion3.get_share_url(include_identifier=True)
-        self.assertEqual(test_assertion3.jsonld_id + '?identifier__url=test.example.com/foo%3Fbar%3D1', url)
+        self.assertEqual(test_assertion3.jsonld_id + '?identity__url=test.example.com/foo%3Fbar%3D1', url)
 
     def test_parse_original_datetime(self):
         result = parse_original_datetime('1577232000')

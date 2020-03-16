@@ -382,6 +382,7 @@ class BadgeInstanceJson(JSONComponentView):
         )
 
         return dict(
+            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
             title=self.current_object.cached_badgeclass.name,
             description=self.current_object.cached_badgeclass.description,
             public_url=self.current_object.public_url,
@@ -554,6 +555,7 @@ class OEmbedAPIEndpoint(APIView):
         )
 
         return Response(data, status=status.HTTP_200_OK)
+
 
 
 class VerifyBadgeAPIEndpoint(JSONComponentView):

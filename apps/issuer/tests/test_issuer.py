@@ -5,6 +5,8 @@ import os.path
 from urllib.parse import quote_plus
 
 import os
+import base64
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.cache import cache
@@ -37,6 +39,22 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
     def test_cant_create_issuer_if_unauthenticated(self):
         response = self.client.post('/v1/issuer/issuers', self.example_issuer_props)
         self.assertIn(response.status_code, (401, 403))
+
+    def test_v2_issuers_badgeclasses_can_paginate(self):
+        NUM_BADGE_CLASSES = 5
+        PAGINATE = 2
+
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclasses = list(self.setup_badgeclasses(issuer=test_issuer, how_many=NUM_BADGE_CLASSES))
+
+        response = self.client.get('/v2/issuers/{slug}/badgeclasses?num={num}'.format(
+            slug=test_issuer.entity_id,
+            num=PAGINATE)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(test_badgeclasses), NUM_BADGE_CLASSES)
+        self.assertEqual(len(response.data.get('result')), PAGINATE)
 
     def test_create_issuer_if_authenticated(self):
         test_user = self.setup_user(authenticate=True)
@@ -98,6 +116,43 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
     def test_create_issuer_image_300x300_stays_300x300(self):
         image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testfiles', '300x300.png')
         self._create_issuer_with_image_and_test_resizing(image_path, 300, 300)
+
+
+    def test_issuer_update_resizes_image(self):
+        desired_width = desired_height = 400
+
+        test_user = self.setup_user(authenticate=True)
+        image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testfiles', '500x300.png')
+        image = open(image_path)
+        encoded = 'data:image/png;base64,' + base64.b64encode(image.read())
+
+        issuer_email = CachedEmailAddress.objects.create(
+                user=test_user, email=self.example_issuer_props['email'], verified=True)
+
+        issuer_fields_with_image = self.example_issuer_props.copy()
+        issuer_fields_with_image['image'] = encoded
+
+        response = self.client.post('/v1/issuer/issuers', issuer_fields_with_image)
+        self.assertEqual(response.status_code, 201)
+        response_slug = response.data.get('slug')
+        new_issuer = Issuer.objects.get(entity_id=response_slug)
+
+        image_width, image_height = get_image_dimensions(new_issuer.image.file)
+        self.assertEqual(image_width, desired_width)
+        self.assertEqual(image_height, desired_height)
+
+        # Update the issuer with the original 500x300 image
+        issuer_fields_with_image['image'] = encoded
+
+        update_response = self.client.put('/v1/issuer/issuers/{}'.format(response_slug), issuer_fields_with_image)
+        self.assertEqual(update_response.status_code, 200)
+        update_response_slug = update_response.data.get('slug')
+        updated_issuer = Issuer.objects.get(entity_id=update_response_slug)
+
+        update_image_width, update_image_height = get_image_dimensions(updated_issuer.image.file)
+        self.assertEqual(update_image_width, desired_width)
+        self.assertEqual(update_image_height, desired_height)
+
 
     def test_can_update_issuer_if_authenticated(self):
         test_user = self.setup_user(authenticate=True)

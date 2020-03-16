@@ -42,7 +42,7 @@ class BadgeClassCreatedEvent(BaseBadgrEvent):
 
 class BadgeClassDeletedEvent(BaseBadgrEvent):
     def __init__(self, badge_class, user):
-        self.badge_class_json = badge_class
+        self.badge_class = badge_class
         self.user = user
 
     def to_representation(self):
