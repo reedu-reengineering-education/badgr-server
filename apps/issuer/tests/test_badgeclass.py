@@ -61,6 +61,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(response.status_code, 201)
             self.assertIn('slug', response.data)
             new_badgeclass_slug = response.data.get('slug')
+            BadgeClass.cached.get(entity_id=new_badgeclass_slug)
 
             # assert that the BadgeClass was published to and fetched from the cache
             with self.assertNumQueries(0):
@@ -666,7 +667,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
 
-        with open(self.get_test_image_path(), 'r') as badge_image:
+        with open(self.get_test_image_path(), 'rb') as badge_image:
             badgeclass_props = {
                 'name': 'Badge of Awesome',
                 'description': 'An awesome badge only awarded to awesome people or non-existent test entities',
@@ -680,7 +681,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(response.status_code, 201)
             badgeclass_slug = response.data['result'][0]['entityId']
 
-        with open(self.get_testfiles_path('450x450.png'), 'r') as new_badge_image:
+        with open(self.get_testfiles_path('450x450.png'), 'rb') as new_badge_image:
             put_response = self.client.put(
                 '/v2/badgeclasses/{badge}'.format(badge=badgeclass_slug),
                 dict(badgeclass_props, image=self._base64_data_uri_encode(new_badge_image, 'image/png'))
