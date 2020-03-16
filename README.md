@@ -40,6 +40,7 @@ Set these values in your settings_local.py file to configure the application to 
 * `docker-compose up`: build and get django and other components running
 * `docker-compose exec api python /badgr_server/manage.py migrate` - (while running) set up database tables
 * `docker-compose exec api python /badgr_server/manage.py dist` - generate docs swagger file(s)
+* `docker-compose exec api python /badgr_server/manage.py collectstatic` - Put built front-end assets into the static directory (Admin panel CSS, swagger docs).
 * `docker-compose exec api python /badgr_server/manage.py createsuperuser` - follow prompts to create your first admin user account
 
 ### First Time Setup
