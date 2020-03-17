@@ -699,7 +699,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
 
-        with open(self.get_test_image_path(), 'r') as badge_image:
+        with open(self.get_test_image_path(), 'rb') as badge_image:
             badgeclass_props = {
                 'name': 'Badge of Awesome',
                 'description': 'An awesome badge only awarded to awesome people or non-existent test entities',

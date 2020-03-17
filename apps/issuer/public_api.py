@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import io
@@ -208,11 +209,14 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
         )
         storage = DefaultStorage()
 
+        def _fit_dimension(new_size, desired_height):
+            return int(math.floor((new_size - desired_height)/2, 0))
+
         def _fit_to_height(img, ar, height=400):
             img.thumbnail((height,height))
             new_size = (int(ar[0]*height), int(ar[1]*height))
             new_img = Image.new("RGBA", new_size)
-            new_img.paste(img, ((new_size[0] - height)/2, (new_size[1] - height)/2))
+            new_img.paste(img, (_fit_dimension(new_size[0], height), _fit_dimension(new_size[1], height)))
             new_img.show()
             return new_img
 
