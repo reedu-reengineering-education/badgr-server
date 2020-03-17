@@ -123,7 +123,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         test_user = self.setup_user(authenticate=True)
         image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testfiles', '500x300.png')
         image = open(image_path, 'rb')
-        encoded = 'data:image/png;base64,' + base64.b64encode(image.read().decode())
+        encoded = 'data:image/png;base64,' + base64.b64encode(image.read()).decode()
 
         issuer_email = CachedEmailAddress.objects.create(
                 user=test_user, email=self.example_issuer_props['email'], verified=True)
