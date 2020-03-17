@@ -660,7 +660,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(len(new_badgelist.data), len(badgelist.data) + 1)
 
     def _base64_data_uri_encode(self, file, mime):
-        encoded = base64.b64encode(file.read()).decode('utf-8')
+        encoded = base64.b64encode(file.read()).decode()
         return "data:{};base64,{}".format(mime, encoded)
 
     def test_v2_badgeclass_put_image_data_uri_resized_from_450_to_400(self):
@@ -713,7 +713,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             self.assertIn('slug', response.data)
             badgeclass_slug = response.data.get('slug')
 
-        with open(self.get_testfiles_path('450x450.png'), 'r') as new_badge_image:
+        with open(self.get_testfiles_path('450x450.png'), 'rb') as new_badge_image:
             put_response = self.client.put(
                 '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(issuer=test_issuer.entity_id, badge=badgeclass_slug),
                 dict(badgeclass_props, image=self._base64_data_uri_encode(new_badge_image, 'image/png'))

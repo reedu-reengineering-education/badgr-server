@@ -210,7 +210,7 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
         storage = DefaultStorage()
 
         def _fit_dimension(new_size, desired_height):
-            return int(math.floor((new_size - desired_height)/2, 0))
+            return int(math.floor((new_size - desired_height)/2))
 
         def _fit_to_height(img, ar, height=400):
             img.thumbnail((height,height))
