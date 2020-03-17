@@ -66,7 +66,7 @@ class PathwayApiTests(SetupIssuerHelper, BadgrTestCase):
 
         # Plumber
         # plumbing badges
-        with open(os.path.join(TOP_DIR, 'apps', 'issuer', 'testfiles', 'guinea_pig_testing_badge.png')) as badge_image:
+        with open(os.path.join(TOP_DIR, 'apps', 'issuer', 'testfiles', 'guinea_pig_testing_badge.png'), 'rb') as badge_image:
             response = self.client.post(reverse('v1_api_badgeclass_list', kwargs={'slug': self.issuer.get('slug')}), {
                 'name': "Plumber",
                 'description': "You plumb now",

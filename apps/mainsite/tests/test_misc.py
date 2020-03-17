@@ -7,8 +7,8 @@ import pytz
 import re
 import responses
 import shutil
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 import warnings
 
 from django.core import mail
@@ -157,20 +157,20 @@ class TestSignup(BadgrTestCase):
         expected_redirect_url = '{badgrapp_redirect}{first_name}?authToken={auth}&email={email}'.format(
             badgrapp_redirect=badgr_app.email_confirmation_redirect,
             first_name=post_data['first_name'],
-            email=urllib.quote(post_data['email']),
+            email=urllib.parse.quote(post_data['email']),
             auth=user.auth_token
         )
 
         response = self.client.get(confirm_url, follow=False)
         self.assertEqual(response.status_code, 302)
 
-        actual = urlparse.urlparse(response.get('location'))
-        expected = urlparse.urlparse(expected_redirect_url)
+        actual = urllib.parse.urlparse(response.get('location'))
+        expected = urllib.parse.urlparse(expected_redirect_url)
         self.assertEqual(actual.netloc, expected.netloc)
         self.assertEqual(actual.scheme, expected.scheme)
 
-        actual_query = urlparse.parse_qs(actual.query)
-        expected_query = urlparse.parse_qs(expected.query)
+        actual_query = urllib.parse.parse_qs(actual.query)
+        expected_query = urllib.parse.parse_qs(expected.query)
         self.assertEqual(actual_query.get('email'), expected_query.get('email'))
         self.assertIsNotNone(actual_query.get('authToken'))
 
@@ -319,7 +319,7 @@ class TestBlacklist(BadgrTestCase):
         # The generate_hash function implementation should not change; We risk contacting people on the blacklist
         for (id_type, id_value) in self.Inputs:
             got = blacklist.generate_hash(id_type, id_value)
-            expected = "{id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value).hexdigest())
+            expected = "{id_type}$sha256${hash}".format(id_type=id_type, hash=sha256(id_value.encode('utf-8')).hexdigest())
             self.assertEqual(got, expected)
 
 
@@ -337,10 +337,10 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
         try:
             shutil.rmtree(dir)
         except OSError as e:
-            print ("%s does not exist and was not deleted" % 'me')
+            print(("%s does not exist and was not deleted" % 'me'))
 
     def mimic_hashed_file_name(self, name, ext=''):
-        return hashlib.md5(name).hexdigest() + ext
+        return hashlib.md5(name.encode('utf-8')).hexdigest() + ext
 
     @responses.activate
     def test_remote_url_is_data_uri(self):
@@ -361,7 +361,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
         responses.add(
             responses.GET,
             self.test_url,
-            body=open(self.get_hacked_svg_image_path()).read(),
+            body=open(self.get_hacked_svg_image_path(), 'rb').read(),
             status=200
         )
 
@@ -381,7 +381,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
         responses.add(
             responses.GET,
             self.test_url,
-            body=open(self.get_test_svg_image_path()).read(),
+            body=open(self.get_test_svg_image_path(), 'rb').read(),
             status=200
         )
 
@@ -396,7 +396,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
 
     @responses.activate
     def test_scrubs_hacked_svg(self):
-        hacked_svg = open(self.get_hacked_svg_image_path()).read()
+        hacked_svg = open(self.get_hacked_svg_image_path(), 'rb').read()
 
         responses.add(
             responses.GET,
@@ -416,10 +416,10 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
             file_name=storage_name)
         )
             
-        saved_svg = open(saved_svg_path).read()[0]
+        saved_svg = open(saved_svg_path, 'rb').read()
 
-        self.assertNotIn('onload', saved_svg)
-        self.assertNotIn('<script>', saved_svg)
+        self.assertNotIn(b'onload', saved_svg)
+        self.assertNotIn(b'<script>', saved_svg)
 
 
 
@@ -431,7 +431,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
         responses.add(
                 responses.GET,
                 self.test_url,
-                body=open(self.get_test_png_with_no_extension_image_path()).read(),
+                body=open(self.get_test_png_with_no_extension_image_path(), 'rb').read(),
                 status=200
             )
 
@@ -452,7 +452,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
         responses.add(
                 responses.GET,
                 self.test_url,
-                body=open(self.get_test_png_image_path()).read(),
+                body=open(self.get_test_png_image_path(), 'rb').read(),
                 status=200
             )
 
@@ -472,7 +472,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
         responses.add(
             responses.GET,
             self.test_url,
-            body=open(self.get_test_jpeg_with_no_extension_image_path()).read(),
+            body=open(self.get_test_jpeg_with_no_extension_image_path(), 'rb').read(),
             status=200
         )
 
@@ -493,7 +493,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
         responses.add(
             responses.GET,
             self.test_url,
-            body=open(self.get_test_jpeg_image_path()).read(),
+            body=open(self.get_test_jpeg_image_path(), 'rb').read(),
             status=200
         )
 

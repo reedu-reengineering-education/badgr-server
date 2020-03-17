@@ -18,7 +18,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         # print(self.defaults)
-        for flag, default_val in self.defaults.iteritems():
+        for flag, default_val in list(self.defaults.items()):
             parser.add_argument(flag, nargs='?', type=str, help='Defaults to: {}'.format(default_val))
         
     def handle(self, *args, **options):

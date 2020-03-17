@@ -135,7 +135,7 @@ class TestBadgeUploads(BadgrTestCase):
 
         responses.add(
             responses.GET, 'http://a.com/badgeclass_image',
-            body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/unbaked_image.png')).read(),
+            body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/unbaked_image.png'), 'rb').read(),
             status=200, content_type='image/png'
         )
 
@@ -182,7 +182,7 @@ class TestBadgeUploads(BadgrTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(
             response.data.get('json').get('badge').get('description'),
-            u'Basic as it gets. v1.0'
+            'Basic as it gets. v1.0'
         )
 
     @responses.activate
@@ -217,7 +217,7 @@ class TestBadgeUploads(BadgrTestCase):
 
         responses.add(
             responses.GET, 'http://a.com/baked_image',
-            body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/baked_image.png')).read(),
+            body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/baked_image.png'), 'rb').read(),
             status=200, content_type='image/png'
         )
 
@@ -245,7 +245,7 @@ class TestBadgeUploads(BadgrTestCase):
         ])
         self.setup_user(email='test@example.com', authenticate=True)
 
-        image = open(os.path.join(CURRENT_DIRECTORY, 'testfiles/baked_image.png'))
+        image = open(os.path.join(CURRENT_DIRECTORY, 'testfiles/baked_image.png'), 'rb')
         post_input = {
             'image': image
         }
@@ -295,13 +295,13 @@ class TestBadgeUploads(BadgrTestCase):
             "url": "http://a.com/issuer/website"
         }
 
-        with open(os.path.join(CURRENT_DIRECTORY, 'testfiles/baked_image.png')) as image_file:
+        with open(os.path.join(CURRENT_DIRECTORY, 'testfiles/baked_image.png'), 'rb') as image_file:
             original_image = bake(image_file, json.dumps(assertion_metadata))
             original_image.seek(0)
 
         responses.add(
             responses.GET, 'http://a.com/badgeclass_image',
-            body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/unbaked_image.png')).read(),
+            body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/unbaked_image.png'), 'rb').read(),
             status=200, content_type='image/png'
         )
 
@@ -378,8 +378,8 @@ class TestBadgeUploads(BadgrTestCase):
         ])
         self.setup_user(email='test@example.com', authenticate=True)
 
-        image = open(os.path.join(CURRENT_DIRECTORY, 'testfiles/baked_image.png'))
-        encoded = 'data:image/png;base64,' + base64.b64encode(image.read())
+        image = open(os.path.join(CURRENT_DIRECTORY, 'testfiles/baked_image.png'), 'rb')
+        encoded = 'data:image/png;base64,' + base64.b64encode(image.read()).decode('utf-8')
         post_input = {
             'image': encoded
         }
@@ -405,7 +405,7 @@ class TestBadgeUploads(BadgrTestCase):
         self.setup_user(email='test@example.com', authenticate=True)
 
         post_input = {
-            'assertion': open(os.path.join(CURRENT_DIRECTORY, 'testfiles/1_0_basic_instance.json')).read()
+            'assertion': open(os.path.join(CURRENT_DIRECTORY, 'testfiles/1_0_basic_instance.json'), 'r').read()
         }
         response = self.client.post(
             '/v1/earner/badges', post_input
@@ -503,7 +503,7 @@ class TestBadgeUploads(BadgrTestCase):
 
         responses.add(
             responses.GET, 'http://a.com/instance',
-            body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/1_0_basic_instance_missing_badge_prop.json')).read(),
+            body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/1_0_basic_instance_missing_badge_prop.json'), 'r').read(),
             status=200, content_type='application/json'
         )
         setup_resources([
@@ -557,7 +557,7 @@ class TestBadgeUploads(BadgrTestCase):
         self.setup_user(email='test@example.com', authenticate=True)
 
         post_input = {
-            'assertion': open(os.path.join(CURRENT_DIRECTORY, 'testfiles', '0_5_basic_instance.json')).read()
+            'assertion': open(os.path.join(CURRENT_DIRECTORY, 'testfiles', '0_5_basic_instance.json'), 'r').read()
         }
         response = self.client.post(
             '/v1/earner/badges', post_input
@@ -688,7 +688,7 @@ class TestBadgeUploads(BadgrTestCase):
         setup_resources([
             {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
             {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
-            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png"},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png", 'mode': 'rb'},
         ])
         self.setup_user(email='test@example.com', authenticate=True)
 
@@ -1014,7 +1014,7 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         setup_resources([
             {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
             {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
-            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png"},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png", 'mode': 'rb'},
         ])
         unverified_email = 'test@example.com'
         test_user = self.setup_user(email='verified@example.com', authenticate=True)
@@ -1057,7 +1057,7 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         setup_resources([
             {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
             {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
-            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png"},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png", 'mode': 'rb'},
         ])
         unverified_email = 'test@example.com'
         test_user = self.setup_user(email='verified@example.com', authenticate=True)

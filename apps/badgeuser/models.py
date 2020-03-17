@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+
 
 import base64
 import re
@@ -124,7 +124,7 @@ class EmailAddressVariant(models.Model):
         super(EmailAddressVariant, self).save(*args, **kwargs)
         self.canonical_email.save()
 
-    def __unicode__(self):
+    def __str__(self):
         return self.email
 
     @property
@@ -230,12 +230,12 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         verbose_name_plural = _('badge users')
         db_table = 'users'
 
-    def __unicode__(self):
+    def __str__(self):
         primary_identifier = self.email or next((e for e in self.all_verified_recipient_identifiers), '')
-        return u"{} ({})".format(self.get_full_name(), primary_identifier)
+        return "{} ({})".format(self.get_full_name(), primary_identifier)
 
     def get_full_name(self):
-        return u"%s %s" % (self.first_name, self.last_name)
+        return "%s %s" % (self.first_name, self.last_name)
 
     def email_user(self, subject, message, from_email=None, **kwargs):
         """
@@ -382,14 +382,14 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
 
     @property
     def primary_email(self):
-        primaries = filter(lambda e: e.primary, self.cached_emails())
+        primaries = [e for e in self.cached_emails() if e.primary]
         if len(primaries) > 0:
             return primaries[0].email
         return self.email
 
     @property
     def verified_emails(self):
-        return filter(lambda e: e.verified, self.cached_emails())
+        return [e for e in self.cached_emails() if e.verified]
 
     @property
     def verified(self):

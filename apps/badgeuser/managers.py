@@ -95,7 +95,7 @@ class BadgeUserManager(UserManager):
         source = kwargs['source']
         expires_seconds = getattr(settings, 'AUTH_TIMEOUT_SECONDS', 7 * 86400)
         payload = kwargs.copy()
-        payload['nonce'] = b''.join(random.choice(string.ascii_uppercase) for _ in range(random.randint(20, 30)))
+        payload['nonce'] = ''.join(random.choice(string.ascii_uppercase) for _ in range(random.randint(20, 30)))
         payload = json.dumps(payload)
 
         authcode = encrypt_authcode(payload, expires_seconds=expires_seconds)

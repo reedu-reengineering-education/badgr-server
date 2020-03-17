@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+
 
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 from django.core.urlresolvers import reverse
@@ -50,7 +50,7 @@ class IssuerAdmin(DjangoObjectActions, ModelAdmin):
 
     def img(self, obj):
         try:
-            return u'<img src="{}" width="32"/>'.format(obj.image.url)
+            return '<img src="{}" width="32"/>'.format(obj.image.url)
         except ValueError:
             return obj.image
     img.short_description = 'Image'
@@ -114,7 +114,7 @@ class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
     change_actions = ['redirect_issuer', 'redirect_instances', 'redirect_pathwaybadges']
 
     def badge_image(self, obj):
-        return u'<img src="{}" width="32"/>'.format(obj.image.url) if obj.image else ''
+        return '<img src="{}" width="32"/>'.format(obj.image.url) if obj.image else ''
     badge_image.short_description = 'Badge'
     badge_image.allow_tags = True
 
@@ -197,7 +197,7 @@ class BadgeInstanceAdmin(DjangoObjectActions, ModelAdmin):
 
     def badge_image(self, obj):
         try:
-            return u'<img src="{}" width="32"/>'.format(obj.image.url)
+            return '<img src="{}" width="32"/>'.format(obj.image.url)
         except ValueError:
             return obj.image
     badge_image.short_description = 'Badge'

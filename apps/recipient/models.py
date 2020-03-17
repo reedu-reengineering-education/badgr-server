@@ -23,19 +23,19 @@ class RecipientProfile(BaseVersionedEntity, CreatedUpdatedAt, CreatedUpdatedBy, 
 
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
 
-    def __unicode__(self):
+    def __str__(self):
         if self.display_name:
             return self.display_name
         return self.recipient_identifier
 
     @property
     def jsonld_id(self):
-        return u'mailto:{}'.format(self.recipient_identifier)
+        return 'mailto:{}'.format(self.recipient_identifier)
 
     def cached_completions(self, pathway):
         # get recipients instances that are aligned to this pathway
         badgeclasses = pathway.cached_badgeclasses()
-        instances = filter(lambda i: not i.revoked and i.cached_badgeclass in badgeclasses, self.cached_badge_instances())
+        instances = [i for i in self.cached_badge_instances() if not i.revoked and i.cached_badgeclass in badgeclasses]
 
         # recurse the tree to build completions
         tree = pathway.element_tree
@@ -46,7 +46,7 @@ class RecipientProfile(BaseVersionedEntity, CreatedUpdatedAt, CreatedUpdatedBy, 
             completion_spec = ElementJunctionCompletionRequirementSpec(
                 junction_type=CompletionRequirementSpecFactory.JUNCTION_TYPE_CONJUNCTION,
                 required_number=len(tree['children']),
-                elements=(c['element'].jsonld_id for c in tree['children'].itervalues()))
+                elements=(c['element'].jsonld_id for c in list(tree['children'].values())))
             tree['element'].completion_requirements = completion_spec.serialize()
 
         if completion_spec.completion_type == CompletionRequirementSpecFactory.BADGE_JUNCTION:
@@ -78,7 +78,7 @@ class RecipientGroup(BaseAuditedModel, BaseVersionedEntity, IsActive):
 
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='slug', slug_field_name='entity_id')
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
     def publish(self):
@@ -159,7 +159,7 @@ class RecipientGroupMembership(BaseVersionedEntity):
 
     @property
     def jsonld_id(self):
-        return u"mailto:{}".format(self.recipient_identifier)
+        return "mailto:{}".format(self.recipient_identifier)
 
     @property
     def cached_recipient_profile(self):

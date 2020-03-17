@@ -1,4 +1,4 @@
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 from django.conf import settings
 from django.http import Http404
@@ -27,7 +27,7 @@ class TwitterShareProvider(ShareProvider):
         else:
             text = obj.share_url
         return "https://twitter.com/intent/tweet?text={text}".format(
-            text=urllib.quote(text)
+            text=urllib.parse.quote(text)
         )
 
 
@@ -37,7 +37,7 @@ class FacebookShareProvider(ShareProvider):
 
     def share_url(self, badge_instance, **kwargs):
         return "https://www.facebook.com/sharer/sharer.php?u={url}".format(
-            url=urllib.quote(badge_instance.get_share_url(**kwargs))
+            url=urllib.parse.quote(badge_instance.get_share_url(**kwargs))
         )
 
 
@@ -48,7 +48,7 @@ class PinterestShareProvider(ShareProvider):
     def share_url(self, badge_instance, **kwargs):
         summary = badge_instance.cached_badgeclass.name.encode('utf8')
         return "http://www.pinterest.com/pin/create/button/?url={url}&media={image}&description={summary}".format(
-            url=urllib.quote(badge_instance.get_share_url(**kwargs)),
+            url=urllib.parse.quote(badge_instance.get_share_url(**kwargs)),
             image=badge_instance.image_url(),
             summary=summary
         )
@@ -78,18 +78,18 @@ class LinkedinShareProvider(ShareProvider):
         if summary is None:
             summary = badge_instance.cached_badgeclass.name.encode('utf8')
         return "https://www.linkedin.com/shareArticle?mini=true&url={url}&title={title}&summary={summary}".format(
-            url=urllib.quote(badge_instance.get_share_url(**kwargs)),
-            title=urllib.quote(title),
-            summary=urllib.quote(summary),
+            url=urllib.parse.quote(badge_instance.get_share_url(**kwargs)),
+            title=urllib.parse.quote(title),
+            summary=urllib.parse.quote(summary),
         )
 
     def collection_share_url(self, collection, **kwargs):
         title = collection.name
         summary = collection.description
         return "https://www.linkedin.com/shareArticle?mini=true&url={url}&title={title}&summary={summary}".format(
-            url=urllib.quote(collection.get_share_url(**kwargs)),
-            title=urllib.quote(title),
-            summary=urllib.quote(summary),
+            url=urllib.parse.quote(collection.get_share_url(**kwargs)),
+            title=urllib.parse.quote(title),
+            summary=urllib.parse.quote(summary),
         )
 
     def certification_share_url(self, badge_instance, **kwargs):
@@ -98,8 +98,8 @@ class LinkedinShareProvider(ShareProvider):
             return None
         return "https://www.linkedin.com/profile/add?_ed={certIssuerId}&pfCertificationName={name}&pfCertificationUrl={url}".format(
             certIssuerId=cert_issuer_id,
-            name=urllib.quote(badge_instance.cached_badgeclass.name),
-            url=urllib.quote(badge_instance.share_url(**kwargs))
+            name=urllib.parse.quote(badge_instance.cached_badgeclass.name),
+            url=urllib.parse.quote(badge_instance.share_url(**kwargs))
         )
 
 

@@ -1,6 +1,6 @@
 import logging
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 
 from allauth.account.adapter import DefaultAccountAdapter, get_adapter
 from allauth.account.models import EmailConfirmation, EmailConfirmationHMAC
@@ -100,12 +100,13 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
                 query_params['signup'] = 'true'
                 return set_url_query_params(badgr_app.get_path('/auth/welcome'), **query_params)
             else:
-                return set_url_query_params(urlparse.urljoin(
+                return set_url_query_params(urllib.parse.urljoin(
                     badgr_app.email_confirmation_redirect.rstrip('/') + '/',
-                    urllib.quote(email_address.user.first_name.encode('utf8'))
+                    urllib.parse.quote(email_address.user.first_name.encode('utf8'))
                 ), **query_params)
 
-        except Resolver404, EmailConfirmation.DoesNotExist:
+        except Resolver404 as xxx_todo_changeme:
+            EmailConfirmation.DoesNotExist = xxx_todo_changeme
             return badgr_app.email_confirmation_redirect
 
     def get_email_confirmation_url(self, request, emailconfirmation, signup=False):

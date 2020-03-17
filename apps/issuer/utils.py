@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+
 import aniso8601
 import hashlib
 import pytz
@@ -45,12 +45,12 @@ def add_obi_version_ifneeded(url, obi_version):
 
 def generate_sha256_hashstring(identifier, salt=None):
     key = '{}{}'.format(identifier, salt if salt is not None else "")
-    return 'sha256$' + hashlib.sha256(key).hexdigest()
+    return 'sha256$' + hashlib.sha256(key.encode('utf-8')).hexdigest()
 
 
 def generate_md5_hashstring(identifier, salt=None):
     key = '{}{}'.format(identifier, salt if salt is not None else "")
-    return 'md5$' + hashlib.md5(key).hexdigest()
+    return 'md5$' + hashlib.md5(key.encode('utf-8')).hexdigest()
 
 
 def is_probable_url(string):

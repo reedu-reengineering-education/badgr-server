@@ -1,3 +1,4 @@
+import base64
 import random
 import string
 from hashlib import md5
@@ -33,5 +34,6 @@ def notify_on_password_change(user, request=None):
 
 def generate_badgr_username(email):
     # md5 hash the email and then encode as base64 to take up only 25 characters
-    hashed = md5(email + ''.join(random.choice(string.lowercase) for i in range(64))).digest().encode('base64')[:-1]  # strip last character because its a newline
+    salted_email = (email + ''.join(random.choice(string.ascii_lowercase) for i in range(64))).encode('utf-8')
+    hashed = str(base64.b64encode(md5(salted_email).hexdigest().encode('utf-8')), 'utf-8')
     return "badgr{}".format(hashed[:25])

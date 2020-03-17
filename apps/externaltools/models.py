@@ -1,7 +1,7 @@
 # encoding: utf-8
-from __future__ import unicode_literals
 
-import urllib
+
+import urllib.request, urllib.parse, urllib.error
 
 import cachemodel
 import lti
@@ -41,7 +41,7 @@ class ExternalTool(BaseAuditedModel, BaseVersionedEntity):
 
     cached = ExternalToolManager()
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
     def publish(self):
@@ -107,9 +107,9 @@ class ExternalToolLaunchpoint(cachemodel.CacheModel):
                     custom_badgr_assertion_recipient=obj.recipient_identifier,
                     custom_badgr_assertion_id=obj.entity_id,
                     custom_badgr_badgeclass_id=obj.cached_badgeclass.entity_id,
-                    custom_badgr_badgeclass_name=urllib.quote_plus(obj.cached_badgeclass.name.encode('utf-8')),
+                    custom_badgr_badgeclass_name=urllib.parse.quote_plus(obj.cached_badgeclass.name.encode('utf-8')),
                     custom_badgr_issuer_id=obj.cached_issuer.entity_id,
-                    custom_badgr_issuer_name=urllib.quote_plus(obj.cached_issuer.name.encode('utf-8')),
+                    custom_badgr_issuer_name=urllib.parse.quote_plus(obj.cached_issuer.name.encode('utf-8')),
                 )
                 if any(s.user.id == user.id for s in obj.cached_issuer.cached_issuerstaff()):
                     roles.append('issuer')
@@ -130,9 +130,9 @@ class ExternalToolLaunchpoint(cachemodel.CacheModel):
         if user is not None:
             params.update(dict(
                 custom_badgr_user_id=user.entity_id,
-                lis_person_name_family=urllib.quote_plus(user.last_name.encode('utf-8')),
-                lis_person_name_given=urllib.quote_plus(user.first_name.encode('utf-8')),
-                lis_person_contact_email_primary=urllib.quote_plus(user.primary_email.encode('utf-8'))
+                lis_person_name_family=urllib.parse.quote_plus(user.last_name.encode('utf-8')),
+                lis_person_name_given=urllib.parse.quote_plus(user.first_name.encode('utf-8')),
+                lis_person_contact_email_primary=urllib.parse.quote_plus(user.primary_email.encode('utf-8'))
             ))
         if context_id is not None:
             params['custom_context_id'] = context_id

@@ -1,8 +1,8 @@
 # encoding: utf-8
-from __future__ import unicode_literals
+
 
 import os.path
-from urllib import quote_plus
+from urllib.parse import quote_plus
 
 import os
 import base64
@@ -90,7 +90,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         issuer_email = CachedEmailAddress.objects.create(
             user=test_user, email=self.example_issuer_props['email'], verified=True)
 
-        with open(image_path, 'r') as badge_image:
+        with open(image_path, 'rb') as badge_image:
             issuer_fields_with_image = self.example_issuer_props.copy()
             issuer_fields_with_image['image'] = badge_image
 
@@ -117,14 +117,13 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testfiles', '300x300.png')
         self._create_issuer_with_image_and_test_resizing(image_path, 300, 300)
 
-
     def test_issuer_update_resizes_image(self):
         desired_width = desired_height = 400
 
         test_user = self.setup_user(authenticate=True)
         image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testfiles', '500x300.png')
-        image = open(image_path)
-        encoded = 'data:image/png;base64,' + base64.b64encode(image.read())
+        image = open(image_path, 'rb')
+        encoded = 'data:image/png;base64,' + base64.b64encode(image.read()).decode()
 
         issuer_email = CachedEmailAddress.objects.create(
                 user=test_user, email=self.example_issuer_props['email'], verified=True)
