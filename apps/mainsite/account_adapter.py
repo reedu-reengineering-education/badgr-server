@@ -55,7 +55,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         # DEFAULT_FROM_EMAIL must not already have < > in it.
         default_from = getattr(settings, 'DEFAULT_FROM_EMAIL', '')
         if not default_from:
-            raise NotImplemented("DEFAULT_FROM_EMAIL setting must be defined.")
+            raise NotImplementedError("DEFAULT_FROM_EMAIL setting must be defined.")
         elif '<' in default_from:
             return default_from
         else:

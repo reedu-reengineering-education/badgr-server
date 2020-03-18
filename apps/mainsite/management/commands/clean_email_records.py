@@ -55,7 +55,7 @@ class Command(BaseCommand):
                             raise e
                         except Exception as e:
                             raise SMTPException("Error sending mail to {} -- {}".format(
-                                new_primary.email, e.message
+                                new_primary.email, str(e)
                             ))
             except IntegrityError as e:
                 user_errors += 1
@@ -63,7 +63,7 @@ class Command(BaseCommand):
                 continue
             except SMTPException as e:
                 email_errors += 1
-                self.stdout.write("Could not send mail: {}".format(e.message))
+                self.stdout.write("Could not send mail: {}".format(str(e)))
 
         self.stdout.write(
             "Done cleaning email: {} users, {} updated primaries, {} user errors, {} email errors.".format(
