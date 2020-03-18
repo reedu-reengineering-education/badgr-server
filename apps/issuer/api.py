@@ -358,7 +358,7 @@ class BatchAssertionsRevoke(VersionedObjectMixin, BaseEntityView):
         try:
             assertion.revoke(revocation_reason)
         except Exception as e:
-            return dict(response, reason=e.message)
+            return dict(response, reason=str(e))
 
         return dict(response, revoked=True)
 

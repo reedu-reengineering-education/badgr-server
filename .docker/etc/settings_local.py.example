@@ -85,6 +85,7 @@ GDPR_COMPLIANCE_NOTIFY_ON_FIRST_AWARD = True
 
 SECRET_KEY = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(40))
 UNSUBSCRIBE_KEY = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(40))
+UNSUBSCRIBE_SECRET_KEY = str(SECRET_KEY)
 
 
 ###
