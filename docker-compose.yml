@@ -1,27 +1,34 @@
+# A dockerized badgr-server stack for development
 version: '3.3'
 services:
-  api:
+
+  # this container mirrors in the app code and runs the django dev server
+  dev_api:
     build:
       context: .
-      dockerfile: .docker/Dockerfile.api
+      dockerfile: .docker/Dockerfile.dev.api
     depends_on:
-      - "db"
-      - "memcached"
-    command: uwsgi --ini uwsgi.ini
+      - "dev_db"
+      - "dev_memcached"
+    command: /badgr_server/manage.py runserver 0.0.0.0:8000
     volumes:
-      - badgr_server_api:/badgr_server
-
-  memcached:
-    image: 'bitnami/memcached:latest'
+      - ./apps:/badgr_server/apps
+      - ./manage.py:/badgr_server/manage.py
+      - ./.docker/etc/settings_local.dev.py:/badgr_server/apps/mainsite/settings_local.py
     ports:
-      - "11211:11211"
+      - "8000:8000"
+
+  # this container runs memcached
+  dev_memcached:
+    image: 'bitnami/memcached:latest'
     expose:
       - "11211"
 
-  db:
+  # this container runs mysql (database)
+  dev_db:
     image: mysql:5.6.39
     volumes:
-      - badgr_server_db:/var/lib/mysql:rw
+      - badgr_server_dev_db:/var/lib/mysql:rw
       - ./.docker/etc/init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
       - "MYSQL_PASSWORD=password"
@@ -30,17 +37,5 @@ services:
     expose:
       - "3306"
 
-  nginx:
-    build:
-      context: .
-      dockerfile: .docker/Dockerfile.nginx
-    volumes:
-      - badgr_server_api:/badgr_server
-    depends_on:
-      - "api"
-    ports:
-      - "8080:80"
-
 volumes:
-  badgr_server_api:
-  badgr_server_db:
+  badgr_server_dev_db:
