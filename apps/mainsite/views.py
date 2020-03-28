@@ -24,7 +24,9 @@ from mainsite.admin_actions import clear_cache
 from mainsite.models import EmailBlacklist, BadgrApp
 from mainsite.serializers import VerifiedAuthTokenSerializer
 from pathway.tasks import resave_all_elements
+import badgrlog
 
+logger = badgrlog.BadgrLogger()
 ##
 #
 #  Error Handler Views
@@ -77,16 +79,19 @@ def email_unsubscribe(request, *args, **kwargs):
     try:
         email = base64.b64decode(kwargs['email_encoded'])
     except TypeError:
+        logger.event(badgrlog.BlacklistUnsubscribeInvalidLinkEvent(email))
         return email_unsubscribe_response(request, 'Invalid unsubscribe link.',
                                           error=True)
 
     if not EmailBlacklist.verify_email_signature(**kwargs):
+        logger.event(badgrlog.BlacklistUnsubscribeInvalidLinkEvent(email))
         return email_unsubscribe_response(request, 'Invalid unsubscribe link.',
                                           error=True)
 
     blacklist_instance = EmailBlacklist(email=email)
     try:
         blacklist_instance.save()
+        logger.event(badgrlog.BlacklistUnsubscribeRequestSuccessEvent(email))
     except IntegrityError:
         pass
 
