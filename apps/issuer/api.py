@@ -233,12 +233,12 @@ class BadgeClassDetail(BaseEntityDetailView):
         ])
     )
     def delete(self, request, **kwargs):
-        baseEntity = super(BadgeClassDetail, self)
-        badge_class = baseEntity.get_object(request, **kwargs)
+        base_entity = super(BadgeClassDetail, self)
+        badge_class = base_entity.get_object(request, **kwargs)
 
         logger.event(badgrlog.BadgeClassDeletedEvent(badge_class, request.user))
 
-        return baseEntity.delete(request, **kwargs)
+        return base_entity.delete(request, **kwargs)
 
     @apispec_put_operation('BadgeClass',
         summary='Update an existing BadgeClass.  Previously issued BadgeInstances will NOT be updated',
