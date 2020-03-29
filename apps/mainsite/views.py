@@ -79,7 +79,7 @@ def email_unsubscribe(request, *args, **kwargs):
     try:
         email = base64.b64decode(kwargs['email_encoded'])
     except TypeError:
-        logger.event(badgrlog.BlacklistUnsubscribeInvalidLinkEvent(email))
+        logger.event(badgrlog.BlacklistUnsubscribeInvalidLinkEvent(kwargs['email_encoded']))
         return email_unsubscribe_response(request, 'Invalid unsubscribe link.',
                                           error=True)
 
@@ -94,6 +94,11 @@ def email_unsubscribe(request, *args, **kwargs):
         logger.event(badgrlog.BlacklistUnsubscribeRequestSuccessEvent(email))
     except IntegrityError:
         pass
+    except:
+        logger.event(badgrlog.BlacklistUnsubscribeRequestFailedEvent(email))
+        return email_unsubscribe_response(
+            request, "Failed to unsubscribe email.",
+            error=True)
 
     return email_unsubscribe_response(
         request, "You will no longer receive email notifications for earned"
