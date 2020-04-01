@@ -138,7 +138,7 @@ class BackpackAssertionDetail(BaseEntityDetailView):
         context['format'] = self.request.query_params.get('json_format', 'v1')  # for /v1/earner/badges compat
         return context
 
-    @apispec_get_operation('Assertion',
+    @apispec_get_operation('BackpackAssertion',
                            summary="Get detail on an Assertion in the user's Backpack",
                            tags=['Backpack']
                            )
@@ -154,7 +154,7 @@ class BackpackAssertionDetail(BaseEntityDetailView):
 
         return super(BackpackAssertionDetail, self).get(request, **mykwargs)
 
-    @apispec_delete_operation('Assertion',
+    @apispec_delete_operation('BackpackAssertion',
                               summary='Remove an assertion from the backpack',
                               tags=['Backpack']
                               )
@@ -174,7 +174,7 @@ class BackpackAssertionDetail(BaseEntityDetailView):
         request.user.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @apispec_put_operation('Assertion',
+    @apispec_put_operation('BackpackAssertion',
                            summary="Update acceptance of an Assertion in the user's Backpack",
                            tags=['Backpack']
                            )
