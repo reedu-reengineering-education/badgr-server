@@ -76,7 +76,11 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
         (AuthenticatedWithVerifiedIdentifier & IsOwnerOrStaff) |
         BadgrOAuthTokenHasEntityScope
     ]
-    valid_scopes = ["rw:issuerOwner:*"]
+    valid_scopes = {
+        "get": ["rw:issuerOwner:*"],
+        "post": ["rw:issuerOwner:*"],
+        "@apispec_scopes": {}
+    }
 
     @apispec_list_operation('IssuerStaff',
         tags=['Issuers'],
