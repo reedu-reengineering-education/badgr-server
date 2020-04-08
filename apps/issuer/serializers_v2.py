@@ -89,52 +89,62 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
                     'type': "string",
                     'format': "string",
                     'description': "Unique identifier for this Issuer",
+                    'readOnly': True,
                 }),
                 ('entityType', {
                     'type': "string",
                     'format': "string",
                     'description': "\"Issuer\"",
+                    'readOnly': True,
                 }),
                 ('openBadgeId', {
                     'type': "string",
                     'format': "url",
                     'description': "URL of the OpenBadge compliant json",
+                    'readOnly': True,
                 }),
                 ('createdAt', {
                     'type': 'string',
                     'format': 'ISO8601 timestamp',
                     'description': "Timestamp when the Issuer was created",
+                    'readOnly': True,
                 }),
                 ('createdBy', {
                     'type': 'string',
                     'format': 'entityId',
                     'description': "BadgeUser who created this Issuer",
+                    'required': False,
                 }),
 
                 ('name', {
                     'type': "string",
                     'format': "string",
                     'description': "Name of the Issuer",
+                    'required': True,
                 }),
                 ('image', {
                     'type': "string",
                     'format': "data:image/png;base64",
                     'description': "Base64 encoded string of an image that represents the Issuer",
+                    'required': False,
                 }),
                 ('email', {
                     'type': "string",
                     'format': "email",
                     'description': "Contact email for the Issuer",
+                    'required': True,
                 }),
                 ('url', {
                     'type': "string",
                     'format': "url",
                     'description': "Homepage or website associated with the Issuer",
+                    'required': False,
                 }),
                 ('description', {
                     'type': "string",
                     'format': "text",
                     'description': "Short description of the Issuer",
+                    'required': False,
                 }),
 
             ])
@@ -244,58 +254,69 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
                     'type': "string",
                     'format': "string",
                     'description': "Unique identifier for this BadgeClass",
+                    'readOnly': True,
                 }),
                 ('entityType', {
                     'type': "string",
                     'format': "string",
                     'description': "\"BadgeClass\"",
+                    'readOnly': True,
                 }),
                 ('openBadgeId', {
                     'type': "string",
                     'format': "url",
                     'description': "URL of the OpenBadge compliant json",
+                    'readOnly': True,
                 }),
                 ('createdAt', {
                     'type': 'string',
                     'format': 'ISO8601 timestamp',
                     'description': "Timestamp when the BadgeClass was created",
+                    'readOnly': True,
                 }),
                 ('createdBy', {
                     'type': 'string',
                     'format': 'entityId',
                     'description': "BadgeUser who created this BadgeClass",
+                    'readOnly': True,
                 }),
 
                 ('issuer', {
                     'type': 'string',
                     'format': 'entityId',
                     'description': "entityId of the Issuer who owns the BadgeClass",
+                    'required': False,
                 }),
 
                 ('name', {
                     'type': "string",
                     'format': "string",
                     'description': "Name of the BadgeClass",
+                    'required': True,
                 }),
                 ('description', {
                     'type': "string",
                     'format': "string",
                     'description': "Short description of the BadgeClass",
+                    'required': True,
                 }),
                 ('image', {
                     'type': "string",
                     'format': "data:image/png;base64",
                     'description': "Base64 encoded string of an image that represents the BadgeClass.",
+                    'required': False,
                 }),
                 ('criteriaUrl', {
                     'type': "string",
                     'format': "url",
-                    'description': "External URL that describes in a human-readable format the criteria for the BadgeClass"
+                    'description': "External URL that describes in a human-readable format the criteria for the BadgeClass",
+                    'required': False,
                 }),
                 ('criteriaNarrative', {
                     'type': "string",
                     'format': "markdown",
-                    'description': "Markdown formatted description of the criteria"
+                    'description': "Markdown formatted description of the criteria",
+                    'required': False,
                 }),
                 ('tags', {
                     'type': "array",
@@ -303,18 +324,21 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
                         'type': "string",
                         'format': "string"
                     },
-                    'description': "List of tags that describe the BadgeClass"
+                    'description': "List of tags that describe the BadgeClass",
+                    'required': False,
                 }),
                 ('alignments', {
                     'type': "array",
                     'items': {
                         '$ref': '#/definitions/BadgeClassAlignment'
                     },
-                    'description': "List of objects describing objectives or educational standards"
+                    'description': "List of objects describing objectives or educational standards",
+                    'required': False,
                 }),
                 ('expires', {
                     '$ref': "#/definitions/BadgeClassExpiration",
-                    'description': "Expiration period for Assertions awarded from this BadgeClass"
+                    'description': "Expiration period for Assertions awarded from this BadgeClass",
+                    'required': False,
                 }),
             ])
         })
@@ -471,77 +495,92 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                     'type': "string",
                     'format': "string",
                     'description': "Unique identifier for this Assertion",
+                    'readOnly': True,
                 }),
                 ('entityType', {
                     'type': "string",
                     'format': "string",
                     'description': "\"Assertion\"",
+                    'readOnly': True,
                 }),
                 ('openBadgeId', {
                     'type': "string",
                     'format': "url",
                     'description': "URL of the OpenBadge compliant json",
+                    'readOnly': True,
                 }),
                 ('createdAt', {
                     'type': 'string',
                     'format': 'ISO8601 timestamp',
                     'description': "Timestamp when the Assertion was created",
+                    'readOnly': True,
                 }),
                 ('createdBy', {
                     'type': 'string',
                     'format': 'entityId',
                     'description': "BadgeUser who created the Assertion",
+                    'readOnly': True,
                 }),
 
                 ('badgeclass', {
                     'type': 'string',
                     'format': 'entityId',
                     'description': "BadgeClass that issued this Assertion",
+                    'required': False,
                 }),
                 ('badgeclassOpenBadgeId', {
                     'type': 'string',
                     'format': 'url',
                     'description': "URL of the BadgeClass to award",
+                    'required': False,
                 }),
                 ('badgeclassName', {
                     'type': 'string',
                     'format': 'string',
                     'description': "Name of BadgeClass to create assertion against, case insensitive",
+                    'required': False,
                 }),
                 ('revoked', {
                     'type': 'boolean',
                     'description': "True if this Assertion has been revoked",
+                    'readOnly': True,
                 }),
                 ('revocationReason', {
                     'type': 'string',
                     'format': "string",
                     'description': "Short description of why the Assertion was revoked",
+                    'readOnly': True,
                 }),
                 ('acceptance', {
                     'type': 'string',
                     'description': "Recipient interaction with Assertion. One of: Unaccepted, Accepted, or Rejected",
+                    'readOnly': True,
                 }),
                 ('image', {
                     'type': 'string',
                     'format': 'url',
                     'description': "URL to the baked assertion image",
+                    'readOnly': True,
                 }),
                 ('issuedOn', {
                     'type': 'string',
                     'format': 'ISO8601 timestamp',
                     'description': "Timestamp when the Assertion was issued",
+                    'required': False,
                 }),
                 ('narrative', {
                     'type': 'string',
                     'format': 'markdown',
                     'description': "Markdown narrative of the achievement",
+                    'required': False,
                 }),
                 ('evidence', {
                     'type': 'array',
                     'items': {
                         '$ref': '#/definitions/AssertionEvidence'
                     },
-                    'description': "List of evidence associated with the achievement"
+                    'description': "List of evidence associated with the achievement",
+                    'required': False,
                 }),
                 ('recipient', {
                     'type': 'object',
@@ -549,28 +588,34 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                         ('identity', {
                             'type': 'string',
                             'format': 'string',
-                            'description': 'Either the hash of the identity or the plaintext value'
+                            'description': 'Either the hash of the identity or the plaintext value',
+                            'required': True,
                         }),
                         ('type', {
                             'type': 'string',
                             'enum': [c[0] for c in BadgeInstance.RECIPIENT_TYPE_CHOICES],
-                            'description': "Type of identifier used to identify recipient"
+                            'description': "Type of identifier used to identify recipient",
+                            'required': False,
                         }),
                         ('hashed', {
                             'type': 'boolean',
-                            'description': "Whether or not the identity value is hashed."
+                            'description': "Whether or not the identity value is hashed.",
+                            'required': False,
                         }),
                         ('plaintextIdentity', {
                             'type': 'string',
-                            'description': "The plaintext identity"
+                            'description': "The plaintext identity",
+                            'required': False,
                         }),
                     ]),
-                    'description': "Recipient that was issued the Assertion"
+                    'description': "Recipient that was issued the Assertion",
+                    'required': False,
                 }),
                 ('expires', {
                     'type': 'string',
                     'format': 'ISO8601 timestamp',
                     'description': "Timestamp when the Assertion expires",
+                    'required': False,
                 }),
             ])
         })
