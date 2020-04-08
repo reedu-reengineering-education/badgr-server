@@ -15,11 +15,12 @@ from oauth2_provider.views.mixins import OAuthLibMixin
 from oauthlib.oauth2.rfc6749.utils import scope_to_list
 from rest_framework import serializers
 from rest_framework.response import Response
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK
+from rest_framework.status import HTTP_401_UNAUTHORIZED, HTTP_400_BAD_REQUEST, HTTP_200_OK
 from rest_framework.views import APIView
 
 import badgrlog
 from badgeuser.authcode import accesstoken_for_authcode
+from badgeuser.models import BadgeUser
 from mainsite.models import ApplicationInfo
 from mainsite.oauth_validator import BadgrRequestValidator, BadgrOauthServer
 from mainsite.utils import client_ip_from_request, throttleable
@@ -64,8 +65,13 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
 
             scopes = ' '.join(serializer.data.get("scopes"))
             allow = serializer.data.get("allow")
-            success_url = self.get_authorization_redirect_url(scopes, credentials, allow)
-            return Response({ 'success_url': success_url })
+            if not isinstance(self.request.user, BadgeUser):
+                return Response({
+                    'error': 'Incorrect authentication credentials.'
+                }, status=HTTP_401_UNAUTHORIZED)
+            else:
+                success_url = self.get_authorization_redirect_url(scopes, credentials, allow)
+            return Response({'success_url': success_url})
 
         except OAuthToolkitError as error:
             return Response({

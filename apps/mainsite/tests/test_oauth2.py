@@ -233,3 +233,54 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 200)
         backoff_data = cache.get(backoff_key)
         self.assertIsNone(backoff_data)
+
+    def test_authorize_handles_authenticated_or_anonymous_or_expired_user(self):
+        app = Application.objects.create(
+            client_id='admin',
+            client_secret='adminsecret',
+            authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
+            client_type=Application.CLIENT_CONFIDENTIAL,
+            name='Admin API Access',
+            redirect_uris='https://redirect.test.org'
+        )
+
+        client_user = self.setup_user(email='tester@example.com')
+
+        access_token = AccessTokenProxy.objects.create(
+            user=client_user,
+            scope='rw:issuer r:profile r:backpack',
+            expires=timezone.now() + timezone.timedelta(hours=1),
+            token='abc123',
+            application=app
+        )
+
+        request_data = dict(
+            allow='true',
+            redirect_uri='https://redirect.test.org',
+            state='L2Rhc2hib2FyZC9zdWJtaXNzaW9uL0E5UEMtUTJOOA==',
+            response_type='code',
+            client_id=app.client_id,
+            scopes='rw:issuer r:profile r:backpack'
+        )
+
+        # anonymous user
+        response = self.client.post('/o/authorize', data=request_data)
+        self.assertEqual(response.status_code, 401)
+
+        # authenticated user
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer {}".format(access_token.token))
+        response = self.client.post('/o/authorize', data=request_data)
+        self.assertEqual(response.status_code, 200)
+
+        expiredToken = AccessTokenProxy.objects.create(
+            user=client_user,
+            scope='rw:issuer r:profile r:backpack',
+            expires=timezone.now() - timezone.timedelta(hours=1),
+            token='abc123_expired',
+            application=app
+        )
+
+        # expired user
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer {}".format(expiredToken.token))
+        response = self.client.post('/o/authorize', data=request_data)
+        self.assertEqual(response.status_code, 401)
