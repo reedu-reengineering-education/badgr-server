@@ -51,6 +51,11 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
         return uri
 
     def post(self, request, *args, **kwargs):
+        if not self.request.user.is_authenticated:
+            return Response({
+                'error': 'Incorrect authentication credentials.'
+            }, status=HTTP_401_UNAUTHORIZED)
+
         # Copy/Pasta'd from oauth2_provider.views.BaseAuthorizationView.form_valid
         try:
             serializer = AuthorizationSerializer(data=request.data)
@@ -65,12 +70,8 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
 
             scopes = ' '.join(serializer.data.get("scopes"))
             allow = serializer.data.get("allow")
-            if not isinstance(self.request.user, BadgeUser):
-                return Response({
-                    'error': 'Incorrect authentication credentials.'
-                }, status=HTTP_401_UNAUTHORIZED)
-            else:
-                success_url = self.get_authorization_redirect_url(scopes, credentials, allow)
+
+            success_url = self.get_authorization_redirect_url(scopes, credentials, allow)
             return Response({'success_url': success_url})
 
         except OAuthToolkitError as error:
