@@ -964,8 +964,8 @@ class BadgeInstance(BaseAuditedModel,
             # Allow sending, as this email is not blacklisted.
             pass
         else:
+            logger.event(badgrlog.BlacklistEarnerNotNotifiedEvent(self))
             return
-            # TODO: Report email non-delivery somewhere.
 
         if badgr_app is None:
             badgr_app = self.cached_issuer.cached_badgrapp

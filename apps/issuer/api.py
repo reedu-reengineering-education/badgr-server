@@ -233,9 +233,12 @@ class BadgeClassDetail(BaseEntityDetailView):
         ])
     )
     def delete(self, request, **kwargs):
-        # TODO: log delete methods
-        # logger.event(badgrlog.BadgeClassDeletedEvent(old_badgeclass, request.user))
-        return super(BadgeClassDetail, self).delete(request, **kwargs)
+        base_entity = super(BadgeClassDetail, self)
+        badge_class = base_entity.get_object(request, **kwargs)
+
+        logger.event(badgrlog.BadgeClassDeletedEvent(badge_class, request.user))
+
+        return base_entity.delete(request, **kwargs)
 
     @apispec_put_operation('BadgeClass',
         summary='Update an existing BadgeClass.  Previously issued BadgeInstances will NOT be updated',
@@ -587,7 +590,7 @@ class BadgeInstanceDetail(BaseEntityDetailView):
 
         serializer = self.get_serializer_class()(assertion, context={'request': request})
 
-        # logger.event(badgrlog.BadgeAssertionRevokedEvent(current_assertion, request.user))
+        logger.event(badgrlog.BadgeAssertionRevokedEvent(assertion, request.user))
         return Response(status=HTTP_200_OK, data=serializer.data)
 
     @apispec_put_operation('Assertion',
