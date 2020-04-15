@@ -206,6 +206,7 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
         self.user.publish()
 
     def delete(self):
+        self.publish_delete('identifier')
         super(UserRecipientIdentifier, self).delete()
         process_post_recipient_id_deletion.delay(self.identifier)
 
