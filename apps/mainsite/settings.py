@@ -482,7 +482,6 @@ OPERATOR_URL = None
 
 # OVERRIDE THESE VALUES WITH YOUR OWN STABLE VALUES IN LOCAL SETTINGS
 from cryptography.fernet import Fernet
-PAGINATION_SECRET_KEY = Fernet.generate_key()
 AUTHCODE_SECRET_KEY = Fernet.generate_key()
 
 AUTHCODE_EXPIRES_SECONDS = 600  # needs to be long enough to fetch information from socialauth providers

@@ -1,6 +1,8 @@
 *.pyc
 *.egg
 settings_local.py
+settings_local.dev.py
+settings_local.prod.py
 .*.sw*
 *~
 .DS_Store
