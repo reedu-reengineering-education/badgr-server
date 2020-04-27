@@ -9,6 +9,7 @@ class Saml2Configuration(models.Model):
     def __unicode__(self):
         return self.slug
 
+
 class Saml2Account(models.Model):
     user = models.ForeignKey(BadgeUser)
     config = models.ForeignKey(Saml2Configuration)
