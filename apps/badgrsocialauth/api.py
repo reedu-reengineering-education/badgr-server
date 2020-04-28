@@ -1,3 +1,5 @@
+import re
+
 from allauth.socialaccount.adapter import get_adapter
 from allauth.socialaccount.models import SocialAccount
 from django.core.exceptions import ValidationError
@@ -10,6 +12,7 @@ from rest_framework.views import APIView
 
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import UserRecipientIdentifier
+from badgrsocialauth.models import Saml2Account
 from badgrsocialauth.permissions import IsSocialAccountOwner
 from badgrsocialauth.serializers_v1 import BadgrSocialAccountSerializerV1
 from badgrsocialauth.serializers_v2 import BadgrSocialAccountSerializerV2
@@ -30,8 +33,9 @@ class BadgrSocialAccountList(BaseEntityListView):
     }
 
     def get_objects(self, request, **kwargs):
-        obj = self.request.user.socialaccount_set.all()
-        return obj
+        oauth2_objects = self.request.user.socialaccount_set.all()
+        saml2_objects = self.request.user.saml2account_set.all()
+        return list(oauth2_objects) + list(saml2_objects)
 
     def get(self, request, **kwargs):
         return super(BadgrSocialAccountList, self).get(request, **kwargs)
@@ -76,9 +80,17 @@ class BadgrSocialAccountDetail(BaseEntityDetailView):
 
     def get_object(self, request, **kwargs):
         try:
-            return SocialAccount.objects.get(id=kwargs.get('id'))
-        except SocialAccount.DoesNotExist:
-            raise Http404
+            saml_id = re.match(r'saml2\.([0-9]+)$', kwargs['id']).group(1)
+            return Saml2Account.objects.get(id=saml_id)
+        except Saml2Account.DoesNotExist:
+            pass
+        except AttributeError:  # None no-match case doesn't have .group attribute
+            try:
+                return SocialAccount.objects.get(id=kwargs['id'])
+            except SocialAccount.DoesNotExist:
+                pass
+
+        raise Http404
 
     def get(self, request, **kwargs):
         return super(BadgrSocialAccountDetail, self).get(request, **kwargs)
