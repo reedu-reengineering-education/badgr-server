@@ -5,7 +5,7 @@ from allauth.socialaccount import providers
 from django.conf.urls import url
 
 from badgrsocialauth.views import BadgrSocialLogin, BadgrSocialEmailExists, BadgrSocialAccountVerifyEmail, \
-    BadgrSocialLoginCancel, BadgrAccountConnected, saml2_redirect, assertion_consumer_service
+    BadgrSocialLoginCancel, BadgrAccountConnected, assertion_consumer_service, saml2_render_or_redirect
 
 urlpatterns = [
     url(r'^sociallogin', BadgrSocialLogin.as_view(permanent=False), name='socialaccount_login'),
@@ -23,7 +23,7 @@ urlpatterns = [
     url(r'^connected', BadgrAccountConnected.as_view(permanent=False), name='socialaccount_connections'),
 
     # SAML2 Identity Provider
-    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/$', saml2_redirect, name='saml2login'),
+    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/$', saml2_render_or_redirect, name='saml2login'),
     url(r'^saml2/(?P<idp_name>[\w\.\-]+)/acs/', assertion_consumer_service, name='assertion_consumer_service'),
 ]
 
