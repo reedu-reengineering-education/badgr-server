@@ -19,7 +19,8 @@ class Command(BaseCommand):
         start_index = 0
         processing_index = 1
 
-        while True:
+        continue_processing = True
+        while continue_processing:
             start = start_index
             end = start_index+chunk_size
 
@@ -57,8 +58,7 @@ class Command(BaseCommand):
                     self.log("[ERROR] No verified CachedEmail found for: {}".format(dup['email']))
 
             processing_index = processing_index + 1
-            if len(dup_emails) < chunk_size:
-                break
+            continue_processing = len(dup_emails) >= chunk_size
             start_index += chunk_size
 
         self.log("finished delete_superseded_users at {}".format(datetime.datetime.now()))
