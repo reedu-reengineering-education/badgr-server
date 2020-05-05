@@ -135,21 +135,6 @@ def saml2_client_for(idp_name=None):
     config = Saml2Configuration.objects.get(slug=idp_name)
     should_sign_authn_request = config.use_signed_authn_request
 
-    key_file = getattr(settings, 'KEY_FILE', None)
-    if key_file is None:
-        raise ImproperlyConfigured(
-            "saml2_client_for() requires the path of a PEM formatted file containing the certificates private key")
-
-    cert_file = getattr(settings, 'CERT_FILE', None)
-    if cert_file is None:
-        raise ImproperlyConfigured(
-            "saml2_client_for() requires the path of a PEM formatted file containing the certificates public key")
-
-    xmlsec_binary_path = getattr(settings, 'XMLSEC_BINARY_PATH', None)
-    if xmlsec_binary_path is None:
-        raise ImproperlyConfigured(
-            "saml2_client_for() requires the path to the xmlsec binary")
-
     metadata = None
     if config:
         metadata = config.cached_metadata
@@ -185,6 +170,21 @@ def saml2_client_for(idp_name=None):
     }
 
     if should_sign_authn_request:
+        key_file = getattr(settings, 'KEY_FILE', None)
+        if key_file is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to a PEM formatted file containing the certificates private key")
+
+        cert_file = getattr(settings, 'CERT_FILE', None)
+        if cert_file is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to a PEM formatted file containing the certificates public key")
+
+        xmlsec_binary_path = getattr(settings, 'XMLSEC_BINARY_PATH', None)
+        if xmlsec_binary_path is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to the xmlsec binary")
+
         setting['key_file'] = key_file
         setting['cert_file'] = cert_file
         # requires xmlsec binaries per https://pysaml2.readthedocs.io/en/latest/examples/sp.html
