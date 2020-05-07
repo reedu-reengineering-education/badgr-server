@@ -170,12 +170,12 @@ def saml2_client_for(idp_name=None):
     }
 
     if should_sign_authn_request:
-        key_file = getattr(settings, 'KEY_FILE', None)
+        key_file = getattr(settings, 'SAML_KEY_FILE', None)
         if key_file is None:
             raise ImproperlyConfigured(
                 "Signed Authn request requires the path to a PEM formatted file containing the certificates private key")
 
-        cert_file = getattr(settings, 'CERT_FILE', None)
+        cert_file = getattr(settings, 'SAML_CERT_FILE', None)
         if cert_file is None:
             raise ImproperlyConfigured(
                 "Signed Authn request requires the path to a PEM formatted file containing the certificates public key")
