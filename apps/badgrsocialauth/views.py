@@ -121,7 +121,7 @@ class BadgrAccountConnected(RedirectView):
 
 """
 
-SAML2 Authentication Flow 
+SAML2 Authentication Flow
 
 """
 
@@ -267,6 +267,7 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
     except CachedEmailAddress.DoesNotExist:
         # Email does not exist, auto-provision account and log in
         return login(new_account(email))
+
 
 def saml2_render_or_redirect(request, idp_name):
     config = Saml2Configuration.objects.get(slug=idp_name)
