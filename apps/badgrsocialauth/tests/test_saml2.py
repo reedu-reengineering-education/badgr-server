@@ -38,15 +38,15 @@ class SAML2Tests(BadgrTestCase):
             idp_metadata = f.read()
             authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
             url = '/account/sociallogin?provider=' + authn_request.slug
-            redirect_url = '/account/saml2' + authn_request.slug
+            redirect_url = '/account/saml2/' + authn_request.slug + '/'
             response = self.client.get(url, follow=True)
             intermediate_url, intermediate_url_status = response.redirect_chain[0]
 
             # login redirect to saml2 login
-            self.assertTrue(intermediate_url, redirect_url)
-            self.assertTrue(intermediate_url_status, 302)
+            self.assertEqual(intermediate_url, redirect_url)
+            self.assertEqual(intermediate_url_status, 302)
             # self populated form generated with metadata file from self.ipd_metadata_path
-            self.assertTrue(response.status_code, 200)
+            self.assertEqual(response.status_code, 200)
             # changing attribute location of element md:SingleSignOnService necessitates updating this value
             self.assertIsNot(
                 response.content.find('<form action="https://example.com/saml2/idp/SSOService.php" method="post">'), -1)
