@@ -441,6 +441,18 @@ class BadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, BaseEn
                 'name': "num",
                 'type': "string",
                 'description': 'Request pagination of results'
+            },
+            {
+                'in': 'query',
+                'name': "include_expired",
+                'type': "boolean",
+                'description': 'Include expired assertions'
+            },
+            {
+                'in': 'query',
+                'name': "include_revoked",
+                'type': "boolean",
+                'description': 'Include revoked assertions'
             }
         ]
     )
