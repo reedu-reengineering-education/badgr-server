@@ -22,6 +22,14 @@ class Saml2Configuration(models.Model):
             reverse('assertion_consumer_service', kwargs={'idp_name': self.slug})
         )
 
+    def sp_metadata_url(self):
+        if not self.slug:
+            return ""
+        return "{}{}".format(
+            getattr(settings, 'HTTP_ORIGIN', ''),
+            reverse('saml2_sp_metadata', kwargs={'idp_name': self.slug})
+        )
+
 
 class Saml2Account(models.Model):
     user = models.ForeignKey(BadgeUser)
