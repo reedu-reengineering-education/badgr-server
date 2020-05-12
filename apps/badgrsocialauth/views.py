@@ -1,6 +1,8 @@
 import urllib
 import urlparse
 
+from saml2.metadata import create_metadata_string
+
 from allauth.account.adapter import get_adapter
 from allauth.socialaccount.providers.base import AuthProcess
 from django.contrib.auth import logout
@@ -130,9 +132,17 @@ def saml2_client_for(idp_name=None):
     '''
     Given the name of an Identity Provider look up the Saml2Configuration and build a SAML Client. Return these.
     '''
-
-    # SAML metadata changes very rarely, check for cached version first
     config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_config = create_saml_config_for(config)
+    spConfig = Saml2Config()
+    spConfig.load(saml_config)
+    spConfig.allow_unknown_attributes = True
+    saml_client = Saml2Client(config=spConfig)
+    return saml_client, config
+
+
+def create_saml_config_for(config):
+    # SAML metadata changes very rarely, check for cached version first
     should_sign_authn_request = config.use_signed_authn_request
 
     metadata = None
@@ -144,7 +154,7 @@ def saml2_client_for(idp_name=None):
         metadata = r.text
 
     origin = getattr(settings, 'HTTP_ORIGIN').split('://')[1]
-    https_acs_url = 'https://' + origin + reverse('assertion_consumer_service', args=[idp_name])
+    https_acs_url = 'https://' + origin + reverse('assertion_consumer_service', args=[config.slug])
 
     setting = {
         'metadata': {
@@ -168,7 +178,6 @@ def saml2_client_for(idp_name=None):
             },
         },
     }
-
     if should_sign_authn_request:
         key_file = getattr(settings, 'SAML_KEY_FILE', None)
         if key_file is None:
@@ -189,12 +198,81 @@ def saml2_client_for(idp_name=None):
         setting['cert_file'] = cert_file
         # requires xmlsec binaries per https://pysaml2.readthedocs.io/en/latest/examples/sp.html
         setting['xmlsec_binary'] = xmlsec_binary_path
+        return setting
 
+
+def saml2_client_for(idp_name=None):
+    '''
+    Given the name of an Identity Provider look up the Saml2Configuration and build a SAML Client. Return these.
+    '''
+    config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_config = create_saml_config_for(config)
     spConfig = Saml2Config()
-    spConfig.load(setting)
+    spConfig.load(saml_config)
     spConfig.allow_unknown_attributes = True
     saml_client = Saml2Client(config=spConfig)
     return saml_client, config
+
+
+def create_saml_config_for(config):
+    # SAML metadata changes very rarely, check for cached version first
+    should_sign_authn_request = config.use_signed_authn_request
+
+    metadata = None
+    if config:
+        metadata = config.cached_metadata
+
+    if not metadata:
+        r = requests.get(config.metadata_conf_url)
+        metadata = r.text
+
+    origin = getattr(settings, 'HTTP_ORIGIN').split('://')[1]
+    https_acs_url = 'https://' + origin + reverse('assertion_consumer_service', args=[config.slug])
+
+    setting = {
+        'metadata': {
+            'inline': [metadata],
+        },
+        'entityid': "badgrserver",
+        'service': {
+            'sp': {
+                'endpoints': {
+                    'assertion_consumer_service': [
+                        (https_acs_url, BINDING_HTTP_POST)
+                    ],
+                },
+                # Don't verify that the incoming requests originate from us via
+                # the built-in cache for authn request ids in pysaml2
+                'allow_unsolicited': True,
+                'authn_requests_signed': should_sign_authn_request,
+                'logout_requests_signed': True,
+                'want_assertions_signed': True,
+                'want_response_signed': False,
+            },
+        },
+    }
+    if should_sign_authn_request:
+        key_file = getattr(settings, 'SAML_KEY_FILE', None)
+        if key_file is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to a PEM formatted file containing the certificates private key")
+
+        cert_file = getattr(settings, 'SAML_CERT_FILE', None)
+        if cert_file is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to a PEM formatted file containing the certificates public key")
+
+        xmlsec_binary_path = getattr(settings, 'XMLSEC_BINARY_PATH', None)
+        if xmlsec_binary_path is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to the xmlsec binary")
+
+        setting['key_file'] = key_file
+        setting['cert_file'] = cert_file
+        # requires xmlsec binaries per https://pysaml2.readthedocs.io/en/latest/examples/sp.html
+        setting['xmlsec_binary'] = xmlsec_binary_path
+        return setting
+
 
 
 @csrf_exempt
@@ -267,6 +345,16 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
     except CachedEmailAddress.DoesNotExist:
         # Email does not exist, auto-provision account and log in
         return login(new_account(email))
+
+
+def saml2_sp_metadata(request, idp_name):
+    config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_config = create_saml_config_for(config)
+    spConfig = Saml2Config()
+    spConfig.load(saml_config)
+
+    metadata = create_metadata_string('', config=spConfig)
+    return HttpResponse(metadata, content_type="text/xml")
 
 
 def saml2_render_or_redirect(request, idp_name):
