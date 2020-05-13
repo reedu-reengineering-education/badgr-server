@@ -679,14 +679,14 @@ class PaginatedAssertionsSinceSerializer(CursorPaginatedListSerializer):
 
 class AssertionsChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
-    valid_scopes = ["r:assertions", "rw:serverAdmin"]
+    valid_scopes = ["r:issuer", "rw:serverAdmin"]
 
     def get_queryset(self, request, since=None):
         user = request.user
 
-        expr = Q(user__oauth2_provider_accesstoken__application__user=user)
-        expr &= Q(user__oauth2_provider_accesstoken__accesstokenscope__scope__in=["r:backpack", "rw:backpack"])
-        expr |= Q(issuer__issuerstaff__user=user)
+        # for efficiency, this is updated to no longer return assertions linked to applications
+        # this will just fetch assertions for issuers that the user is a staff member for
+        expr = Q(issuer__issuerstaff__user=user)
 
         if since is not None:
             expr &= Q(updated_at__gt=since)
