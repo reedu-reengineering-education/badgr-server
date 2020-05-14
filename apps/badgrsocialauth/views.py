@@ -1,16 +1,24 @@
 import urllib.request, urllib.parse, urllib.error
 import urllib.parse
 
+from saml2.metadata import create_metadata_string
+
 from allauth.account.adapter import get_adapter
 from allauth.socialaccount.providers.base import AuthProcess
 from django.contrib.auth import logout
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ImproperlyConfigured
 from django.core.urlresolvers import reverse, NoReverseMatch
-from django.http import HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponseBadRequest, HttpResponseForbidden, HttpResponse
 from django.views.generic import RedirectView
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render_to_response
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework import status
+
+from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
+
+import logging
+
 import requests
 
 import base64
@@ -32,6 +40,7 @@ from saml2.client import Saml2Client
 from saml2.config import Config as Saml2Config
 from mainsite.models import AccessTokenProxy
 
+logger = logging.getLogger(__name__)
 
 class BadgrSocialLogin(RedirectView):
     def get(self, request, *args, **kwargs):
@@ -117,7 +126,7 @@ class BadgrAccountConnected(RedirectView):
 
 """
 
-SAML2 Authentication Flow 
+SAML2 Authentication Flow
 
 """
 
@@ -126,9 +135,19 @@ def saml2_client_for(idp_name=None):
     '''
     Given the name of an Identity Provider look up the Saml2Configuration and build a SAML Client. Return these.
     '''
-
-    # SAML metadata changes very rarely, check for cached version first
     config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_config = create_saml_config_for(config)
+    spConfig = Saml2Config()
+    spConfig.load(saml_config)
+    spConfig.allow_unknown_attributes = True
+    saml_client = Saml2Client(config=spConfig)
+    return saml_client, config
+
+
+def create_saml_config_for(config):
+    # SAML metadata changes very rarely, check for cached version first
+    should_sign_authn_request = config.use_signed_authn_request
+
     metadata = None
     if config:
         metadata = config.cached_metadata
@@ -137,14 +156,14 @@ def saml2_client_for(idp_name=None):
         r = requests.get(config.metadata_conf_url)
         metadata = r.text
 
-    origin = getattr(settings, 'HTTP_ORIGIN').split('://')[1]
-    https_acs_url = 'https://' + origin + reverse('assertion_consumer_service', args=[idp_name])
+    origin = getattr(settings, 'HTTP_ORIGIN')
+    https_acs_url = origin + reverse('assertion_consumer_service', args=[config.slug])
 
     setting = {
         'metadata': {
             'inline': [metadata],
         },
-        'entityid': "badgrserver",
+        'entityid': https_acs_url,
         'service': {
             'sp': {
                 'endpoints': {
@@ -155,28 +174,91 @@ def saml2_client_for(idp_name=None):
                 # Don't verify that the incoming requests originate from us via
                 # the built-in cache for authn request ids in pysaml2
                 'allow_unsolicited': True,
-                # Don't sign authn requests, since signed requests only make
-                # sense in a situation where you control both the SP and IdP
-                'authn_requests_signed': False,
+                'authn_requests_signed': should_sign_authn_request,
                 'logout_requests_signed': True,
                 'want_assertions_signed': True,
                 'want_response_signed': False,
             },
         },
     }
+    if should_sign_authn_request:
+        key_file = getattr(settings, 'SAML_KEY_FILE', None)
+        if key_file is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to a PEM formatted file containing the certificates private key")
+
+        cert_file = getattr(settings, 'SAML_CERT_FILE', None)
+        if cert_file is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to a PEM formatted file containing the certificates public key")
+
+        xmlsec_binary_path = getattr(settings, 'XMLSEC_BINARY_PATH', None)
+        if xmlsec_binary_path is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to the xmlsec binary")
+
+        setting['key_file'] = key_file
+        setting['cert_file'] = cert_file
+        # requires xmlsec binaries per https://pysaml2.readthedocs.io/en/latest/examples/sp.html
+        setting['xmlsec_binary'] = xmlsec_binary_path
+    return setting
+
+
+def saml2_sp_metadata(request, idp_name):
+    config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_config = create_saml_config_for(config)
     spConfig = Saml2Config()
-    spConfig.load(setting)
-    spConfig.allow_unknown_attributes = True
-    saml_client = Saml2Client(config=spConfig)
-    return saml_client, config
+    spConfig.load(saml_config)
+
+    metadata = create_metadata_string('', config=spConfig)
+    return HttpResponse(metadata, content_type="text/xml")
+
+
+def saml2_render_or_redirect(request, idp_name):
+    config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_client, _ = saml2_client_for(idp_name)
+    response = None
+
+    if config.use_signed_authn_request:
+        reqid, info = saml_client.prepare_for_authenticate(
+            binding=BINDING_HTTP_POST,
+            sign=True
+        )
+        response = HttpResponse(info['data'])
+    else:
+        reqid, info = saml_client.prepare_for_authenticate(binding=BINDING_HTTP_REDIRECT)
+        redirect_url = None
+        # Select the IdP URL to send the AuthN request to
+        for key, value in info['headers']:
+            if key == 'Location':
+                redirect_url = value
+        response = redirect(redirect_url)
+        #  Read http://stackoverflow.com/a/5494469 and
+        #  http://docs.oasis-open.org/security/saml/v2.0/saml-bindings-2.0-os.pdf
+        #  We set those headers here as a "belt and suspenders" approach.
+        response['Cache-Control'] = 'no-cache, no-store'
+        response['Pragma'] = 'no-cache'
+
+    badgr_app = BadgrApp.objects.get_current(request)
+    request.session['badgr_app_pk'] = badgr_app.pk
+    return response
 
 
 @csrf_exempt
 def assertion_consumer_service(request, idp_name):
     saml_client, config = saml2_client_for(idp_name)
-    authn_response = saml_client.parse_authn_request_response(
-        request.POST.get('SAMLResponse'),
-        entity.BINDING_HTTP_POST)
+    try:
+        authn_response = saml_client.parse_authn_request_response(
+            request.POST.get('SAMLResponse'),
+            entity.BINDING_HTTP_POST)
+    except Exception as e:
+        error = "assertion_consumer_service: saml_client entityid:{}, reponse: {}".format(
+            saml_client.config.entityid,
+            request.POST.get('SAMLResponse')
+        )
+        logger.error(error)
+        raise e
+
     authn_response.get_identity()
     if len(set(settings.SAML_EMAIL_KEYS) & set(authn_response.ava.keys())) == 0:
         raise ValidationError('Missing email in SAML assertions, received {}'.format(list(authn_response.ava.keys())))
@@ -241,25 +323,4 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
     except CachedEmailAddress.DoesNotExist:
         # Email does not exist, auto-provision account and log in
         return login(new_account(email))
-
-
-def saml2_redirect(request, idp_name):
-    saml_client, _ = saml2_client_for(idp_name)
-    reqid, info = saml_client.prepare_for_authenticate()
-    redirect_url = None
-    # Select the IdP URL to send the AuthN request to
-    for key, value in info['headers']:
-        if key == 'Location':
-            redirect_url = value
-    response = redirect(redirect_url)
-    #  Read http://stackoverflow.com/a/5494469 and
-    #  http://docs.oasis-open.org/security/saml/v2.0/saml-bindings-2.0-os.pdf
-    #  We set those headers here as a "belt and suspenders" approach.
-    response['Cache-Control'] = 'no-cache, no-store'
-    response['Pragma'] = 'no-cache'
-    badgr_app = BadgrApp.objects.get_current(request)
-    request.session['badgr_app_pk'] = badgr_app.pk
-    return response
-
-
 

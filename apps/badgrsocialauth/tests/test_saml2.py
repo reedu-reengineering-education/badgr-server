@@ -1,15 +1,67 @@
-from badgeuser.models import CachedEmailAddress, BadgeUser
-from mainsite.models import BadgrApp
-from mainsite.tests import BadgrTestCase
+import os
+
+from django.test import override_settings
 
 from badgrsocialauth.models import Saml2Configuration, Saml2Account
 from badgrsocialauth.views import auto_provision, saml2_client_for
+
+from badgeuser.models import CachedEmailAddress, BadgeUser
+
+from mainsite.models import BadgrApp
+from mainsite.tests import BadgrTestCase
+from mainsite import TOP_DIR
 
 
 class SAML2Tests(BadgrTestCase):
     def setUp(self):
         super(SAML2Tests, self).setUp()
         self.config = Saml2Configuration.objects.create(metadata_conf_url="http://example.com", slug="saml2.test")
+        self.test_files_path = os.path.join(TOP_DIR, 'apps', 'badgrsocialauth', 'testfiles')
+        self.ipd_metadata_path = os.path.join(self.test_files_path, 'idp-test-metadata.txt')
+        self.ipd_cert_path = os.path.join(self.test_files_path, 'idp-test-cert.pem')
+        self.ipd_key_path = os.path.join(self.test_files_path, 'idp-test-key.pem')
+
+    def create_signed_auth_request_saml2Configuration(self, idp_metadata):
+        return Saml2Configuration.objects.create(
+            metadata_conf_url="http://example.com",
+            cached_metadata=idp_metadata,
+            slug='saml2.authn',
+            use_signed_authn_request=True
+        )
+
+    def test_signed_authn_request_option_creates_signed_metadata(self):
+        with override_settings(
+                SAML_KEY_FILE=self.ipd_key_path,
+                SAML_CERT_FILE=self.ipd_cert_path):
+            with open(self.ipd_metadata_path, 'r') as f:
+                idp_metadata = f.read()
+                authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
+                saml_client, config = saml2_client_for(authn_request.slug)
+                self.assertTrue(saml_client.authn_requests_signed)
+                self.assertNotEqual(saml_client.sec.sec_backend, None)
+
+    def test_signed_authn_request_option_returns_self_posting_form_populated_with_signed_metadata(self):
+        with override_settings(
+                SAML_KEY_FILE=self.ipd_key_path,
+                SAML_CERT_FILE=self.ipd_cert_path):
+            with open(self.ipd_metadata_path, 'r') as f:
+                idp_metadata = f.read()
+                authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
+                url = '/account/sociallogin?provider=' + authn_request.slug
+                redirect_url = '/account/saml2/' + authn_request.slug + '/'
+                response = self.client.get(url, follow=True)
+                intermediate_url, intermediate_url_status = response.redirect_chain[0]
+
+                # login redirect to saml2 login
+                self.assertEqual(intermediate_url, redirect_url)
+                self.assertEqual(intermediate_url_status, 302)
+                # self populated form generated with metadata file from self.ipd_metadata_path
+                self.assertEqual(response.status_code, 200)
+                # changing attribute location of element md:SingleSignOnService necessitates updating this value
+                self.assertIsNot(
+                    response.content.find('<form action="https://example.com/saml2/idp/SSOService.php" method="post">'), -1)
+                self.assertIsNot(
+                    response.content.find('<input type="hidden" name="SAMLRequest" value="'), -1)
 
     def test_create_saml2_client(self):
         Saml2Configuration.objects.create(metadata_conf_url="http://example.com", cached_metadata="<xml></xml>",  slug="saml2.test2")

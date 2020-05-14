@@ -206,6 +206,7 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
         self.user.publish()
 
     def delete(self):
+        self.publish_delete('identifier')
         super(UserRecipientIdentifier, self).delete()
         process_post_recipient_id_deletion.delay(self.identifier)
 
@@ -357,7 +358,7 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
 
             # remove old items
             for emailaddress in self.email_items:
-                if emailaddress.email not in new_email_idx:
+                if emailaddress.email.lower() not in (lower_case_idx.lower() for lower_case_idx in new_email_idx):
                     emailaddress.delete()
 
         if self.email != requested_primary:

@@ -1,11 +1,11 @@
 import json
 
+from allauth.socialaccount.models import SocialAccount, SocialApp
 from django.contrib.sites.models import Site
 
-from badgeuser.models import CachedEmailAddress, BadgeUser
-from mainsite.models import BadgrApp
+from badgrsocialauth.models import Saml2Account, Saml2Configuration
 from mainsite.tests import BadgrTestCase, SetupUserHelper
-from allauth.socialaccount.models import SocialAccount, SocialApp
+
 
 from badgrsocialauth.providers.twitter.tests import MOCK_TWITTER_PROFILE_RESPONSE
 
@@ -18,6 +18,11 @@ class SocialAccountV2APITests(BadgrTestCase, SetupUserHelper):
             provider='twitter', name='Twitter OAuth2', client_id='fake', secret='also fake'
         )
         self.socialapplication.sites.add(site)
+
+        self.examplesamlconfig = Saml2Configuration.objects.create(
+            metadata_conf_url='https://example.com/saml2conf',
+            slug='saml2.example'
+        )
 
     def _basic_api_requests(self):
         # have a user already authenticated on the self.client with preferred method.
@@ -47,8 +52,13 @@ class SocialAccountV2APITests(BadgrTestCase, SetupUserHelper):
         socialaccount = SocialAccount.objects.create(
             user=user, provider='twitter', uid='123', extra_data=json.loads(MOCK_TWITTER_PROFILE_RESPONSE)
         )
+        samlaccount = Saml2Account.objects.create(
+            user=user, config=self.examplesamlconfig, uuid='abc123'
+        )
 
         self._basic_api_requests()
+        response = self.client.get('/v2/socialaccounts/{}'.format(samlaccount.account_identifier))
+        self.assertEqual(response.status_code, 200)
 
     def test_socialaccount_basic_operations_with_oauth_token_scope(self):
         user = self.setup_user(authenticate=True, token_scope='rw:profile')

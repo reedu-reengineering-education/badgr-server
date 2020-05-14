@@ -117,6 +117,19 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testfiles', '300x300.png')
         self._create_issuer_with_image_and_test_resizing(image_path, 300, 300)
 
+    def test_get_issuer_detail_unauthenticated_fails(self):
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_issuer.created_by = None
+        test_issuer.source_url = 'https://example.com/issuer1'
+        test_issuer.save()
+        IssuerStaff.objects.last().delete()
+
+        response = self.client.get('/v2/issuers/{}'.format(test_issuer.entity_id), headers={
+            'Accept': 'text/html'
+        })
+        self.assertEqual(response.status_code, 401)
+
     def test_issuer_update_resizes_image(self):
         desired_width = desired_height = 400
 
