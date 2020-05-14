@@ -210,7 +210,7 @@ def saml2_sp_metadata(request, idp_name):
     spConfig = Saml2Config()
     spConfig.load(saml_config)
 
-    metadata = create_metadata_string('', config=spConfig)
+    metadata = create_metadata_string('', config=spConfig, sign=True)
     return HttpResponse(metadata, content_type="text/xml")
 
 
