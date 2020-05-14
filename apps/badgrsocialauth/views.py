@@ -17,6 +17,8 @@ from rest_framework import status
 
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 
+import logging
+
 import requests
 
 import base64
@@ -38,6 +40,7 @@ from saml2.client import Saml2Client
 from saml2.config import Config as Saml2Config
 from mainsite.models import AccessTokenProxy
 
+logger = logging.getLogger(__name__)
 
 class BadgrSocialLogin(RedirectView):
     def get(self, request, *args, **kwargs):
@@ -155,13 +158,12 @@ def create_saml_config_for(config):
 
     origin = getattr(settings, 'HTTP_ORIGIN')
     https_acs_url = origin + reverse('assertion_consumer_service', args=[config.slug])
-    entityid = '{}/account/saml2/{}/metadata'.format(origin, config.slug)
 
     setting = {
         'metadata': {
             'inline': [metadata],
         },
-        'entityid': entityid,
+        'entityid': https_acs_url,
         'service': {
             'sp': {
                 'endpoints': {
@@ -245,9 +247,18 @@ def saml2_render_or_redirect(request, idp_name):
 @csrf_exempt
 def assertion_consumer_service(request, idp_name):
     saml_client, config = saml2_client_for(idp_name)
-    authn_response = saml_client.parse_authn_request_response(
-        request.POST.get('SAMLResponse'),
-        entity.BINDING_HTTP_POST)
+    try:
+        authn_response = saml_client.parse_authn_request_response(
+            request.POST.get('SAMLResponse'),
+            entity.BINDING_HTTP_POST)
+    except Exception as e:
+        error = "assertion_consumer_service: saml_client entityid:{}, reponse: {}".format(
+            saml_client.config.entityid,
+            request.POST.get('SAMLResponse')
+        )
+        logger.error(error)
+        raise e
+
     authn_response.get_identity()
     if len(set(settings.SAML_EMAIL_KEYS) & set(authn_response.ava.keys())) == 0:
         raise ValidationError('Missing email in SAML assertions, received {}'.format(authn_response.ava.keys()))
