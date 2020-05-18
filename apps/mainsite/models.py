@@ -20,6 +20,9 @@ from django.utils.deconstruct import deconstructible
 from oauth2_provider.models import AccessToken, Application, RefreshToken
 from rest_framework.authtoken.models import Token
 
+from mainsite.utils import set_url_query_params
+
+
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 
@@ -222,6 +225,19 @@ class ApplicationInfo(cachemodel.CacheModel):
     def get_icon_url(self):
         if self.icon:
             return self.icon.url
+
+    @property
+    def default_launch_url(self):
+        application = self.application
+        if application.authorization_grant_type != Application.GRANT_AUTHORIZATION_CODE:
+            # This is not a Auth Code Application. Cannot Launch.
+            return ''
+        launch_url = BadgrApp.objects.get_current().get_path('/auth/oauth2/authorize')
+        launch_url = set_url_query_params(
+            launch_url, client_id=application.client_id, redirect_uri=application.default_redirect_uri,
+            scope=self.allowed_scopes
+        )
+        return launch_url
 
     @property
     def scope_list(self):
