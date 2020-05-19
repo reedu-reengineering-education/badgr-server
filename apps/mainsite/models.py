@@ -316,6 +316,10 @@ class AccessTokenProxy(AccessToken):
         b64_trimmed = re.sub(r'=+$', '', b64_string)
         return b64_trimmed
 
+    @property
+    def client_id(self):
+        return self.application.client_id
+
     def get_entity_class_name(self):
         return 'AccessToken'
 
