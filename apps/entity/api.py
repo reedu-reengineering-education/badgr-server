@@ -56,7 +56,7 @@ class BaseEntityListView(BaseEntityView):
         """
         GET a list of an entities the authenticated user is authorized for
         """
-        if self.allow_any_unauthenticated_access is False and not request.user.is_authenticated():
+        if self.allow_any_unauthenticated_access is False and not request.user.is_authenticated:
             raise NotAuthenticated()
 
         objects = self.get_objects(request, **kwargs)
@@ -77,7 +77,7 @@ class BaseEntityListView(BaseEntityView):
         """
         POST a new entity to be owned by the authenticated user
         """
-        if not request.user or request.user.is_anonymous():
+        if not request.user or request.user.is_anonymous:
             raise NotAuthenticated()
 
         context = self.get_context_data(**kwargs)
@@ -100,7 +100,7 @@ class VersionedObjectMixin(object):
         return True
 
     def get_object(self, request, **kwargs):
-        if self.allow_any_unauthenticated_access is False and not request.user.is_authenticated():
+        if self.allow_any_unauthenticated_access is False and not request.user.is_authenticated:
             raise NotAuthenticated()
 
         version = getattr(request, 'version', 'v1')

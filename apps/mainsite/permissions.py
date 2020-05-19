@@ -28,7 +28,7 @@ class AuthenticatedWithVerifiedIdentifier(permissions.BasePermission):
     message = "This function only available to authenticated users with confirmed email addresses."
 
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated() and request.user.verified
+        return request.user and request.user.is_authenticated and request.user.verified
 
 
 class IsServerAdmin(permissions.BasePermission):

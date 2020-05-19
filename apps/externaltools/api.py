@@ -21,7 +21,7 @@ class ExternalToolList(BaseEntityListView):
 
     def get_objects(self, request, **kwargs):
         tools = list(ExternalTool.cached.global_tools())
-        if self.request.user.is_authenticated():
+        if self.request.user.is_authenticated:
             tools.extend(request.user.cached_externaltools())
         return tools
 
