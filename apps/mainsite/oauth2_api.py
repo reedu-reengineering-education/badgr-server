@@ -3,7 +3,7 @@
 
 import json
 import re
-import urlparse
+from urllib.parse import urlparse
 
 from django.http import HttpResponse
 from django.utils import timezone
@@ -194,7 +194,7 @@ class RegisterApiView(APIView):
         uris = set()
         schemes = set()
         def parse_uri(uri):
-            parsed = urlparse.urlparse(uri)
+            parsed = urlparse(uri)
             uris.add(parsed.netloc)
             schemes.add(parsed.scheme)
         parse_uri(serializer.data.get('client_uri'))

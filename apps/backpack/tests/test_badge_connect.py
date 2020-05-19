@@ -2,11 +2,10 @@
 from __future__ import unicode_literals
 
 import json
-from urllib import quote
+from urllib import parse
 
 from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V2_URI, OPENBADGES_CONTEXT_V2_DICT
 import responses
-import urlparse
 
 from django.utils.encoding import force_text
 from rest_framework.fields import DateTimeField
@@ -31,7 +30,7 @@ class ManifestFileTests(BadgrTestCase):
         response = self.client.get('/.well-known/badgeconnect.json')
         self.assertEqual(response.status_code, 302)
 
-        url = urlparse.urlparse(response._headers['location'][1])
+        url = parse.urlparse(response._headers['location'][1])
         self.assertIn('/bcv1/manifest/', url.path)
 
     def test_manifest_file_is_theme_appropriate(self):
@@ -87,8 +86,8 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         response = self.client.post(url, data=data)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data['success_url'].startswith(registration_data['redirect_uris'][0]))
-        url = urlparse.urlparse(response.data['success_url'])
-        code = urlparse.parse_qs(url.query)['code'][0]
+        url = parse.urlparse(response.data['success_url'])
+        code = parse.parse_qs(url.query)['code'][0]
 
         data = {
             'grant_type': 'authorization_code',
@@ -319,8 +318,8 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         response = self.client.post(url, data=data)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data['success_url'].startswith(registration_data['redirect_uris'][0]))
-        url = urlparse.urlparse(response.data['success_url'])
-        code = urlparse.parse_qs(url.query)['code'][0]
+        url = parse.urlparse(response.data['success_url'])
+        code = parse.parse_qs(url.query)['code'][0]
 
         data = {
             'grant_type': 'authorization_code',
@@ -398,7 +397,7 @@ class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
         for x in range(0, 5):
             self.assertEqual(response.data['results'][x]['id'], assertions[24 - (x + 20)].jsonld_id)
 
-        since = quote(DateTimeField().to_representation(assertions[5].created_at))
+        since = parse.quote(DateTimeField().to_representation(assertions[5].created_at))
         response = self.client.get('/bcv1/assertions?limit=10&offset=0&since=' + since)
         self.assertEqual(len(response.data['results']), 10)
         self.assertTrue('<http://testserver/bcv1/assertions?limit=10&offset=10&since=%s>; rel="next"' % since in response['Link'])
