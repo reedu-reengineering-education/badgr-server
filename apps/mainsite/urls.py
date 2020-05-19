@@ -33,7 +33,7 @@ urlpatterns = [
     url(r'^o/token/?$', TokenView.as_view(), name='oauth2_provider_token'),
     url(r'^o/code/?$', AuthCodeExchange.as_view(), name='oauth2_code_exchange'),
     url(r'^o/register/?$', RegisterApiView.as_view(), name='oauth2_api_register'),
-    url(r'^o/', include(oauth2_provider_base_urlpatterns, namespace='oauth2_provider')),
+    url(r'^o/', include(oauth2_provider_base_urlpatterns)),
 
     # Badge Connect URLs
     url(r'^bcv1/manifest/(?P<domain>[^/]+)$', BadgeConnectManifestView.as_view(), name='badge_connect_manifest'),
