@@ -21,7 +21,8 @@ class Pathway(cachemodel.CacheModel, IsActive):
     issuer = models.ForeignKey('issuer.Issuer',
                                on_delete=models.CASCADE)
     slug = AutoSlugField(max_length=254, populate_from='populate_slug', unique=True, blank=False)
-    root_element = models.OneToOneField('pathway.PathwayElement', related_name='toplevel_pathway', null=True)
+    root_element = models.OneToOneField('pathway.PathwayElement', related_name='toplevel_pathway', null=True,
+                                        on_delete=models.CASCADE)
     # recipient_groups = reverse M2M relation to subscribed instances of recipient.RecipientGroup
 
     cached = SlugOrJsonIdCacheModelManager('pathway_slug')

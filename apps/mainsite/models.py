@@ -208,7 +208,8 @@ class DefinedScopesValidator(object):
 
 
 class ApplicationInfo(cachemodel.CacheModel):
-    application = models.OneToOneField('oauth2_provider.Application')
+    application = models.OneToOneField('oauth2_provider.Application',
+                                       on_delete=models.CASCADE)
     icon = models.FileField(blank=True, null=True)
     name = models.CharField(max_length=254, blank=True, null=True, default=None)
     website_url = models.URLField(blank=True, null=True, default=None)
