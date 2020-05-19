@@ -116,7 +116,8 @@ class ProxyEmailConfirmation(EmailConfirmation):
 
 class EmailAddressVariant(models.Model):
     email = models.EmailField(blank=False)
-    canonical_email = models.ForeignKey(CachedEmailAddress, blank=False)
+    canonical_email = models.ForeignKey(CachedEmailAddress, blank=False,
+                                        on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
         self.is_valid(raise_exception=True)
@@ -170,7 +171,8 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
     }
     type = models.CharField(max_length=9, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
     identifier = models.CharField(max_length=255)
-    user = models.ForeignKey(AUTH_USER_MODEL)
+    user = models.ForeignKey(AUTH_USER_MODEL,
+                             on_delete=models.CASCADE)
     verified = models.BooleanField(default=False)
 
     class Meta:
@@ -545,7 +547,8 @@ class TermsVersion(IsActive, BaseAuditedModel, cachemodel.CacheModel):
 
 
 class TermsAgreement(BaseAuditedModel, cachemodel.CacheModel):
-    user = models.ForeignKey('badgeuser.BadgeUser')
+    user = models.ForeignKey('badgeuser.BadgeUser',
+                             on_delete=models.CASCADE)
     terms_version = models.PositiveIntegerField()
     agreed = models.BooleanField(default=True)
 

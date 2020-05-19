@@ -63,7 +63,8 @@ class ExternalTool(BaseAuditedModel, BaseVersionedEntity):
 
 
 class ExternalToolLaunchpoint(cachemodel.CacheModel):
-    externaltool = models.ForeignKey('externaltools.ExternalTool')
+    externaltool = models.ForeignKey('externaltools.ExternalTool',
+                                     on_delete=models.CASCADE)
     launchpoint = models.CharField(max_length=254)
     launch_url = models.CharField(max_length=1024)
     label = models.CharField(max_length=254)
@@ -144,8 +145,10 @@ class ExternalToolLaunchpoint(cachemodel.CacheModel):
 
 
 class ExternalToolUserActivation(BaseAuditedModel, cachemodel.CacheModel):
-    externaltool = models.ForeignKey('externaltools.ExternalTool')
-    user = models.ForeignKey('badgeuser.BadgeUser')
+    externaltool = models.ForeignKey('externaltools.ExternalTool',
+                                     on_delete=models.CASCADE)
+    user = models.ForeignKey('badgeuser.BadgeUser',
+                             on_delete=models.CASCADE)
     is_active = models.BooleanField(default=True, db_index=True)
 
 

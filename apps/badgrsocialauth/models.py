@@ -32,8 +32,10 @@ class Saml2Configuration(models.Model):
 
 
 class Saml2Account(models.Model):
-    user = models.ForeignKey(BadgeUser)
-    config = models.ForeignKey(Saml2Configuration)
+    user = models.ForeignKey(BadgeUser,
+                             on_delete=models.CASCADE)
+    config = models.ForeignKey(Saml2Configuration,
+                               on_delete=models.CASCADE)
     uuid = models.CharField(max_length=255, unique=True)
 
     def __str__(self):

@@ -143,7 +143,8 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
     public_pages_redirect = models.URLField(null=True)
     oauth_authorization_redirect = models.URLField(null=True)
     use_auth_code_exchange = models.BooleanField(default=False)
-    oauth_application = models.ForeignKey("oauth2_provider.Application", null=True, blank=True)
+    oauth_application = models.ForeignKey("oauth2_provider.Application", null=True, blank=True,
+                                          on_delete=models.CASCADE)
 
     objects = BadgrAppManager()
 
@@ -337,7 +338,8 @@ class AccessTokenProxy(AccessToken):
 
 
 class AccessTokenScope(models.Model):
-    token = models.ForeignKey(AccessToken)
+    token = models.ForeignKey(AccessToken,
+                              on_delete=models.CASCADE)
     scope = models.CharField(max_length=255)
 
     class Meta:
