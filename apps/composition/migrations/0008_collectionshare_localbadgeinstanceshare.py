@@ -2,6 +2,7 @@
 
 
 from django.db import models, migrations
+import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -19,7 +20,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('provider', models.CharField(max_length=254, choices=[(b'facebook', b'Facebook'), (b'linkedin', b'LinkedIn')])),
-                ('collection', models.ForeignKey(to='composition.Collection')),
+                ('collection', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='composition.Collection')),
             ],
             options={
                 'abstract': False,
@@ -33,8 +34,8 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('provider', models.CharField(max_length=254, choices=[(b'facebook', b'Facebook'), (b'linkedin', b'LinkedIn')])),
-                ('instance', models.ForeignKey(to='composition.LocalBadgeInstance', null=True)),
-                ('issuer_instance', models.ForeignKey(to='issuer.BadgeInstance', null=True)),
+                ('instance', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='composition.LocalBadgeInstance', null=True)),
+                ('issuer_instance', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='issuer.BadgeInstance', null=True)),
             ],
             options={
                 'abstract': False,
