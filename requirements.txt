@@ -1,5 +1,5 @@
 # Django stuff
-Django==1.11.28
+Django>=2.1,<2.2
 semver==2.6.0
 pytz==2017.2
 # PIL support
@@ -16,7 +16,7 @@ python-resize-image==1.1.19
 django-cachemodel==2.2.0
 django-basic-models==4.0.0
 
-django-object-actions==0.8.2
+django-object-actions==1.1.0
 
 python-memcached==1.58
 
@@ -35,7 +35,7 @@ django-oauth-toolkit==1.1.2
 
 # Some extras
 django-cors-headers==1.1.0
-django-autoslug==1.9.3
+django-autoslug==1.9.7
 puremagic==1.6
 sqlparse==0.3.0
 netaddr
