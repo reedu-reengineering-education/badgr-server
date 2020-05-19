@@ -9,6 +9,10 @@ from mainsite.oauth2_api import AuthorizationApiView, TokenView, AuthCodeExchang
 badgr_admin.autodiscover()
 # make sure that any view/model/form imports occur AFTER admin.autodiscover
 
+def django2_include(three_tuple_urlconf):
+    (urls, app_name, namespace) = three_tuple_urlconf
+    return include((urls, app_name), namespace=namespace)
+
 from django.views.generic.base import RedirectView, TemplateView
 from oauth2_provider.urls import base_urlpatterns as oauth2_provider_base_urlpatterns
 
@@ -46,7 +50,7 @@ urlpatterns = [
 
     # Admin URLs
     url(r'^staff/sidewide-actions$', SitewideActionFormView.as_view(), name='badgr_admin_sitewide_actions'),
-    url(r'^staff/', include(badgr_admin.urls)),
+    url(r'^staff/', django2_include(badgr_admin.urls)),
 
     # Service health endpoint
     url(r'^health', include('health.urls')),
