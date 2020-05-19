@@ -9,7 +9,7 @@ import hmac
 from basic_models.models import CreatedUpdatedBy, CreatedUpdatedAt, IsActive
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db import models, transaction
 from django.utils import timezone
 from oauthlib.common import generate_token

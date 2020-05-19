@@ -3,7 +3,7 @@ import pytz
 import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.core.validators import EmailValidator, URLValidator
 from django.db.models import Q
 from django.utils.html import strip_tags

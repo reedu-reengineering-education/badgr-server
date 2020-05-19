@@ -12,7 +12,7 @@ import re
 from urllib.parse import quote_plus
 
 from django.core import mail
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.utils import timezone
 from django.test import override_settings
 from oauth2_provider.models import Application

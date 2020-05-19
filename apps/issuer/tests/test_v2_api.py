@@ -5,7 +5,7 @@ import time
 import urllib.request, urllib.parse, urllib.error
 from urllib.parse import urlparse
 
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import override_settings
 
 from mainsite.tests import SetupIssuerHelper, BadgrTestCase, BadgeUser

@@ -7,7 +7,7 @@ from allauth.account.adapter import get_adapter
 from allauth.socialaccount.providers.base import AuthProcess
 from django.contrib.auth import logout
 from django.core.exceptions import ValidationError, ImproperlyConfigured
-from django.core.urlresolvers import reverse, NoReverseMatch
+from django.urls import reverse, NoReverseMatch
 from django.http import HttpResponseBadRequest, HttpResponseForbidden, HttpResponse
 from django.views.generic import RedirectView
 from django.shortcuts import redirect, render_to_response

@@ -21,7 +21,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import SuspiciousFileOperation
 from django.core.files.storage import DefaultStorage
-from django.core.urlresolvers import get_callable
+from django.urls import get_callable
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS

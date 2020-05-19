@@ -1,4 +1,4 @@
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from mainsite.tests import SetupIssuerHelper, BadgrTestCase
 from django.utils import timezone
 from oauth2_provider.models import Application, RefreshToken
