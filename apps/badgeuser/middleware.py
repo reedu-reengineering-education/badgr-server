@@ -1,9 +1,10 @@
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import deprecation
 from django.urls import reverse
 from django.http import HttpResponseRedirect
 
 
-class InactiveUserMiddleware(object):
+class InactiveUserMiddleware(deprecation.MiddlewareMixin):
     def process_request(self, request):
         if not hasattr(request, 'user'):
             raise ImproperlyConfigured(
