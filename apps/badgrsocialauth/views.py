@@ -275,10 +275,13 @@ def assertion_consumer_service(request, idp_name):
 
 
 def auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name):
-    def login(user):
-        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
-            user,
-            scope='rw:backpack rw:profile rw:issuer')
+    def login(user, token=None):
+        if token is not None and not token.is_expired():
+            accesstoken = token
+        else:
+            accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
+                user,
+                scope='rw:backpack rw:profile rw:issuer')
 
         if badgr_app.use_auth_code_exchange:
             authcode = authcode_for_accesstoken(accesstoken)
@@ -321,8 +324,8 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
             if authcode is not None:
                 access_token = accesstoken_for_authcode(authcode)
                 if access_token is not None and access_token.user == existing_email.user:
-                    Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
-                    return login(saml2_account.user)
+                    saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
+                    return login(saml2_account.user, access_token)
 
             # Fail: user does not have an appropriate authcode
             url = set_url_query_params(

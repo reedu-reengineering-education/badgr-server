@@ -1,18 +1,19 @@
 import os
-from urlparse import urlparse
+from urlparse import urlparse, parse_qs
 
 from django.shortcuts import reverse
 from django.test import override_settings
+from django.test.client import RequestFactory
 
 from badgrsocialauth.models import Saml2Configuration, Saml2Account
 from badgrsocialauth.views import auto_provision, saml2_client_for
+from badgrsocialauth.utils import set_session_authcode
 
 from badgeuser.models import CachedEmailAddress, BadgeUser
 
 from mainsite.models import AccessTokenProxy, BadgrApp
 from mainsite.tests import BadgrTestCase, SetupUserHelper
 from mainsite import TOP_DIR
-
 
 class SAML2Tests(BadgrTestCase):
     def setUp(self):
@@ -97,7 +98,7 @@ class SAML2Tests(BadgrTestCase):
         email.verified = True
         email.save()
         Saml2Account.objects.create(config=self.config, user=new_user, uuid=email)
-        badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com")
+        badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com", cors='example.com')
         resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
@@ -106,7 +107,7 @@ class SAML2Tests(BadgrTestCase):
         email = "test456@example.com"
         first_name = "firsty"
         last_name = "lastington"
-        badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com")
+        badgr_app = self.badgr_app
         resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
@@ -179,6 +180,7 @@ class SAML2Tests(BadgrTestCase):
         )
         self.assertEqual(preflight_response.status_code, 200)
         location = urlparse(preflight_response.data['result']['url'])
+        authcode = parse_qs(location.query)['authCode'][0]
         location = '?'.join([location.path, location.query])
 
         # the location now includes an auth code
@@ -191,10 +193,20 @@ class SAML2Tests(BadgrTestCase):
         self.assertEqual(response.status_code, 302)
 
         # Can auto provision again
+        rf = RequestFactory()
+        fake_request = rf.post(
+            reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
+            {'saml_assertion': 'very fake'}
+        )
+        fake_request.session = dict()
+        set_session_authcode(fake_request, authcode)
+
         resp = auto_provision(
-            None, email, test_user.first_name, test_user.last_name, self.badgr_app, self.config, self.config.slug
+            fake_request, email, test_user.first_name, test_user.last_name, self.badgr_app, self.config, self.config.slug
         )
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
         account = Saml2Account.objects.get(user=test_user)
+
+
 
