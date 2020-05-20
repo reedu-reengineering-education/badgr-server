@@ -42,6 +42,7 @@ from mainsite.models import AccessTokenProxy
 
 logger = logging.getLogger(__name__)
 
+
 class BadgrSocialLogin(RedirectView):
     def get(self, request, *args, **kwargs):
         try:
@@ -269,7 +270,7 @@ def assertion_consumer_service(request, idp_name):
     email = [authn_response.ava[key][0] for key in settings.SAML_EMAIL_KEYS if key in authn_response.ava][0]
     first_name = [authn_response.ava[key][0] for key in settings.SAML_FIRST_NAME_KEYS if key in authn_response.ava][0]
     last_name = [authn_response.ava[key][0] for key in settings.SAML_LAST_NAME_KEYS if key in authn_response.ava][0]
-    badgr_app = BadgrApp.objects.get(pk=request.session.get('badgr_app_pk'))
+    badgr_app = BadgrApp.objects.get_current(request=request)
     return auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name)
 
 
