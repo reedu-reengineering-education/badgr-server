@@ -207,6 +207,3 @@ class SAML2Tests(BadgrTestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
         account = Saml2Account.objects.get(user=test_user)
-
-
-
