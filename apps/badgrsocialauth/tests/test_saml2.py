@@ -117,6 +117,10 @@ class SAML2Tests(BadgrTestCase):
         )
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
+        self.assertEqual(Saml2Account.objects.all().count(), 1)
+        email_address = CachedEmailAddress.objects.get(email='different425@example.com')
+        self.assertTrue(email_address.verified)
+        self.assertTrue(email_address.primary)
 
         # email exists, but is unverified
         BadgeUser.objects.create(
@@ -128,6 +132,9 @@ class SAML2Tests(BadgrTestCase):
         resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
+        email_address = CachedEmailAddress.objects.get(email=email)
+        self.assertTrue(email_address.verified)
+        self.assertTrue(email_address.primary)
 
         # Can auto provision again
         resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
@@ -144,7 +151,9 @@ class SAML2Tests(BadgrTestCase):
         cachedemail = CachedEmailAddress.objects.get(email=email2)
         cachedemail.verified = True
         cachedemail.save()
+        saml_account_count = Saml2Account.objects.count()
         resp = auto_provision(None, email2, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authError", resp.url)
         self.assertIn(self.config.slug, resp.url)
+        self.assertEqual(saml_account_count, Saml2Account.objects.count(), "A Saml2Account must not have been created.")

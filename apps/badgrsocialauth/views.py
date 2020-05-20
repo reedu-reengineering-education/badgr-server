@@ -286,23 +286,23 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
             params = dict(authToken=accesstoken.token)
         return redirect(set_url_query_params(badgr_app.ui_login_redirect, **params))
 
-    def new_account(email):
+    def new_account(requested_email):
         new_user = BadgeUser.objects.create(
-            email=email,
+            email=requested_email,
             first_name=first_name,
             last_name=last_name,
             request=request,
             send_confirmation=False
         )
         # Auto verify emails
-        cached_email = CachedEmailAddress.objects.get(email=email)
+        cached_email = CachedEmailAddress.objects.get(email=requested_email)
         cached_email.verified = True
         cached_email.save()
-        Saml2Account.objects.create(config=config, user=new_user, uuid=email)
+        Saml2Account.objects.create(config=config, user=new_user, uuid=requested_email)
         return new_user
 
     # Get/Create account and redirect with token or with error message
-    saml2_account = Saml2Account.objects.filter(uuid=email).first()
+    saml2_account = Saml2Account.objects.filter(uuid=email, config=config).first()
     if saml2_account:
         return login(saml2_account.user)
 
@@ -310,17 +310,17 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
         existing_email = CachedEmailAddress.cached.get(email=email)
         if not existing_email.verified:
             # Email exists but is not verified, auto-provision account and log in
-            return login(new_account(email))
-        Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
-        # Email exists and is already verified
-        url = set_url_query_params(
-            badgr_app.ui_signup_failure_redirect,
-            authError='An account already exists with provided email address',
-            email=base64.urlsafe_b64encode(email),
-            socialAuthSlug=idp_name
-        )
-        return redirect(url)
+            new_account = new_account(email)
+            return login(new_account)
+        elif existing_email.verified:
+            # Email exists and is already verified
+            url = set_url_query_params(
+                badgr_app.ui_signup_failure_redirect,
+                authError='An account already exists with provided email address',
+                email=base64.urlsafe_b64encode(email),
+                socialAuthSlug=idp_name
+            )
+            return redirect(url)
     except CachedEmailAddress.DoesNotExist:
         # Email does not exist, auto-provision account and log in
         return login(new_account(email))
-
