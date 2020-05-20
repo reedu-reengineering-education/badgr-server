@@ -23,10 +23,10 @@ import requests
 
 import base64
 
-from badgeuser.authcode import authcode_for_accesstoken
+from badgeuser.authcode import authcode_for_accesstoken, accesstoken_for_authcode
 from badgeuser.models import CachedEmailAddress, BadgeUser
 from badgrsocialauth.models import Saml2Account, Saml2Configuration
-from badgrsocialauth.utils import (set_session_badgr_app, get_session_badgr_app,
+from badgrsocialauth.utils import (set_session_badgr_app, get_session_authcode,
                                    get_session_verification_email, set_session_authcode,)
 from django.conf import settings
 from mainsite.models import BadgrApp
@@ -315,6 +315,16 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
             return login(new_account)
         elif existing_email.verified:
             # Email exists and is already verified
+
+            # Override: user has an appropriate authcode for the return flight to the UI
+            authcode = get_session_authcode(request)
+            if authcode is not None:
+                access_token = accesstoken_for_authcode(authcode)
+                if access_token is not None and access_token.user == existing_email.user:
+                    Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
+                    return login(saml2_account.user)
+
+            # Fail: user does not have an appropriate authcode
             url = set_url_query_params(
                 badgr_app.ui_signup_failure_redirect,
                 authError='An account already exists with provided email address',
