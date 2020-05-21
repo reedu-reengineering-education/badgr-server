@@ -207,3 +207,45 @@ class SAML2Tests(BadgrTestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
         account = Saml2Account.objects.get(user=test_user)
+
+    def test_add_samlaccount_to_existing_user_with_varying_email(self):
+        email = 'exampleuser@example.com'
+        t_user = self.setup_user(
+            email=email,
+            token_scope='rw:profile rw:issuer rw:backpack'
+        )
+
+        preflight_response = self.client.get(
+            reverse('v2_api_user_socialaccount_connect') + '?provider={}'.format(self.config.slug)
+        )
+        self.assertEqual(preflight_response.status_code, 200)
+        location = urlparse(preflight_response.data['result']['url'])
+        authcode = parse_qs(location.query)['authCode'][0]
+        location = '?'.join([location.path, location.query])
+
+        # the location now includes an auth code
+        self.client.logout()
+        response = self.client.get(location)
+        self.assertEqual(response.status_code, 302)
+        location = response._headers['location'][1]
+
+        response = self.client.get(location)
+        self.assertEqual(response.status_code, 302)
+
+        # Can auto provision again
+        rf = RequestFactory()
+        fake_request = rf.post(
+            reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
+            {'saml_assertion': 'very fake'}
+        )
+        fake_request.session = dict()
+        set_session_authcode(fake_request, authcode)
+
+        email2 = 'exampleuser_alt@example.com'
+        resp = auto_provision(
+            fake_request, email2, t_user.first_name, t_user.last_name, self.badgr_app, self.config, self.config.slug
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("authToken", resp.url)
+        Saml2Account.objects.get(user=t_user)
+        CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)

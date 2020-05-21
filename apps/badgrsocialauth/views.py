@@ -322,10 +322,10 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
             # Override: user has an appropriate authcode for the return flight to the UI
             authcode = get_session_authcode(request)
             if authcode is not None:
-                access_token = accesstoken_for_authcode(authcode)
-                if access_token is not None and access_token.user == existing_email.user:
+                token = accesstoken_for_authcode(authcode)
+                if token is not None and not token.is_expired() and token.user == existing_email.user:
                     saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
-                    return login(saml2_account.user, access_token)
+                    return login(saml2_account.user, token)
 
             # Fail: user does not have an appropriate authcode
             url = set_url_query_params(
@@ -336,5 +336,13 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
             )
             return redirect(url)
     except CachedEmailAddress.DoesNotExist:
-        # Email does not exist, auto-provision account and log in
+        authcode = get_session_authcode(request)
+        if authcode is not None:
+            token = accesstoken_for_authcode(authcode)
+            if token is not None and not token.is_expired():
+                saml2_account = Saml2Account.objects.create(config=config, user=token.user, uuid=email)
+                new_mail = CachedEmailAddress.objects.create(email=email, user=token.user, verified=True, primary=False)
+                return login(saml2_account.user, token)
+
+        # Email does not exist, nor does existing account. auto-provision new account and log in
         return login(new_account(email))
