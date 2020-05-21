@@ -1,25 +1,36 @@
 import os
+from urlparse import urlparse, parse_qs
 
+from django.shortcuts import reverse
 from django.test import override_settings
+from django.test.client import RequestFactory
 
 from badgrsocialauth.models import Saml2Configuration, Saml2Account
 from badgrsocialauth.views import auto_provision, saml2_client_for
+from badgrsocialauth.utils import set_session_authcode
 
 from badgeuser.models import CachedEmailAddress, BadgeUser
 
-from mainsite.models import BadgrApp
-from mainsite.tests import BadgrTestCase
+from mainsite.models import AccessTokenProxy, BadgrApp
+from mainsite.tests import BadgrTestCase, SetupUserHelper
 from mainsite import TOP_DIR
-
 
 class SAML2Tests(BadgrTestCase):
     def setUp(self):
         super(SAML2Tests, self).setUp()
-        self.config = Saml2Configuration.objects.create(metadata_conf_url="http://example.com", slug="saml2.test")
         self.test_files_path = os.path.join(TOP_DIR, 'apps', 'badgrsocialauth', 'testfiles')
         self.ipd_metadata_path = os.path.join(self.test_files_path, 'idp-test-metadata.txt')
+        with open(self.ipd_metadata_path, 'r') as f:
+            metadata_xml = f.read()
+        self.config = Saml2Configuration.objects.create(
+            metadata_conf_url="http://example.com", slug="saml2.test", cached_metadata=metadata_xml
+        )
         self.ipd_cert_path = os.path.join(self.test_files_path, 'idp-test-cert.pem')
         self.ipd_key_path = os.path.join(self.test_files_path, 'idp-test-key.pem')
+
+        self.badgr_app = BadgrApp.objects.create(
+            ui_login_redirect="https://example.com", ui_signup_failure_redirect='https://example.com/fail'
+        )
 
     def create_signed_auth_request_saml2Configuration(self, idp_metadata):
         return Saml2Configuration.objects.create(
@@ -87,7 +98,7 @@ class SAML2Tests(BadgrTestCase):
         email.verified = True
         email.save()
         Saml2Account.objects.create(config=self.config, user=new_user, uuid=email)
-        badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com")
+        badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com", cors='example.com')
         resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
@@ -96,7 +107,7 @@ class SAML2Tests(BadgrTestCase):
         email = "test456@example.com"
         first_name = "firsty"
         last_name = "lastington"
-        badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com")
+        badgr_app = self.badgr_app
         resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
@@ -107,9 +118,7 @@ class SAML2Tests(BadgrTestCase):
         first_name = "firsty"
         last_name = "lastington"
         idp_name = self.config.slug
-        badgr_app = BadgrApp.objects.create(
-            ui_login_redirect="https://example.com", ui_signup_failure_redirect='https://example.com/fail'
-        )
+        badgr_app = self.badgr_app
 
         # email does not exist
         resp = auto_provision(
@@ -157,3 +166,44 @@ class SAML2Tests(BadgrTestCase):
         self.assertIn("authError", resp.url)
         self.assertIn(self.config.slug, resp.url)
         self.assertEqual(saml_account_count, Saml2Account.objects.count(), "A Saml2Account must not have been created.")
+
+    def test_add_samlaccount_to_existing_user(self):
+        # email exists, but is verified
+        email = 'exampleuser@example.com'
+        test_user = self.setup_user(
+            email=email,
+            token_scope='rw:profile rw:issuer rw:backpack'
+        )
+
+        preflight_response = self.client.get(
+            reverse('v2_api_user_socialaccount_connect') + '?provider={}'.format(self.config.slug)
+        )
+        self.assertEqual(preflight_response.status_code, 200)
+        location = urlparse(preflight_response.data['result']['url'])
+        authcode = parse_qs(location.query)['authCode'][0]
+        location = '?'.join([location.path, location.query])
+
+        # the location now includes an auth code
+        self.client.logout()
+        response = self.client.get(location)
+        self.assertEqual(response.status_code, 302)
+        location = response._headers['location'][1]
+
+        response = self.client.get(location)
+        self.assertEqual(response.status_code, 302)
+
+        # Can auto provision again
+        rf = RequestFactory()
+        fake_request = rf.post(
+            reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
+            {'saml_assertion': 'very fake'}
+        )
+        fake_request.session = dict()
+        set_session_authcode(fake_request, authcode)
+
+        resp = auto_provision(
+            fake_request, email, test_user.first_name, test_user.last_name, self.badgr_app, self.config, self.config.slug
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("authToken", resp.url)
+        account = Saml2Account.objects.get(user=test_user)

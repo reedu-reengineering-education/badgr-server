@@ -32,7 +32,8 @@ def set_session_badgr_app(request, badgr_app):
 
 
 def get_session_authcode(request):
-    return request.session.get('badgr_authcode', None)
+    if request is not None:
+        return request.session.get('badgr_authcode', None)
 
 
 def set_session_authcode(request, authcode):

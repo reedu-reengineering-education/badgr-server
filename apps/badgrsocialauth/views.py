@@ -23,10 +23,10 @@ import requests
 
 import base64
 
-from badgeuser.authcode import authcode_for_accesstoken
+from badgeuser.authcode import authcode_for_accesstoken, accesstoken_for_authcode
 from badgeuser.models import CachedEmailAddress, BadgeUser
 from badgrsocialauth.models import Saml2Account, Saml2Configuration
-from badgrsocialauth.utils import (set_session_badgr_app, get_session_badgr_app,
+from badgrsocialauth.utils import (set_session_badgr_app, get_session_authcode,
                                    get_session_verification_email, set_session_authcode,)
 from django.conf import settings
 from mainsite.models import BadgrApp
@@ -41,6 +41,7 @@ from saml2.config import Config as Saml2Config
 from mainsite.models import AccessTokenProxy
 
 logger = logging.getLogger(__name__)
+
 
 class BadgrSocialLogin(RedirectView):
     def get(self, request, *args, **kwargs):
@@ -269,15 +270,18 @@ def assertion_consumer_service(request, idp_name):
     email = [authn_response.ava[key][0] for key in settings.SAML_EMAIL_KEYS if key in authn_response.ava][0]
     first_name = [authn_response.ava[key][0] for key in settings.SAML_FIRST_NAME_KEYS if key in authn_response.ava][0]
     last_name = [authn_response.ava[key][0] for key in settings.SAML_LAST_NAME_KEYS if key in authn_response.ava][0]
-    badgr_app = BadgrApp.objects.get(pk=request.session.get('badgr_app_pk'))
+    badgr_app = BadgrApp.objects.get_current(request=request)
     return auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name)
 
 
 def auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name):
-    def login(user):
-        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
-            user,
-            scope='rw:backpack rw:profile rw:issuer')
+    def login(user, token=None):
+        if token is not None and not token.is_expired():
+            accesstoken = token
+        else:
+            accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
+                user,
+                scope='rw:backpack rw:profile rw:issuer')
 
         if badgr_app.use_auth_code_exchange:
             authcode = authcode_for_accesstoken(accesstoken)
@@ -314,6 +318,16 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
             return login(new_account)
         elif existing_email.verified:
             # Email exists and is already verified
+
+            # Override: user has an appropriate authcode for the return flight to the UI
+            authcode = get_session_authcode(request)
+            if authcode is not None:
+                access_token = accesstoken_for_authcode(authcode)
+                if access_token is not None and access_token.user == existing_email.user:
+                    saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
+                    return login(saml2_account.user, access_token)
+
+            # Fail: user does not have an appropriate authcode
             url = set_url_query_params(
                 badgr_app.ui_signup_failure_redirect,
                 authError='An account already exists with provided email address',
