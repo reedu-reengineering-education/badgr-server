@@ -84,11 +84,11 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get(url)
         self.assertEqual(len(response.data['result']), 0)
 
-        # Application B should have access to the badge instance
+        # Application B should *not* have access to the badge instance as per update in BP-2347
         self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(token_b.token))
         url = reverse('v2_api_assertions_changed_list')
         response = self.client.get(url)
-        self.assertEqual(len(response.data['result']), 1)
+        self.assertEqual(len(response.data['result']), 0)
 
     def test_user_cant_fetch_changed_assertions(self):
         staff = self.setup_user(email='staff@example.com')
@@ -104,14 +104,15 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_application_can_fetch_changed_assertions(self):
+        #as per update in BP-2347, this token should not be able to get anything anymore
         staff = self.setup_user(email='staff@example.com')
         recipient = self.setup_user(email='recipient@example.com', authenticate=False)
         unrelated_recipient = self.setup_user(email='otherrecipient1@example.com')
 
         issuer = self.setup_issuer(owner=staff)
         badgeclass = self.setup_badgeclass(issuer=issuer)
-        assertion_one = badgeclass.issue(recipient_id=recipient.email)
-        assertion_two = badgeclass.issue(recipient_id=staff.email)
+        badgeclass.issue(recipient_id=recipient.email)
+        badgeclass.issue(recipient_id=staff.email)
         badgeclass.issue(recipient_id=unrelated_recipient.email)
         url = reverse('v2_api_assertions_changed_list')
 
@@ -139,15 +140,10 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         )
 
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['result']), 2)
-
-        # The oldest badge in the set should appear first in the list (ascending order)
-        self.assertEqual(response.data['result'][0]['entityId'], assertion_one.entity_id)
-        self.assertEqual(response.data['result'][1]['entityId'], assertion_two.entity_id)
+        self.assertEqual(response.status_code, 404)
 
     def assertions_in_expected_order_through_pagination(self):
-        staff = self.setup_user(email='staff@example.com')
+        staff = self.setup_user(email='staff@example.com', token_scope='r:issuer')
         recipient = self.setup_user(email='recipient@example.com', authenticate=False)
         issuer = self.setup_issuer(owner=staff)
         badgeclass = self.setup_badgeclass(issuer=issuer)
@@ -161,19 +157,6 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
 
         for n in range(10):
             assertions.append(badgeclass.issue(recipient_id=recipient.email))
-
-        clientAppUser = self.setup_user(email='clientApp@example.com', token_scope='r:assertions')
-        app = Application.objects.create(
-            client_id='clientApp-authcode', client_secret='testsecret', authorization_grant_type='authorization-code',
-            user=clientAppUser)
-        AccessTokenProxy.objects.create(
-            user=staff, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
-            token='123', application=app
-        )
-        token = AccessTokenProxy.objects.create(
-            user=recipient, scope='rw:issuer r:profile r:backpack', expires=timezone.now() + timedelta(hours=1),
-            token='abc2', application=app
-        )
 
         response = self.client.get(reverse('v2_api_assertions_changed_list') + '?num=5&since={}'.format(cut_time))
         self.assertEqual(response.status_code, 200)
