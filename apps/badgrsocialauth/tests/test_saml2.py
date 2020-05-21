@@ -247,5 +247,5 @@ class SAML2Tests(BadgrTestCase):
         )
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
-        Saml2Account.objects.get(user=t_user)
-        CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)
+        Saml2Account.objects.get(user=t_user)  # There is a Saml account associated with the user.
+        CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)  # User has the email.
