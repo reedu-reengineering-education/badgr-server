@@ -1230,7 +1230,7 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
         response = self.client.post('/o/token', data=dict(
             grant_type=application.authorization_grant_type.replace('-','_'),
             client_id=application.client_id,
-            scope="rw:issuer r:assertions",
+            scope="rw:issuer",
             username=issuer_user.email,
             password='secret'
         ))
@@ -1240,7 +1240,7 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
         response = self.client.post('/o/token', data=dict(
             grant_type=application.authorization_grant_type.replace('-', '_'),
             client_id=application.client_id,
-            scope="r:assertions",
+            scope="rw:issuer",
             username=application_user.email,
             password='secret'
         ))

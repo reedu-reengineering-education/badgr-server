@@ -178,7 +178,7 @@ class BadgeCheckHelper(object):
         return getattr(settings, 'BADGECHECK_OPTIONS', {
             'include_original_json': True,
             'use_cache': True,
-            # 'cache_backend': cls.cache_instance()  #  just use locmem cache for now 
+            # 'cache_backend': cls.cache_instance()  #  just use locmem cache for now
         })
 
     @classmethod
@@ -190,7 +190,7 @@ class BadgeCheckHelper(object):
         if len(query) != 1:
             raise ValueError("Must provide only 1 of: url, imagefile or assertion_obo")
         query = query[0]
-        
+
         if created_by:
             emails = [d.email for d in created_by.email_items.all()]
             badgecheck_recipient_profile = {
@@ -257,7 +257,7 @@ class BadgeCheckHelper(object):
                 return BadgeInstance.objects.get_or_create_from_ob2(
                     badgeclass, assertion_obo,
                     recipient_identifier=recipient_identifier, recipient_type=recipient_type,
-                    original_json=original_json.get(assertion_obo.get('id'), image=badgeinstance_image)
+                    original_json=original_json.get(assertion_obo.get('id')), image=badgeinstance_image
                 )
         try:
             return commit_new_badge()
