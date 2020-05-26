@@ -123,7 +123,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         setup_resources([
             {'url': REMOTE_BADGE_URI, 'filename': '2_0_assertion_embedded_badgeclass.json'},
             {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
-            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png"},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png", 'mode': 'rb'},
         ])
         # Post new external assertion
         assertion.save()
