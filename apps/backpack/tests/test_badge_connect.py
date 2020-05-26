@@ -6,6 +6,7 @@ from urllib import parse
 
 from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V2_URI, OPENBADGES_CONTEXT_V2_DICT
 import responses
+import mock
 
 from django.utils.encoding import force_text
 from rest_framework.fields import DateTimeField
@@ -108,7 +109,10 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         test_issuer_user = self.setup_user(authenticate=False)
         test_issuer = self.setup_issuer(owner=test_issuer_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
-        assertion = test_badgeclass.issue(user.email, notify=False)
+
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            assertion = test_badgeclass.issue(user.email, notify=False)
 
         # Get the assertion
         self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(access_token))
@@ -346,7 +350,7 @@ class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
                 "statusText": 'UNAUTHENTICATED'
             }
         }
-        
+
         response = self.client.get('/bcv1/assertions')
         self.assertEquals(response.status_code, 401)
         self.assertJSONEqual(force_text(response.content), expected_response)
@@ -366,9 +370,13 @@ class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
         test_issuer_user = self.setup_user(authenticate=False)
         test_issuer = self.setup_issuer(owner=test_issuer_user)
         assertions = []
-        for _ in range(25):
-            test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
-            assertions.append(test_badgeclass.issue(self.user.email, notify=False))
+
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            for _ in range(25):
+                test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+                assertions.append(test_badgeclass.issue(self.user.email,
+                                                        notify=False))
         response = self.client.get('/bcv1/assertions?limit=10&offset=0')
         self.assertEqual(len(response.data['results']), 10)
         self.assertTrue(response.has_header('Link'))
