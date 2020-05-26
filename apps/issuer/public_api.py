@@ -26,7 +26,8 @@ from . import utils
 from backpack.models import BackpackCollection
 from entity.api import VersionedObjectMixin
 from mainsite.models import BadgrApp
-from mainsite.utils import OriginSetting, set_url_query_params, first_node_match, fit_image_to_height
+from mainsite.utils import (OriginSetting, set_url_query_params, first_node_match, fit_image_to_height,
+                            convert_svg_to_png)
 from .models import Issuer, BadgeClass, BadgeInstance
 logger = badgrlog.BadgrLogger()
 
@@ -215,16 +216,21 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
         elif ext == '.svg':
             if not storage.exists(new_name):
                 with storage.open(image_prop.name, 'rb') as input_svg:
-                    svg_buf = io.BytesIO()
-                    out_buf = io.BytesIO()
-                    try:
-                        cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
-                    except IOError:
-                        return redirect(storage.url(image_prop.name))  # If conversion fails, return existing file.
+                    if settings.SVG_SERVERLESS_CONVERSION_ENABLED:
+                        max_square = getattr(settings, 'IMAGE_FIELD_MAX_PX', 400)
+                        svg_buf = convert_svg_to_png(input_svg.read(), max_square, max_square)
+                        # If serverless conversion fails, try falling back to python solution
+                        if not svg_buf:
+                            svg_buf = io.BytesIO()
+                            try:
+                                cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
+                            except IOError:
+                                return redirect(storage.url(image_prop.name))  # If conversion fails, return existing file.
                     img = Image.open(svg_buf)
 
                     img = fit_image_to_height(img, supported_fmts[image_fmt])
 
+                    out_buf = io.BytesIO()
                     img.save(out_buf, format='png')
                     storage.save(new_name, out_buf)
             image_url = storage.url(new_name)

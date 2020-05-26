@@ -1,10 +1,13 @@
 # encoding: utf-8
+import os
 
 import dateutil
 import itertools
 import requests
 from celery.utils.log import get_task_logger
 from django.conf import settings
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.db.models.signals import post_save
 from requests import ConnectionError
 
 import badgrlog
@@ -13,7 +16,7 @@ from issuer.managers import resolve_source_url_referencing_local_object
 from issuer.models import BadgeClass, BadgeInstance, Issuer
 from issuer.utils import CURRENT_OBI_VERSION
 from mainsite.celery import app
-from mainsite.utils import OriginSetting
+from mainsite.utils import OriginSetting, convert_svg_to_png, verify_svg
 
 logger = get_task_logger(__name__)
 badgrLogger = badgrlog.BadgrLogger()
@@ -317,3 +320,72 @@ def resend_notifications(self, badgeinstance_entity_ids):
         'message': "{} notification requests processed".format(len(badgeinstance_entity_ids)),
         'entity_ids': badgeinstance_entity_ids
     }
+
+
+@app.task(bind=True, queue=background_task_queue_name)
+def generate_png_preview_image(self, entity_id, entity_type):
+    # Get instance of entity we are creating PNG preview for
+    if entity_type == BadgeClass.__name__:
+        entity = BadgeClass.objects.get(id=entity_id)
+    elif entity_type == Issuer.__name__:
+        entity = Issuer.objects.get(id=entity_id)
+    else:
+        return {
+            'success': False,
+            'message': 'Unknown entity type.',
+            'entity_type': entity_type,
+            'entity_id': entity_id,
+        }
+
+    # Check if a preview image already exists
+    if entity.image_preview:
+        return {
+            'success': True,
+            'message': 'Image preview already exists on entity.',
+            'entity_type': entity_type,
+            'entity_id': entity_id,
+        }
+
+    # Verify that this entity's image is an SVG
+    if not verify_svg(entity.image):
+        return {
+            'success': False,
+            'message': 'Image on entity is not an SVG.',
+            'entity_type': entity_type,
+            'entity_id': entity_id,
+        }
+
+    max_square = getattr(settings, 'IMAGE_FIELD_MAX_PX', 400)
+
+    # Do the conversion call
+    png_bytes = convert_svg_to_png(entity.image.read(), max_square, max_square)
+
+    if not png_bytes:
+        return {
+            'success': False,
+            'message': 'Error converting SVG to PNG',
+            'entity_type': entity_type,
+            'entity_id': entity_id,
+        }
+
+    png_preview_name = '%s.png' % os.path.splitext(entity.image.name)[0]
+    entity.image_preview = InMemoryUploadedFile(png_bytes, None,
+                                                png_preview_name, 'image/png',
+                                                png_bytes.tell(), None)
+    entity.save()
+    return {
+        'success': True,
+        'message': 'PNG preview created from SVG',
+        'entity_type': entity_type,
+        'entity_id': entity_id,
+    }
+
+
+def handle_png_preview_post_save(sender, instance, **kwargs):
+    # If instance doesn't have an image preview and its image is an SVG, generate PNG image_preview copy.
+    if not instance.image_preview and instance.image and verify_svg(instance.image):
+        generate_png_preview_image.delay(entity_id=instance.id, entity_type=type(instance).__name__)
+
+
+post_save.connect(handle_png_preview_post_save, sender=Issuer)
+post_save.connect(handle_png_preview_post_save, sender=BadgeClass)

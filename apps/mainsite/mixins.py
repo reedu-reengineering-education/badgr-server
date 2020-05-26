@@ -1,4 +1,5 @@
 import io
+import os
 
 from PIL import Image
 from django.conf import settings
@@ -9,7 +10,8 @@ from resizeimage.resizeimage import resize_contain
 
 from defusedxml.cElementTree import parse as safe_parse
 
-from mainsite.utils import verify_svg, scrubSvgElementTree, hash_for_image
+from mainsite.utils import verify_svg, scrubSvgElementTree, hash_for_image, convert_svg_to_png
+from mainsite.utils import verify_svg, scrubSvgElementTree, convert_svg_to_png
 
 
 def _decompression_bomb_check(image, max_pixels=Image.MAX_IMAGE_PIXELS):
@@ -48,6 +50,16 @@ class HashUploadedImage(models.Model):
         :return: None
         """
         pass
+
+
+class PngImagePreview(object):
+    def save(self, *args, **kwargs):
+        # Check that conversions are enabled and that an image was uploaded.
+        if (getattr(settings, 'SVG_SERVERLESS_CONVERSION_ENABLED', False) and kwargs.get('force_resize')):
+            # Set this to None to ensure that we make a updated preview image later in post_save.
+            self.image_preview = None
+
+        return super(PngImagePreview, self).save(*args, **kwargs)
 
 
 class ResizeUploadedImage(object):
