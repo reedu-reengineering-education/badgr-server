@@ -23,14 +23,14 @@ from .utils import setup_basic_0_5_0, setup_basic_1_0, setup_basic_1_0_bad_image
 
 class TestShareProviders(SetupIssuerHelper, BadgrTestCase):
     # issuer name with ascii
-    issuer_name_with_ascii = base64.b64decode('w45zc8O8w6ly')
+    issuer_name_non_ascii = base64.b64decode('w45zc8O8w6ly').decode('utf-8')
     # name with ascii
-    badge_class_name_with_ascii = base64.b64decode('w45zc8O8w6lycyBDb3Jw')
+    badge_class_name_non_ascii = base64.b64decode('w45zc8O8w6lycyBDb3Jw').decode('utf-8')
 
     def test_twitter_share_with_ascii_issuer(self):
         provider = 'twitter'
         test_user = self.setup_user(authenticate=True)
-        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_with_ascii)
+        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_non_ascii)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
         share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
@@ -40,7 +40,7 @@ class TestShareProviders(SetupIssuerHelper, BadgrTestCase):
         provider = 'pinterest'
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
-        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_with_ascii)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_non_ascii)
         test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
         share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
         share_url = share.get_share_url(provider, include_identifier=True)
@@ -48,8 +48,8 @@ class TestShareProviders(SetupIssuerHelper, BadgrTestCase):
     def test_linked_in_share_with_ascii_summary_and_issuer(self):
         provider = 'linkedin'
         test_user = self.setup_user(authenticate=True)
-        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_with_ascii)
-        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_with_ascii)
+        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_non_ascii)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_non_ascii)
         test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
         share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
         share_url = share.get_share_url(provider, include_identifier=True)
