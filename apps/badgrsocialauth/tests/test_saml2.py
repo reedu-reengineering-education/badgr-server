@@ -310,11 +310,11 @@ class SAML2Tests(BadgrTestCase):
                 sp_config = config.SPConfig()
                 sp_config.load(create_saml_config_for(saml2config))
 
-                metadata = create_metadata_string('', config=sp_config, sign=True)
+                sp_metadata = create_metadata_string('', config=sp_config, sign=True)
 
         TIMESLACK = 60*5
 
-        idp_config = self.get_idp_config(metadata)
+        idp_config = self.get_idp_config(sp_metadata)
 
         identity = {"eduPersonAffiliation": ["staff", "member"],
                     "surName": ["Jeter"], "givenName": ["Derek"],
