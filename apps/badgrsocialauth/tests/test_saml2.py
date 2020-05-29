@@ -21,8 +21,8 @@ class SAML2Tests(BadgrTestCase):
     def setUp(self):
         super(SAML2Tests, self).setUp()
         self.test_files_path = os.path.join(TOP_DIR, 'apps', 'badgrsocialauth', 'testfiles')
-        self.ipd_metadata_path = os.path.join(self.test_files_path, 'idp-test-metadata.txt')
-        with open(self.ipd_metadata_path, 'r') as f:
+        self.badgr_sp_metadata_path = os.path.join(self.test_files_path, 'badgr-sp-metadata.txt')
+        with open(self.badgr_sp_metadata_path, 'r') as f:
             metadata_xml = f.read()
         self.config = Saml2Configuration.objects.create(
             metadata_conf_url="http://example.com", slug="saml2.test", cached_metadata=metadata_xml
@@ -46,7 +46,7 @@ class SAML2Tests(BadgrTestCase):
         with override_settings(
                 SAML_KEY_FILE=self.ipd_key_path,
                 SAML_CERT_FILE=self.ipd_cert_path):
-            with open(self.ipd_metadata_path, 'r') as f:
+            with open(self.badgr_sp_metadata_path, 'r') as f:
                 idp_metadata = f.read()
                 authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
                 saml_client, config = saml2_client_for(authn_request.slug)
@@ -57,7 +57,7 @@ class SAML2Tests(BadgrTestCase):
         with override_settings(
                 SAML_KEY_FILE=self.ipd_key_path,
                 SAML_CERT_FILE=self.ipd_cert_path):
-            with open(self.ipd_metadata_path, 'r') as f:
+            with open(self.badgr_sp_metadata_path, 'r') as f:
                 idp_metadata = f.read()
                 authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
                 url = '/account/sociallogin?provider=' + authn_request.slug
@@ -304,7 +304,7 @@ class SAML2Tests(BadgrTestCase):
                 SAML_KEY_FILE=self.ipd_key_path,
                 SAML_CERT_FILE=self.ipd_cert_path):
 
-            with open(self.ipd_metadata_path, 'r') as f:
+            with open(self.badgr_sp_metadata_path, 'r') as f:
                 idp_metadata = f.read()
                 saml2config = self.create_signed_auth_request_saml2Configuration(idp_metadata)
                 sp_config = config.SPConfig()
@@ -372,7 +372,7 @@ class SAML2Tests(BadgrTestCase):
         # sp_config = config.SPConfig()
         # sp_config.load_file(server_conf_path)
 
-        with open(self.ipd_metadata_path, 'r') as f:
+        with open(self.badgr_sp_metadata_path, 'r') as f:
             idp_metadata = f.read()
             saml2config = self.create_signed_auth_request_saml2Configuration(idp_metadata)
             sp_config = config.SPConfig()
