@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <md:EntityDescriptor
-	xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" validUntil="2030-05-10T17:02:01Z" cacheDuration="PT1589562121S" entityID="Badgr-server-test-IDP">
-	<md:IDPSSODescriptor WantAuthnRequestsSigned="false" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+	xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" validUntil="2030-05-10T17:02:01Z" cacheDuration="PT1589562121S" entityID="urn:mace:example.com:saml:roland:idp">
+	<md:IDPSSODescriptor WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
 		<md:KeyDescriptor use="signing">
 			<ds:KeyInfo
 				xmlns:ds="http://www.w3.org/2000/09/xmldsig#">

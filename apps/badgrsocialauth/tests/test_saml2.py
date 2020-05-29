@@ -21,8 +21,8 @@ class SAML2Tests(BadgrTestCase):
     def setUp(self):
         super(SAML2Tests, self).setUp()
         self.test_files_path = os.path.join(TOP_DIR, 'apps', 'badgrsocialauth', 'testfiles')
-        self.badgr_sp_metadata_path = os.path.join(self.test_files_path, 'badgr-sp-metadata.txt')
-        with open(self.badgr_sp_metadata_path, 'r') as f:
+        self.idp_metadata_for_sp_config_path = os.path.join(self.test_files_path, 'idp-metadata-for-saml2configuration.xml')
+        with open(self.idp_metadata_for_sp_config_path, 'r') as f:
             metadata_xml = f.read()
         self.config = Saml2Configuration.objects.create(
             metadata_conf_url="http://example.com", slug="saml2.test", cached_metadata=metadata_xml
@@ -46,7 +46,7 @@ class SAML2Tests(BadgrTestCase):
         with override_settings(
                 SAML_KEY_FILE=self.ipd_key_path,
                 SAML_CERT_FILE=self.ipd_cert_path):
-            with open(self.badgr_sp_metadata_path, 'r') as f:
+            with open(self.idp_metadata_for_sp_config_path, 'r') as f:
                 idp_metadata = f.read()
                 authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
                 saml_client, config = saml2_client_for(authn_request.slug)
@@ -57,7 +57,7 @@ class SAML2Tests(BadgrTestCase):
         with override_settings(
                 SAML_KEY_FILE=self.ipd_key_path,
                 SAML_CERT_FILE=self.ipd_cert_path):
-            with open(self.badgr_sp_metadata_path, 'r') as f:
+            with open(self.idp_metadata_for_sp_config_path, 'r') as f:
                 idp_metadata = f.read()
                 authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
                 url = '/account/sociallogin?provider=' + authn_request.slug
@@ -304,7 +304,7 @@ class SAML2Tests(BadgrTestCase):
                 SAML_KEY_FILE=self.ipd_key_path,
                 SAML_CERT_FILE=self.ipd_cert_path):
 
-            with open(self.badgr_sp_metadata_path, 'r') as f:
+            with open(self.idp_metadata_for_sp_config_path, 'r') as f:
                 idp_metadata = f.read()
                 saml2config = self.create_signed_auth_request_saml2Configuration(idp_metadata)
                 sp_config = config.SPConfig()
@@ -313,7 +313,6 @@ class SAML2Tests(BadgrTestCase):
                 sp_metadata = create_metadata_string('', config=sp_config, sign=True)
 
         TIMESLACK = 60*5
-
         idp_config = self.get_idp_config(sp_metadata)
 
         identity = {"eduPersonAffiliation": ["staff", "member"],
@@ -335,28 +334,18 @@ class SAML2Tests(BadgrTestCase):
                 "http://lingon.catalogix.se:8087/",  # consumer_url
                 "http://localhost:8000/account/saml2/saml2.authn/acs/",  # sp_entity_id
                 name_id=name_id,
+                sign_assertion=True,
                 sign_response=True,
                 authn=authn
             )
 
-            # resp = response_factory(
-            #     authn_response, sp_config,
-            #     return_addrs=['https://myreviewroom.com/saml2/acs/'],
-            #     outstanding_queries={'id-f4d370f3d03650f3ec0da694e2348bfe':"http://localhost:8088/sso"},
-            #     timeslack=TIMESLACK,
-            #     # want_assertions_signed=True,
-            #     decode=False
-            # )
+        base64_encoded_response_metadata = base64.b64encode(authn_response)
+        base_64_utf8_response_metadata = base64_encoded_response_metadata.decode('utf-8')
 
-        # base64_encoded_response_metadata = base64.b64encode(authn_response)
-        # base_64_utf8_response_metadata = base64_encoded_response_metadata.decode('utf-8')
-        #
-        # request = self.client.post(
-        #     reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
-        #     {'SAMLResponse': base_64_utf8_response_metadata}
-        # )
-
-        stop = ''
+        request = self.client.post(
+            reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
+            {'SAMLResponse': base_64_utf8_response_metadata}
+        )
 
     def test_acs_with_attribute_response(self):
         from saml2.response import response_factory
@@ -372,7 +361,7 @@ class SAML2Tests(BadgrTestCase):
         # sp_config = config.SPConfig()
         # sp_config.load_file(server_conf_path)
 
-        with open(self.badgr_sp_metadata_path, 'r') as f:
+        with open(self.idp_metadata_for_sp_config_path, 'r') as f:
             idp_metadata = f.read()
             saml2config = self.create_signed_auth_request_saml2Configuration(idp_metadata)
             sp_config = config.SPConfig()
