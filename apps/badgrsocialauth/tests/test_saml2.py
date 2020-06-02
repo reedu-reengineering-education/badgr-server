@@ -26,6 +26,7 @@ from saml2.metadata import create_metadata_string
 from saml2.saml import AuthnContext, AuthnStatement, NAME_FORMAT_URI, NAMEID_FORMAT_PERSISTENT, \
     NAME_FORMAT_BASIC, AUTHN_PASSWORD_PROTECTED
 from saml2.server import Server
+from saml2.s_utils import MissingValue
 
 
 class SAML2Tests(BadgrTestCase):
@@ -300,7 +301,7 @@ class SAML2Tests(BadgrTestCase):
                     "mail": ["foo@gmail.com"],
                     "title": ["shortstop"]}
 
-        with closing(Server(idp_config)) as server:
+        with closing(SamlServer(idp_config)) as server:
             name_id = server.ident.transient_nameid(
                 "urn:mace:example.com:saml:roland:idp", "id12")
 
@@ -313,7 +314,8 @@ class SAML2Tests(BadgrTestCase):
             authn_statement = AuthnStatement(
                 subject_locality=locality,
                 authn_instant=datetime.now().isoformat(),
-                authn_context=authn_context
+                authn_context=authn_context,
+                session_index="id12"
             )
 
             authn_response = server.create_authn_response(
@@ -376,3 +378,95 @@ class SAML2Tests(BadgrTestCase):
         self.assertIn("authToken", resp.url)
         Saml2Account.objects.get(user=t_user)  # There is a Saml account associated with the user.
         CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)  # User has the email.
+
+class SamlServer(Server):
+    def __int__(self, kwargs):
+        super(SamlServer, self).__init__(**kwargs)
+
+    def create_authn_response(self, identity, in_response_to, destination,
+                              sp_entity_id, name_id_policy=None, userid=None,
+                              name_id=None, authn=None, issuer=None,
+                              sign_response=None, sign_assertion=None,
+                              encrypt_cert_advice=None,
+                              encrypt_cert_assertion=None,
+                              encrypt_assertion=None,
+                              encrypt_assertion_self_contained=True,
+                              encrypted_advice_attributes=False, pefim=False,
+                              sign_alg=None, digest_alg=None,
+                              session_not_on_or_after=None,
+                              **kwargs):
+        """ Constructs an AuthenticationResponse
+
+        :param identity: Information about an user
+        :param in_response_to: The identifier of the authentication request
+            this response is an answer to.
+        :param destination: Where the response should be sent
+        :param sp_entity_id: The entity identifier of the Service Provider
+        :param name_id_policy: How the NameID should be constructed
+        :param userid: The subject identifier
+        :param name_id: The identifier of the subject. A saml.NameID instance.
+        :param authn: Dictionary with information about the authentication
+            context
+        :param issuer: Issuer of the response
+        :param sign_assertion: Whether the assertion should be signed or not.
+        :param sign_response: Whether the response should be signed or not.
+        :param encrypt_assertion: True if assertions should be encrypted.
+        :param encrypt_assertion_self_contained: True if all encrypted
+        assertions should have alla namespaces
+        selfcontained.
+        :param encrypted_advice_attributes: True if assertions in the advice
+        element should be encrypted.
+        :param encrypt_cert_advice: Certificate to be used for encryption of
+        assertions in the advice element.
+        :param encrypt_cert_assertion: Certificate to be used for encryption
+        of assertions.
+        :param sign_assertion: True if assertions should be signed.
+        :param pefim: True if a response according to the PEFIM profile
+        should be created.
+        :return: A response instance
+        """
+
+        try:
+            args = self.gather_authn_response_args(
+                sp_entity_id, name_id_policy=name_id_policy, userid=userid,
+                name_id=name_id, sign_response=sign_response,
+                sign_assertion=sign_assertion,
+                encrypt_cert_advice=encrypt_cert_advice,
+                encrypt_cert_assertion=encrypt_cert_assertion,
+                encrypt_assertion=encrypt_assertion,
+                encrypt_assertion_self_contained
+                =encrypt_assertion_self_contained,
+                encrypted_advice_attributes=encrypted_advice_attributes,
+                pefim=pefim, **kwargs)
+
+            # authn statement is not returned from gather_authn_response_args()
+            # make sure to include it in args if it was passed in initially
+            if 'authn_statement' in kwargs:
+                args['authn_statement'] = kwargs['authn_statement']
+        except IOError as exc:
+            response = self.create_error_response(in_response_to,
+                                                  destination,
+                                                  sp_entity_id,
+                                                  exc, name_id)
+            return ("%s" % response).split("\n")
+
+        try:
+            _authn = authn
+            if (sign_assertion or sign_response) and \
+                    self.sec.cert_handler.generate_cert():
+                with self.lock:
+                    self.sec.cert_handler.update_cert(True)
+                    return self._authn_response(
+                        in_response_to, destination, sp_entity_id, identity,
+                        authn=_authn, issuer=issuer, pefim=pefim,
+                        sign_alg=sign_alg, digest_alg=digest_alg,
+                        session_not_on_or_after=session_not_on_or_after, **args)
+            return self._authn_response(
+                in_response_to, destination, sp_entity_id, identity,
+                authn=_authn, issuer=issuer, pefim=pefim, sign_alg=sign_alg,
+                digest_alg=digest_alg,
+                session_not_on_or_after=session_not_on_or_after, **args)
+
+        except MissingValue as exc:
+            return self.create_error_response(in_response_to, destination,
+                                              sp_entity_id, exc, name_id)

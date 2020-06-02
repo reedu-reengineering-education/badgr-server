@@ -248,17 +248,16 @@ def saml2_render_or_redirect(request, idp_name):
 @csrf_exempt
 def assertion_consumer_service(request, idp_name):
     saml_client, config = saml2_client_for(idp_name)
-    try:
-        authn_response = saml_client.parse_authn_request_response(
-            request.POST.get('SAMLResponse'),
-            entity.BINDING_HTTP_POST)
-    except Exception as e:
-        error = "assertion_consumer_service: saml_client entityid:{}, reponse: {}".format(
-            saml_client.config.entityid,
-            request.POST.get('SAMLResponse')
-        )
-        logger.error(error)
-        raise e
+
+    saml_info = "assertion_consumer_service: saml_client entityid:{}, reponse: {}".format(
+        saml_client.config.entityid,
+        request.POST.get('SAMLResponse')
+    )
+    logger.info(saml_info)
+
+    authn_response = saml_client.parse_authn_request_response(
+        request.POST.get('SAMLResponse'),
+        entity.BINDING_HTTP_POST)
 
     authn_response.get_identity()
     if len(set(settings.SAML_EMAIL_KEYS) & set(authn_response.ava.keys())) == 0:
