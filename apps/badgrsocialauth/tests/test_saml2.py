@@ -5,6 +5,7 @@ from contextlib import closing
 from urlparse import urlparse, parse_qs
 
 from django.conf import settings
+from django.utils.timezone import datetime
 from django.shortcuts import reverse
 from django.test import override_settings
 from django.test.client import RequestFactory
@@ -20,10 +21,10 @@ from mainsite.tests import BadgrTestCase
 from mainsite import TOP_DIR
 
 from saml2 import config, saml, BINDING_SOAP, BINDING_HTTP_REDIRECT, BINDING_HTTP_POST
-from saml2.saml import NAME_FORMAT_URI, NAMEID_FORMAT_PERSISTENT, NAME_FORMAT_BASIC
-from saml2.authn_context import INTERNETPROTOCOLPASSWORD
+from saml2.authn_context import authn_context_class_ref
 from saml2.metadata import create_metadata_string
-from saml2.saml import AuthnStatement
+from saml2.saml import AuthnContext, AuthnStatement, NAME_FORMAT_URI, NAMEID_FORMAT_PERSISTENT, \
+    NAME_FORMAT_BASIC, AUTHN_PASSWORD_PROTECTED
 from saml2.server import Server
 
 
@@ -280,7 +281,7 @@ class SAML2Tests(BadgrTestCase):
         }
 
 
-    def test_acs_with_local_sp(self):
+    def test_acs_with_authn_response_includes_subjectLocality(self):
         self.config.use_signed_authn_request = True
         self.config.save()
 
@@ -293,7 +294,6 @@ class SAML2Tests(BadgrTestCase):
             sp_metadata = create_metadata_string('', config=sp_config, sign=True)
 
         idp_config = self.get_idp_config(sp_metadata)
-        # idp_config = get_idp_config(sp_metadata)
 
         identity = {"eduPersonAffiliation": ["staff", "member"],
                     "surName": ["Jeter"], "givenName": ["Derek"],
@@ -303,24 +303,27 @@ class SAML2Tests(BadgrTestCase):
         with closing(Server(idp_config)) as server:
             name_id = server.ident.transient_nameid(
                 "urn:mace:example.com:saml:roland:idp", "id12")
-            authn = {
-                "class_ref": INTERNETPROTOCOLPASSWORD,
-                "authn_auth": "http://www.example.com/login",
-            }
 
-            # <saml2:SubjectLocality Address="172.31.25.30"/>
+            authn_context_ref = authn_context_class_ref(AUTHN_PASSWORD_PROTECTED)
+            authn_context = AuthnContext(authn_context_class_ref=authn_context_ref)
+
             locality = saml.SubjectLocality()
             locality.address = "172.31.25.30"
-            authn_statement = AuthnStatement(locality)
+
+            authn_statement = AuthnStatement(
+                subject_locality=locality,
+                authn_instant=datetime.now().isoformat(),
+                authn_context=authn_context
+            )
+
             authn_response = server.create_authn_response(
                 identity,
                 "id12",  # in_response_to
-                self.sp_acs_location,  # consumer_url
+                self.sp_acs_location,  # consumer_url. config.sp.endpoints.assertion_consumer_service:["acs_endpoint"]
                 self.sp_acs_location,  # sp_entity_id
                 name_id=name_id,
                 sign_assertion=True,
                 sign_response=True,
-                authn=authn,
                 authn_statement=authn_statement
             )
 
