@@ -350,3 +350,11 @@ def _request_authenticated_with_admin_scope(request):
     if token is None:
         return False
     return 'rw:serverAdmin' in getattr(token, 'scope', '')
+
+
+def netloc_to_domain(netloc):
+    # Authorization specified in URL
+    domain = netloc.split('@')[-1]
+    # Port specified in URL
+    domain = domain.split(':')[0]
+    return domain
