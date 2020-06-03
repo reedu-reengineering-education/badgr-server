@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('authtoken', '0002_auto_20160226_1747'),
-        ('oauth2_provider', '0006_auto_20171214_2232'),
+        ('oauth2_provider', '0001_initial'),
         migrations.swappable_dependency(settings.OAUTH2_PROVIDER_APPLICATION_MODEL),
         ('mainsite', '0015_badgrapp_use_auth_code_exchange'),
     ]
