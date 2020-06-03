@@ -134,7 +134,10 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
             "statusText": 'OK'
         }
 
-        response = self.client.post('/bcv1/assertions', data={'id': REMOTE_BADGE_URI}, format='json')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post('/bcv1/assertions', data={
+                'id': REMOTE_BADGE_URI}, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertJSONEqual(force_text(response.content), {
             "status": expected_status
