@@ -1,78 +1,89 @@
+import base64
 import os
+
+from contextlib import closing
 from urlparse import urlparse, parse_qs
 
+from django.conf import settings
+from django.utils.timezone import datetime
 from django.shortcuts import reverse
 from django.test import override_settings
 from django.test.client import RequestFactory
 
 from badgrsocialauth.models import Saml2Configuration, Saml2Account
-from badgrsocialauth.views import auto_provision, saml2_client_for
+from badgrsocialauth.views import auto_provision, saml2_client_for, create_saml_config_for
 from badgrsocialauth.utils import set_session_authcode
 
 from badgeuser.models import CachedEmailAddress, BadgeUser
 
-from mainsite.models import AccessTokenProxy, BadgrApp
-from mainsite.tests import BadgrTestCase, SetupUserHelper
+from mainsite.models import BadgrApp
+from mainsite.tests import BadgrTestCase
 from mainsite import TOP_DIR
+
+from saml2 import config, saml, BINDING_SOAP, BINDING_HTTP_REDIRECT, BINDING_HTTP_POST
+from saml2.authn_context import authn_context_class_ref
+from saml2.metadata import create_metadata_string
+from saml2.saml import AuthnContext, AuthnStatement, NAME_FORMAT_URI, NAMEID_FORMAT_PERSISTENT, \
+    NAME_FORMAT_BASIC, AUTHN_PASSWORD_PROTECTED
+from saml2.server import Server
+from saml2.s_utils import MissingValue
+
 
 class SAML2Tests(BadgrTestCase):
     def setUp(self):
         super(SAML2Tests, self).setUp()
         self.test_files_path = os.path.join(TOP_DIR, 'apps', 'badgrsocialauth', 'testfiles')
-        self.ipd_metadata_path = os.path.join(self.test_files_path, 'idp-test-metadata.txt')
-        with open(self.ipd_metadata_path, 'r') as f:
+        self.idp_metadata_for_sp_config_path = os.path.join(self.test_files_path, 'idp-metadata-for-saml2configuration.xml')
+
+        with open(self.idp_metadata_for_sp_config_path, 'r') as f:
             metadata_xml = f.read()
         self.config = Saml2Configuration.objects.create(
-            metadata_conf_url="http://example.com", slug="saml2.test", cached_metadata=metadata_xml
+            metadata_conf_url="http://example.com",
+            slug="saml2.test",
+            cached_metadata=metadata_xml
         )
+        self.badgr_app = BadgrApp.objects.create(
+            ui_login_redirect="https://example.com",
+            ui_signup_failure_redirect='https://example.com/fail'
+        )
+        self.badgr_app.is_default = True
+        self.badgr_app.save()
         self.ipd_cert_path = os.path.join(self.test_files_path, 'idp-test-cert.pem')
         self.ipd_key_path = os.path.join(self.test_files_path, 'idp-test-key.pem')
-
-        self.badgr_app = BadgrApp.objects.create(
-            ui_login_redirect="https://example.com", ui_signup_failure_redirect='https://example.com/fail'
-        )
-
-    def create_signed_auth_request_saml2Configuration(self, idp_metadata):
-        return Saml2Configuration.objects.create(
-            metadata_conf_url="http://example.com",
-            cached_metadata=idp_metadata,
-            slug='saml2.authn',
-            use_signed_authn_request=True
-        )
+        self.sp_acs_location = 'http://localhost:8000/account/saml2/{}/acs/'.format(self.config.slug)
 
     def test_signed_authn_request_option_creates_signed_metadata(self):
+        self.config.use_signed_authn_request = True
+        self.config.save()
         with override_settings(
-                SAML_KEY_FILE=self.ipd_key_path,
-                SAML_CERT_FILE=self.ipd_cert_path):
-            with open(self.ipd_metadata_path, 'r') as f:
-                idp_metadata = f.read()
-                authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
-                saml_client, config = saml2_client_for(authn_request.slug)
-                self.assertTrue(saml_client.authn_requests_signed)
-                self.assertNotEqual(saml_client.sec.sec_backend, None)
+            SAML_KEY_FILE=self.ipd_key_path,
+            SAML_CERT_FILE=self.ipd_cert_path):
+            saml_client, config = saml2_client_for(self.config)
+            self.assertTrue(saml_client.authn_requests_signed)
+            self.assertNotEqual(saml_client.sec.sec_backend, None)
 
     def test_signed_authn_request_option_returns_self_posting_form_populated_with_signed_metadata(self):
+        self.config.use_signed_authn_request = True
+        self.config.save()
         with override_settings(
-                SAML_KEY_FILE=self.ipd_key_path,
-                SAML_CERT_FILE=self.ipd_cert_path):
-            with open(self.ipd_metadata_path, 'r') as f:
-                idp_metadata = f.read()
-                authn_request = self.create_signed_auth_request_saml2Configuration(idp_metadata)
-                url = '/account/sociallogin?provider=' + authn_request.slug
-                redirect_url = '/account/saml2/' + authn_request.slug + '/'
-                response = self.client.get(url, follow=True)
-                intermediate_url, intermediate_url_status = response.redirect_chain[0]
+            SAML_KEY_FILE=self.ipd_key_path,
+            SAML_CERT_FILE=self.ipd_cert_path):
+            authn_request = self.config
+            url = '/account/sociallogin?provider=' + authn_request.slug
+            redirect_url = '/account/saml2/' + authn_request.slug + '/'
+            response = self.client.get(url, follow=True)
+            intermediate_url, intermediate_url_status = response.redirect_chain[0]
 
-                # login redirect to saml2 login
-                self.assertEqual(intermediate_url, redirect_url)
-                self.assertEqual(intermediate_url_status, 302)
-                # self populated form generated with metadata file from self.ipd_metadata_path
-                self.assertEqual(response.status_code, 200)
-                # changing attribute location of element md:SingleSignOnService necessitates updating this value
-                self.assertIsNot(
-                    response.content.find('<form action="https://example.com/saml2/idp/SSOService.php" method="post">'), -1)
-                self.assertIsNot(
-                    response.content.find('<input type="hidden" name="SAMLRequest" value="'), -1)
+            # login redirect to saml2 login
+            self.assertEqual(intermediate_url, redirect_url)
+            self.assertEqual(intermediate_url_status, 302)
+            # self populated form generated with metadata file from self.ipd_metadata_path
+            self.assertEqual(response.status_code, 200)
+            # changing attribute location of element md:SingleSignOnService necessitates updating this value
+            self.assertIsNot(
+                response.content.find('<form action="https://example.com/saml2/idp/SSOService.php" method="post">'), -1)
+            self.assertIsNot(
+                response.content.find('<input type="hidden" name="SAMLRequest" value="'), -1)
 
     def test_create_saml2_client(self):
         Saml2Configuration.objects.create(metadata_conf_url="http://example.com", cached_metadata="<xml></xml>",  slug="saml2.test2")
@@ -208,6 +219,125 @@ class SAML2Tests(BadgrTestCase):
         self.assertIn("authToken", resp.url)
         account = Saml2Account.objects.get(user=test_user)
 
+    def get_idp_config(self, meta=None):
+        metadata_sp_1 = os.path.join(self.test_files_path, 'metadata_sp_1.xml')
+        metadata_sp_2 = os.path.join(self.test_files_path, 'metadata_sp_2.xml')
+        vo_metadata = os.path.join(self.test_files_path, 'vo_metadata.xml')
+        attribute_map_dir = os.path.join(self.test_files_path, 'attributemaps')
+
+        BASE = "http://localhost:8088"
+
+        local_metadata = {"local": [metadata_sp_1, metadata_sp_2, vo_metadata]}
+        metadata_source = local_metadata if meta is None else {'inline': [meta]}
+
+        return {
+            "entityid": "urn:mace:example.com:saml:roland:idp",
+            "name": "Rolands IdP",
+            "service": {
+                "idp": {
+                    "endpoints": {
+                        "single_sign_on_service": [
+                            ("%s/sso" % BASE, BINDING_HTTP_REDIRECT)],
+                        "single_logout_service": [
+                            ("%s/slo" % BASE, BINDING_SOAP),
+                            ("%s/slop" % BASE, BINDING_HTTP_POST)]
+                    },
+                    "policy": {
+                        "default": {
+                            "lifetime": {"minutes": 15},
+                            "attribute_restrictions": None,  # means all I have
+                            "name_form": NAME_FORMAT_URI,
+                        },
+                        self.sp_acs_location: {
+                            "lifetime": {"minutes": 5},
+                            "nameid_format": NAMEID_FORMAT_PERSISTENT,
+                        },
+                        "https://example.com/sp": {
+                            "lifetime": {"minutes": 5},
+                            "nameid_format": NAMEID_FORMAT_PERSISTENT,
+                            "name_form": NAME_FORMAT_BASIC
+                        }
+                    },
+                },
+            },
+            "debug": 1,
+            "key_file": self.ipd_key_path,
+            "cert_file": self.ipd_cert_path,
+            "xmlsec_binary": getattr(settings, 'XMLSEC_BINARY_PATH', None),
+            "metadata": metadata_source,
+            "attribute_map_dir": attribute_map_dir,
+            "organization": {
+                "name": "Exempel AB",
+                "display_name": [("Exempel AB", "se"), ("Example Co.", "en")],
+                "url": "http://www.example.com/roland",
+            },
+            "contact_person": [
+                {
+                    "given_name": "John",
+                    "sur_name": "Smith",
+                    "email_address": ["john.smith@example.com"],
+                    "contact_type": "technical",
+                },
+            ],
+        }
+
+
+    def test_acs_with_authn_response_includes_subjectLocality(self):
+        self.config.use_signed_authn_request = True
+        self.config.save()
+
+        with override_settings(
+            SAML_KEY_FILE=self.ipd_key_path,
+            SAML_CERT_FILE=self.ipd_cert_path):
+            saml2config = self.config
+            sp_config = config.SPConfig()
+            sp_config.load(create_saml_config_for(saml2config))
+            sp_metadata = create_metadata_string('', config=sp_config, sign=True)
+
+        idp_config = self.get_idp_config(sp_metadata)
+
+        identity = {"eduPersonAffiliation": ["staff", "member"],
+                    "surName": ["Jeter"], "givenName": ["Derek"],
+                    "mail": ["foo@gmail.com"],
+                    "title": ["shortstop"]}
+
+        with closing(SamlServer(idp_config)) as server:
+            name_id = server.ident.transient_nameid(
+                "urn:mace:example.com:saml:roland:idp", "id12")
+
+            authn_context_ref = authn_context_class_ref(AUTHN_PASSWORD_PROTECTED)
+            authn_context = AuthnContext(authn_context_class_ref=authn_context_ref)
+
+            locality = saml.SubjectLocality()
+            locality.address = "172.31.25.30"
+
+            authn_statement = AuthnStatement(
+                subject_locality=locality,
+                authn_instant=datetime.now().isoformat(),
+                authn_context=authn_context,
+                session_index="id12"
+            )
+
+            authn_response = server.create_authn_response(
+                identity,
+                "id12",  # in_response_to
+                self.sp_acs_location,  # consumer_url. config.sp.endpoints.assertion_consumer_service:["acs_endpoint"]
+                self.sp_acs_location,  # sp_entity_id
+                name_id=name_id,
+                sign_assertion=True,
+                sign_response=True,
+                authn_statement=authn_statement
+            )
+
+        base64_encoded_response_metadata = base64.b64encode(authn_response)
+        base_64_utf8_response_metadata = base64_encoded_response_metadata.decode('utf-8')
+
+        request = self.client.post(
+            reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
+            {'SAMLResponse': base_64_utf8_response_metadata}
+        )
+
+
     def test_add_samlaccount_to_existing_user_with_varying_email(self):
         email = 'exampleuser@example.com'
         t_user = self.setup_user(
@@ -228,7 +358,6 @@ class SAML2Tests(BadgrTestCase):
         response = self.client.get(location)
         self.assertEqual(response.status_code, 302)
         location = response._headers['location'][1]
-
         response = self.client.get(location)
         self.assertEqual(response.status_code, 302)
 
@@ -249,3 +378,95 @@ class SAML2Tests(BadgrTestCase):
         self.assertIn("authToken", resp.url)
         Saml2Account.objects.get(user=t_user)  # There is a Saml account associated with the user.
         CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)  # User has the email.
+
+class SamlServer(Server):
+    def __int__(self, kwargs):
+        super(SamlServer, self).__init__(**kwargs)
+
+    def create_authn_response(self, identity, in_response_to, destination,
+                              sp_entity_id, name_id_policy=None, userid=None,
+                              name_id=None, authn=None, issuer=None,
+                              sign_response=None, sign_assertion=None,
+                              encrypt_cert_advice=None,
+                              encrypt_cert_assertion=None,
+                              encrypt_assertion=None,
+                              encrypt_assertion_self_contained=True,
+                              encrypted_advice_attributes=False, pefim=False,
+                              sign_alg=None, digest_alg=None,
+                              session_not_on_or_after=None,
+                              **kwargs):
+        """ Constructs an AuthenticationResponse
+
+        :param identity: Information about an user
+        :param in_response_to: The identifier of the authentication request
+            this response is an answer to.
+        :param destination: Where the response should be sent
+        :param sp_entity_id: The entity identifier of the Service Provider
+        :param name_id_policy: How the NameID should be constructed
+        :param userid: The subject identifier
+        :param name_id: The identifier of the subject. A saml.NameID instance.
+        :param authn: Dictionary with information about the authentication
+            context
+        :param issuer: Issuer of the response
+        :param sign_assertion: Whether the assertion should be signed or not.
+        :param sign_response: Whether the response should be signed or not.
+        :param encrypt_assertion: True if assertions should be encrypted.
+        :param encrypt_assertion_self_contained: True if all encrypted
+        assertions should have alla namespaces
+        selfcontained.
+        :param encrypted_advice_attributes: True if assertions in the advice
+        element should be encrypted.
+        :param encrypt_cert_advice: Certificate to be used for encryption of
+        assertions in the advice element.
+        :param encrypt_cert_assertion: Certificate to be used for encryption
+        of assertions.
+        :param sign_assertion: True if assertions should be signed.
+        :param pefim: True if a response according to the PEFIM profile
+        should be created.
+        :return: A response instance
+        """
+
+        try:
+            args = self.gather_authn_response_args(
+                sp_entity_id, name_id_policy=name_id_policy, userid=userid,
+                name_id=name_id, sign_response=sign_response,
+                sign_assertion=sign_assertion,
+                encrypt_cert_advice=encrypt_cert_advice,
+                encrypt_cert_assertion=encrypt_cert_assertion,
+                encrypt_assertion=encrypt_assertion,
+                encrypt_assertion_self_contained
+                =encrypt_assertion_self_contained,
+                encrypted_advice_attributes=encrypted_advice_attributes,
+                pefim=pefim, **kwargs)
+
+            # authn statement is not returned from gather_authn_response_args()
+            # make sure to include it in args if it was passed in initially
+            if 'authn_statement' in kwargs:
+                args['authn_statement'] = kwargs['authn_statement']
+        except IOError as exc:
+            response = self.create_error_response(in_response_to,
+                                                  destination,
+                                                  sp_entity_id,
+                                                  exc, name_id)
+            return ("%s" % response).split("\n")
+
+        try:
+            _authn = authn
+            if (sign_assertion or sign_response) and \
+                    self.sec.cert_handler.generate_cert():
+                with self.lock:
+                    self.sec.cert_handler.update_cert(True)
+                    return self._authn_response(
+                        in_response_to, destination, sp_entity_id, identity,
+                        authn=_authn, issuer=issuer, pefim=pefim,
+                        sign_alg=sign_alg, digest_alg=digest_alg,
+                        session_not_on_or_after=session_not_on_or_after, **args)
+            return self._authn_response(
+                in_response_to, destination, sp_entity_id, identity,
+                authn=_authn, issuer=issuer, pefim=pefim, sign_alg=sign_alg,
+                digest_alg=digest_alg,
+                session_not_on_or_after=session_not_on_or_after, **args)
+
+        except MissingValue as exc:
+            return self.create_error_response(in_response_to, destination,
+                                              sp_entity_id, exc, name_id)
