@@ -4,6 +4,7 @@
 import io
 import json
 import urllib.request, urllib.parse, urllib.error
+import mock
 
 import responses
 from django.urls import reverse
@@ -218,9 +219,11 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         uploaded_badge = response.data
         assertion_entityid = uploaded_badge.get('id')
@@ -303,7 +306,10 @@ class PendingAssertionsPublicAPITests(SetupIssuerHelper, BadgrTestCase):
         CachedEmailAddress.objects.add_email(test_user, unverified_email)
         post_input = {"url": "http://a.com/assertion-embedded1"}
 
-        post_resp = self.client.post('/v2/backpack/import', post_input, format='json')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            post_resp = self.client.post('/v2/backpack/import', post_input,
+                                         format='json')
         assertion = BadgeInstance.objects.first()
 
         self.client.logout()

@@ -2,7 +2,7 @@ import base64
 import os
 
 from contextlib import closing
-from urlparse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs
 
 from django.conf import settings
 from django.utils.timezone import datetime
@@ -81,9 +81,9 @@ class SAML2Tests(BadgrTestCase):
             self.assertEqual(response.status_code, 200)
             # changing attribute location of element md:SingleSignOnService necessitates updating this value
             self.assertIsNot(
-                response.content.find('<form action="https://example.com/saml2/idp/SSOService.php" method="post">'), -1)
+                response.content.find(b'<form action="https://example.com/saml2/idp/SSOService.php" method="post">'), -1)
             self.assertIsNot(
-                response.content.find('<input type="hidden" name="SAMLRequest" value="'), -1)
+                response.content.find(b'<input type="hidden" name="SAMLRequest" value="'), -1)
 
     def test_create_saml2_client(self):
         Saml2Configuration.objects.create(metadata_conf_url="http://example.com", cached_metadata="<xml></xml>",  slug="saml2.test2")

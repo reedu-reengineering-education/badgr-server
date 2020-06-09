@@ -33,7 +33,7 @@ logger = badgrlog.BadgrLogger()
 #
 ##
 @xframe_options_exempt
-def error404(request):
+def error404(request, *args, **kwargs):
     try:
         template = loader.get_template('error/404.html')
     except TemplateDoesNotExist:
@@ -44,7 +44,7 @@ def error404(request):
 
 
 @xframe_options_exempt
-def error500(request):
+def error500(request, *args, **kwargs):
     try:
         template = loader.get_template('error/500.html')
     except TemplateDoesNotExist:
@@ -54,7 +54,7 @@ def error500(request):
     }))
 
 
-def info_view(request):
+def info_view(request, *args, **kwargs):
     return redirect(getattr(settings, 'LOGIN_REDIRECT_URL'))
 
 

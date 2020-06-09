@@ -4,6 +4,7 @@
 from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V2_URI
 import os
 import responses
+import mock
 
 from backpack.tests.utils import CURRENT_DIRECTORY as BACKPACK_TESTS_DIRECTORY
 from issuer.models import Issuer, BadgeClass, BadgeInstance, BadgeInstanceEvidence
@@ -90,9 +91,11 @@ class BadgeInstanceAndEvidenceManagerTests(SetupIssuerHelper, BadgrTestCase):
 
         issuer, _ = Issuer.objects.get_or_create_from_ob2(issuer_ob2, image=issuer_image)
         badgeclass, _ = BadgeClass.objects.get_or_create_from_ob2(issuer, badgeclass_ob2, image=badgeclass_image)
-        badgeinstance, _ = BadgeInstance.objects.get_or_create_from_ob2(
-            badgeclass, assertion_ob2, recipient_identifier='test@example.com', image=badgeinstance_image
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            badgeinstance, _ = BadgeInstance.objects.get_or_create_from_ob2(
+                badgeclass, assertion_ob2, recipient_identifier='test@example.com', image=badgeinstance_image
+            )
         self.assertTrue(badgeinstance.badgeclass, badgeclass)
 
         # Add evidence item that didn't exist at initial import
