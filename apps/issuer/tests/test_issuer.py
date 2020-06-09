@@ -18,7 +18,7 @@ from oauth2_provider.models import Application
 
 from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import Issuer, BadgeClass, IssuerStaff
-from mainsite.models import ApplicationInfo, AccessTokenProxy
+from mainsite.models import ApplicationInfo, AccessTokenProxy, BadgrApp
 from mainsite.tests import SetupOAuth2ApplicationHelper
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 
@@ -165,6 +165,31 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(update_image_width, desired_width)
         self.assertEqual(update_image_height, desired_height)
 
+    def test_update_issuer_does_not_clear_badgrDomain(self):
+        badgr_app_two = BadgrApp.objects.create(cors='somethingelse.example.com', name='two')
+        test_user = self.setup_user(authenticate=True)
+        issuer = self.setup_issuer(owner=test_user)
+        issuer.badgrapp = self.badgr_app
+        issuer.save()
+
+        issuer_data = self.client.get('/v2/issuers/{}'.format(issuer.entity_id)).data['result'][0]
+        put_data = {
+            'name': 'Test Issuer Updated',
+            'url': issuer_data['url'],
+            'email': issuer_data['email'],
+            'badgrDomain': issuer_data['badgrDomain']
+        }
+        response = self.client.put('/v2/issuers/{}'.format(issuer.entity_id), put_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            put_data['badgrDomain'], response.data['result'][0]['badgrDomain'], "badgrDomain has not been harmed"
+        )
+        put_data['badgrDomain'] = 'somethingelse.example.com'
+        response = self.client.put('/v2/issuers/{}'.format(issuer.entity_id), put_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            issuer_data['badgrDomain'], response.data['result'][0]['badgrDomain'], "badgrDomain has not been changed"
+        )
 
     def test_can_update_issuer_if_authenticated(self):
         test_user = self.setup_user(authenticate=True)

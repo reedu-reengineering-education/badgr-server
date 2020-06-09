@@ -20,6 +20,9 @@ from django.utils.deconstruct import deconstructible
 from oauth2_provider.models import AccessToken, Application, RefreshToken
 from rest_framework.authtoken.models import Token
 
+from mainsite.utils import set_url_query_params
+
+
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 
@@ -234,6 +237,19 @@ class ApplicationInfo(cachemodel.CacheModel):
             return self.icon.url
 
     @property
+    def default_launch_url(self):
+        application = self.application
+        if application.authorization_grant_type != Application.GRANT_AUTHORIZATION_CODE:
+            # This is not a Auth Code Application. Cannot Launch.
+            return ''
+        launch_url = BadgrApp.objects.get_current().get_path('/auth/oauth2/authorize')
+        launch_url = set_url_query_params(
+            launch_url, client_id=application.client_id, redirect_uri=application.default_redirect_uri,
+            scope=self.allowed_scopes
+        )
+        return launch_url
+
+    @property
     def scope_list(self):
         return [s for s in re.split(r'[\s\n]+', self.allowed_scopes) if s]
 
@@ -309,6 +325,10 @@ class AccessTokenProxy(AccessToken):
         b64_string = str(base64.urlsafe_b64encode(digest.encode('utf-8')), 'utf-8')
         b64_trimmed = re.sub(r'=+$', '', b64_string)
         return b64_trimmed
+
+    @property
+    def client_id(self):
+        return self.application.client_id
 
     def get_entity_class_name(self):
         return 'AccessToken'

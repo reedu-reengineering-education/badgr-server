@@ -156,15 +156,15 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
             image.name = 'issuer_logo_' + str(uuid.uuid4()) + img_ext
         return image
 
-    def validate_badgrDomain(self, val):
-        if not request_authenticated_with_server_admin_token(self.context.get('request')):
-            return None
-        return val
-
     def validate_createdBy(self, val):
         if not request_authenticated_with_server_admin_token(self.context.get('request')):
             return None
         return val
+
+    def validate(self, data):
+        if data.get('badgrapp') and not request_authenticated_with_server_admin_token(self.context.get('request')):
+            data.pop('badgrapp')
+        return data
 
     def create(self, validated_data):
         request = self.context.get('request')

@@ -84,10 +84,14 @@ class BadgeInstanceAndEvidenceManagerTests(SetupIssuerHelper, BadgrTestCase):
         assertion_ob2 = _generate_assertion_ob2()
         _register_image_mock(badgeclass_ob2['image'])
 
-        issuer, _ = Issuer.objects.get_or_create_from_ob2(issuer_ob2)
-        badgeclass, _ = BadgeClass.objects.get_or_create_from_ob2(issuer, badgeclass_ob2)
+        issuer_image = Issuer.objects.image_from_ob2(issuer_ob2)
+        badgeclass_image = BadgeClass.objects.image_from_ob2(badgeclass_ob2)
+        badgeinstance_image = BadgeInstance.objects.image_from_ob2(badgeclass_image, assertion_ob2)
+
+        issuer, _ = Issuer.objects.get_or_create_from_ob2(issuer_ob2, image=issuer_image)
+        badgeclass, _ = BadgeClass.objects.get_or_create_from_ob2(issuer, badgeclass_ob2, image=badgeclass_image)
         badgeinstance, _ = BadgeInstance.objects.get_or_create_from_ob2(
-            badgeclass, assertion_ob2, recipient_identifier='test@example.com'
+            badgeclass, assertion_ob2, recipient_identifier='test@example.com', image=badgeinstance_image
         )
         self.assertTrue(badgeinstance.badgeclass, badgeclass)
 
