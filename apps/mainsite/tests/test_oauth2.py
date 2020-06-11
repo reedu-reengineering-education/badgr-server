@@ -186,6 +186,10 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
 
     @override_settings(TOKEN_BACKOFF_MAXIMUM_SECONDS=3600, TOKEN_BACKOFF_PERIOD_SECONDS=2)
     def test_can_reset_failed_login_backoff(self):
+        """
+        This test is time sensitive down to a second or two. You may get unexpected failures if you run in a debugger
+        and pause at certain times, allowing throttle backoffs of 2sec to expire.
+        """
         cache.clear()
         password = 'secret'
         user = self.setup_user(authenticate=False, password=password, email='testemail233@example.test')
@@ -213,18 +217,17 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
 
         post_data['password'] = 'bad_and_incorrect'
         response = self.client.post('/o/token', data=post_data)
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 400)
         backoff_data = cache.get(backoff_key)
         self.assertEqual(backoff_data['count'], 1)
         backoff_time = backoff_data['until']
 
-        post_data['password'] = password
+        post_data['password'] = password  # Now try the correct password
         response = self.client.post('/o/token', data=post_data)
         self.assertEqual(response.status_code, 429)
         backoff_data = cache.get(backoff_key)
-        self.assertEqual(backoff_data['count'], 2, "Count increases even if sent too soon even if password is right")
-        self.assertGreaterEqual(backoff_data['until'], backoff_time + timezone.timedelta(seconds=2),
-                                "backoff time should increase by at least two seconds")
+        self.assertEqual(backoff_data['count'], 1, "Count does not increase if correct password sent too soon")
+        self.assertGreaterEqual(backoff_data['until'], backoff_time, "backoff time should not increase.")
 
         backoff_data['until'] = backoff_time - timezone.timedelta(seconds=3)  # reset to a time in the past
         cache.set(backoff_key, backoff_data)

@@ -253,13 +253,7 @@ def throttleable(f):
         if backoff is not None and max_backoff != 0 and not _request_authenticated_with_admin_scope(request):
             backoff_until = backoff.get('until', None)
             if backoff_until > timezone.now():
-
-                cache.set(
-                    backoff_cache_key(username, client_ip),
-                    iterate_backoff_count(backoff),
-                    timeout=max_backoff
-                )
-
+                # Don't increase the backoff count, just return 429.
                 return HttpResponse(json.dumps({
                     "error_description": "Too many login attempts. Please wait and try again.",
                     "error": "login attempts throttled",
