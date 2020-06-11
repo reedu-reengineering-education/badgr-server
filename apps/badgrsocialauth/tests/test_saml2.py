@@ -5,6 +5,7 @@ from contextlib import closing
 from urllib.parse import urlparse, parse_qs
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.timezone import datetime
 from django.shortcuts import reverse
 from django.test import override_settings
@@ -52,7 +53,14 @@ class SAML2Tests(BadgrTestCase):
         self.ipd_key_path = os.path.join(self.test_files_path, 'idp-test-key.pem')
         self.sp_acs_location = 'http://localhost:8000/account/saml2/{}/acs/'.format(self.config.slug)
 
+    def _skip_if_xmlsec_binary_missing(self):
+        xmlsec_binary_path = getattr(settings, 'XMLSEC_BINARY_PATH', None)
+        if xmlsec_binary_path is None:
+            self.skipTest("SKIPPING: In order to test XML Signing, XMLSEC_BINARY_PATH to xmlsec1 must be configured.")
+
     def test_signed_authn_request_option_creates_signed_metadata(self):
+        self._skip_if_xmlsec_binary_missing()
+
         self.config.use_signed_authn_request = True
         self.config.save()
         with override_settings(
@@ -63,6 +71,7 @@ class SAML2Tests(BadgrTestCase):
             self.assertNotEqual(saml_client.sec.sec_backend, None)
 
     def test_signed_authn_request_option_returns_self_posting_form_populated_with_signed_metadata(self):
+        self._skip_if_xmlsec_binary_missing()
         self.config.use_signed_authn_request = True
         self.config.save()
         with override_settings(
@@ -281,8 +290,8 @@ class SAML2Tests(BadgrTestCase):
             ],
         }
 
-
     def test_acs_with_authn_response_includes_subjectLocality(self):
+        self._skip_if_xmlsec_binary_missing()
         self.config.use_signed_authn_request = True
         self.config.save()
 
