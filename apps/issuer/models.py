@@ -181,10 +181,15 @@ class Issuer(ResizeUploadedImage,
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
 
     def publish(self, publish_staff=True, *args, **kwargs):
+        fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
+        self._state.fields_cache = dict()
+
         super(Issuer, self).publish(*args, **kwargs)
         if publish_staff:
             for member in self.cached_issuerstaff():
                 member.cached_user.publish()
+
+        self._state.fields_cache = fields_cache  # restore the fields cache
 
     def delete(self, *args, **kwargs):
         if self.recipient_count > 0:
@@ -466,12 +471,14 @@ class BadgeClass(ResizeUploadedImage,
         verbose_name_plural = "Badge classes"
 
     def publish(self):
-        if hasattr(self, '_issuer_cache'):
-            del self._issuer_cache
+        fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
+        self._state.fields_cache = dict()
         super(BadgeClass, self).publish()
         self.issuer.publish(publish_staff=False)
         if self.created_by:
             self.created_by.publish()
+
+        self._state.fields_cache = fields_cache  # restore the fields cache
 
     def delete(self, *args, **kwargs):
         # if there are some assertions and some have not expired
@@ -898,10 +905,9 @@ class BadgeInstance(BaseAuditedModel,
             self.save()
 
     def publish(self):
-        if hasattr(self, '_issuer_cache'):
-            del self._issuer_cache
-        if hasattr(self, '_badgeclass_cache'):
-            del self._badgeclass_cache
+        fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
+        self._state.fields_cache = dict()
+
         super(BadgeInstance, self).publish()
         self.badgeclass.publish()
         if self.cached_recipient_profile:
@@ -914,6 +920,7 @@ class BadgeInstance(BaseAuditedModel,
             collection.publish()
 
         self.publish_by('entity_id', 'revoked')
+        self._state.fields_cache = fields_cache  # restore the stashed fields cache
 
     def delete(self, *args, **kwargs):
         badgeclass = self.badgeclass

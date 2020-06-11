@@ -1,7 +1,4 @@
 # Created by wiggins@concentricsky.com on 8/24/15.
-
-
-
 from django.conf import settings
 from celery import Celery
 import os

@@ -1449,9 +1449,9 @@ class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
         assertion = test_badgeclass.issue(
             'test3@example.com', expires_at=timezone.now() - timezone.timedelta(days=1)
         )
-        _ = assertion.badgeclass
-        self.assertTrue(hasattr(assertion, '_badgeclass_cache'))
+        _ = assertion.badgeclass  # call the foreign key attribute to ensure the related object is cached
+        self.assertIsNotNone(assertion._state.fields_cache.get('badgeclass'))
 
         cached_assertion = BadgeInstance.cached.get(entity_id=assertion.entity_id)
-        self.assertFalse(hasattr(cached_assertion, '_badgeclass_cache'))
-        self.assertFalse(hasattr(cached_assertion, '_issuer_cache'))
+        self.assertIsNone(cached_assertion._state.fields_cache.get('badgeclass'))
+        self.assertIsNone(cached_assertion._state.fields_cache.get('issuer'))
