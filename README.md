@@ -54,10 +54,10 @@ development server will reload itself in the docker container whenever changes a
 To run the project with docker in a development mode:
 
 * `docker-compose up`: build and get django and other components running
-* `docker-compose exec dev_api python /badgr_server/manage.py migrate` - (while running) set up database tables
-* `docker-compose exec dev_api python /badgr_server/manage.py dist` - generate docs swagger file(s)
-* `docker-compose exec dev_api python /badgr_server/manage.py collectstatic` - Put built front-end assets into the static directory (Admin panel CSS, swagger docs).
-* `docker-compose exec dev_api python /badgr_server/manage.py createsuperuser` - follow prompts to create your first admin user account
+* `docker-compose exec api python /badgr_server/manage.py migrate` - (while running) set up database tables
+* `docker-compose exec api python /badgr_server/manage.py dist` - generate docs swagger file(s)
+* `docker-compose exec api python /badgr_server/manage.py collectstatic` - Put built front-end assets into the static directory (Admin panel CSS, swagger docs).
+* `docker-compose exec api python /badgr_server/manage.py createsuperuser` - follow prompts to create your first admin user account
 
 ### Running the Django Server in "Production"
 
@@ -67,12 +67,9 @@ is the development (and thus default) config for `docker-compose`.
 If you'd like to run the project with a more production-like setup, you can specify the `docker-compose.prod.yml` 
 file. This setup **copies** the project code in (instead of mirroring) and uses nginx with uwsgi to run django.
 
-* `docker-compose -f docker-compose.prod.yml up` - build and get django and other components (production mode)
+* `docker-compose -f docker-compose.prod.yml up -d` - build and get django and other components (production mode)
 
-The commands listed above will work the same, with two changes: you must specify the `docker-compose.prod.yml` 
-file, and the containers are  prefixed with `prod_` instead of `dev_`. For example:
-
-* `docker-compose -f docker-compose.prod.yml exec prod_api python /badgr_server/manage.py migrate` - (while running) set up database tables
+* `docker-compose -f docker-compose.prod.yml exec api python /badgr_server/manage.py migrate` - (while running) set up database tables
 
 If you are using the production setup and you have made changes you wish to see reflected in the running container,
 you will need to stop and then rebuild the production containers:
