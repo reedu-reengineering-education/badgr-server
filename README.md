@@ -69,9 +69,6 @@ file. This setup **copies** the project code in (instead of mirroring) and uses 
 
 * `docker-compose -f docker-compose.prod.yml up -d` - build and get django and other components (production mode)
 
-The commands listed above will work the same, with two changes: you must specify the `docker-compose.prod.yml` 
-file, and the containers are  prefixed with `prod_` instead of `dev_`. For example:
-
 * `docker-compose -f docker-compose.prod.yml exec api python /badgr_server/manage.py migrate` - (while running) set up database tables
 
 If you are using the production setup and you have made changes you wish to see reflected in the running container,
