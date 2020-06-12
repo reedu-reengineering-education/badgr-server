@@ -388,6 +388,7 @@ class SAML2Tests(BadgrTestCase):
         Saml2Account.objects.get(user=t_user)  # There is a Saml account associated with the user.
         CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)  # User has the email.
 
+
 class SamlServer(Server):
     def __int__(self, kwargs):
         super(SamlServer, self).__init__(**kwargs)
