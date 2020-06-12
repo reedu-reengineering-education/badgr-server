@@ -409,13 +409,15 @@ class BadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, BaseEn
 
     def get_queryset(self, request=None, **kwargs):
         badgeclass = self.get_object(request, **kwargs)
-        queryset = BadgeInstance.objects.filter(
-            badgeclass=badgeclass,
-            revoked=False
-        )
+        queryset = BadgeInstance.objects.filter(badgeclass=badgeclass)
         recipients = request.query_params.getlist('recipient', None)
         if recipients:
             queryset = queryset.filter(recipient_identifier__in=recipients)
+        if request.query_params.get('include_expired', '').lower() not in ['1', 'true']:
+            queryset = queryset.filter(
+                Q(expires_at__gte=datetime.datetime.now()) | Q(expires_at__isnull=True))
+        if request.query_params.get('include_revoked', '').lower() not in ['1', 'true']:
+            queryset = queryset.filter(revoked=False)
 
         return queryset
 
@@ -439,6 +441,18 @@ class BadgeInstanceList(UncachedPaginatedViewMixin, VersionedObjectMixin, BaseEn
                 'name': "num",
                 'type': "string",
                 'description': 'Request pagination of results'
+            },
+            {
+                'in': 'query',
+                'name': "include_expired",
+                'type': "boolean",
+                'description': 'Include expired assertions'
+            },
+            {
+                'in': 'query',
+                'name': "include_revoked",
+                'type': "boolean",
+                'description': 'Include revoked assertions'
             }
         ]
     )

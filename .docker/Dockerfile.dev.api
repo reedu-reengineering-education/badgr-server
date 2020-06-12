@@ -3,8 +3,6 @@ FROM python:3.7-slim
 RUN mkdir /badgr_server
 WORKDIR /badgr_server
 
-COPY requirements.txt              /badgr_server
-
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y default-libmysqlclient-dev \
                        python3-dev \
@@ -12,7 +10,7 @@ RUN apt-get install -y default-libmysqlclient-dev \
                        build-essential \
                        xmlsec1
 
-RUN pip install -r requirements.txt
 RUN pip install uwsgi
 
-
+COPY requirements.txt              /badgr_server
+RUN pip install -r requirements.txt

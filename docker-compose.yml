@@ -3,29 +3,33 @@ version: '3.3'
 services:
 
   # this container mirrors in the app code and runs the django dev server
-  dev_api:
+  api:
     build:
       context: .
       dockerfile: .docker/Dockerfile.dev.api
     depends_on:
-      - "dev_db"
-      - "dev_memcached"
+      - "db"
+      - "memcached"
     command: /badgr_server/manage.py runserver 0.0.0.0:8000
     volumes:
       - ./apps:/badgr_server/apps
       - ./manage.py:/badgr_server/manage.py
       - ./.docker/etc/settings_local.dev.py:/badgr_server/apps/mainsite/settings_local.py
+    networks:
+      - badgr
     ports:
       - "8000:8000"
 
   # this container runs memcached
-  dev_memcached:
+  memcached:
     image: 'bitnami/memcached:latest'
     expose:
       - "11211"
+    networks:
+      - badgr
 
   # this container runs mysql (database)
-  dev_db:
+  db:
     image: mysql:5.6.39
     volumes:
       - badgr_server_dev_db:/var/lib/mysql:rw
@@ -36,6 +40,12 @@ services:
       - "MYSQL_ROOT_PASSWORD=password"
     expose:
       - "3306"
+    networks:
+      - badgr
+
+networks:
+  badgr:
+    driver: bridge
 
 volumes:
   badgr_server_dev_db:

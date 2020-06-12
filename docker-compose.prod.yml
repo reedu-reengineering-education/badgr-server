@@ -3,25 +3,29 @@ version: '3.3'
 services:
 
   # this container copies in the project code and runs the app with uwsgi
-  prod_api:
+  api:
     build:
       context: .
       dockerfile: .docker/Dockerfile.prod.api
     depends_on:
-      - "prod_db"
-      - "prod_memcached"
+      - "db"
+      - "memcached"
     command: uwsgi --ini uwsgi.ini
     volumes:
       - badgr_server_api:/badgr_server
+    networks:
+      - badgr
 
   # this container runs memcached
-  prod_memcached:
+  memcached:
     image: 'bitnami/memcached:latest'
     expose:
       - "11211"
+    networks:
+      - badgr
 
   # this container runs mysql (database)
-  prod_db:
+  db:
     image: mysql:5.6.39
     volumes:
       - badgr_server_prod_db:/var/lib/mysql:rw
@@ -32,6 +36,8 @@ services:
       - "MYSQL_ROOT_PASSWORD=password"
     expose:
       - "3306"
+    networks:
+      - badgr
 
   # this container runs nginx (webserver) and uses the uwsgi app.sock file from prod_api via a volume
   nginx:
@@ -41,9 +47,15 @@ services:
     volumes:
       - badgr_server_api:/badgr_server
     depends_on:
-      - "prod_api"
+      - "api"
+    networks:
+      - badgr
     ports:
       - "8080:80"
+
+networks:
+  badgr:
+    driver: bridge
 
 volumes:
   badgr_server_api:
