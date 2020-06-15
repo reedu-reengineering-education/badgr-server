@@ -95,6 +95,9 @@ class BaseOpenBadgeObjectModel(OriginalJsonMixin, cachemodel.CacheModel):
     def get_extensions_manager(self):
         raise NotImplementedError()
 
+    def __hash__(self):
+        return hash((self.source, self.source_url))
+
     def __eq__(self, other):
         UNUSABLE_DEFAULT = uuid.uuid4()
 

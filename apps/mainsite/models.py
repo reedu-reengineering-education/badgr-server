@@ -206,6 +206,9 @@ class DefinedScopesValidator(object):
             raise ValidationError(self.message, code=self.code)
         pass
 
+    def __hash__(self):
+        return hash((self.code, self.message))
+
     def __eq__(self, other):
         return isinstance(other, self.__class__)
 
