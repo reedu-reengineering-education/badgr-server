@@ -1,6 +1,7 @@
 from django.apps import apps
 from django.conf import settings
 from django.conf.urls import include, url
+from django.urls import path
 
 from mainsite.admin import badgr_admin
 from backpack.badge_connect_api import BadgeConnectManifestView, BadgeConnectManifestRedirectView
@@ -37,7 +38,7 @@ urlpatterns = [
     url(r'^o/token/?$', TokenView.as_view(), name='oauth2_provider_token'),
     url(r'^o/code/?$', AuthCodeExchange.as_view(), name='oauth2_code_exchange'),
     url(r'^o/register/?$', RegisterApiView.as_view(), name='oauth2_api_register'),
-    url(r'^o/', include(oauth2_provider_base_urlpatterns)),
+    path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
 
     # Badge Connect URLs
     url(r'^bcv1/manifest/(?P<domain>[^/]+)$', BadgeConnectManifestView.as_view(), name='badge_connect_manifest'),
