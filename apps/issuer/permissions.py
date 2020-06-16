@@ -278,4 +278,7 @@ class BadgrOAuthTokenHasEntityScope(permissions.BasePermission):
             return scope
 
     def _get_valid_scopes(self, request, view):
-        return getattr(view, "valid_scopes")
+        view_scopes = getattr(view, "valid_scopes")
+        if isinstance(view_scopes, dict):
+            return view_scopes.get(request.method.lower(), [])
+        return view_scopes
