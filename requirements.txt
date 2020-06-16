@@ -83,8 +83,7 @@ tinycss==0.4
 backports.csv==1.0.4
 
 apispec==0.22.0
-# apispec-djangorestframework==1.1.1
-git+https://github.com/concentricsky/apispec-djangorestframework@v1.1.1
+apispec-djangorestframework==1.1.1
 
 responses==0.8.1
 mock==3.0.5
