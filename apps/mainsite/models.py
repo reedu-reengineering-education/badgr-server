@@ -60,7 +60,7 @@ class EmailBlacklist(models.Model):
         return hmac.compare_digest(hashed.hexdigest(), str(signature))
 
 
-class BadgrAppManager(Manager):
+class BadgrAppManager(cachemodel.CacheModelManager):
     def get_current(self, request=None, raise_exception=False):
         """
         A safe method for getting the current BadgrApp related to a request. It will always return a BadgrApp if
@@ -183,7 +183,11 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
     def save(self, *args, **kwargs):
         if self.is_default:
             # Set all other BadgrApp instances as no longer the default.
-            self.__class__.objects.filter(is_default=True).exclude(id=self.pk).update(is_default=False)
+            existing_default = self.__class__.objects.filter(is_default=True).exclude(id=self.pk)
+            if existing_default.exists():
+                for b in existing_default:
+                    b.is_default = False
+                    b.save()
         else:
             if not self.__class__.objects.filter(is_default=True).exists():
                 self.is_default = True

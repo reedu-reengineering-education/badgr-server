@@ -55,7 +55,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     description = StripTagsCharField(max_length=16384, required=False)
     url = serializers.URLField(max_length=1024, required=True)
     staff = IssuerStaffSerializerV1(read_only=True, source='cached_issuerstaff', many=True)
-    badgrapp = serializers.CharField(read_only=True, max_length=255)
+    badgrapp = serializers.CharField(read_only=True, max_length=255, source='cached_badgrapp')
 
     class Meta:
         apispec_definition = ('Issuer', {})

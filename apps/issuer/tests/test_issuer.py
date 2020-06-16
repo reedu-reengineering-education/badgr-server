@@ -72,10 +72,12 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(badge_object['email'], self.example_issuer_props['email'])
         self.assertIsNotNone(badge_object.get('id'))
         self.assertIsNotNone(badge_object.get('@context'))
+        slug = response.data.get('slug')
 
+        issuer = Issuer.cached.get(entity_id=slug)
+        badgrapp = issuer.cached_badgrapp  # warm the cache
         # assert that the issuer was published to and fetched from the cache
         with self.assertNumQueries(0):
-            slug = response.data.get('slug')
             response = self.client.get('/v1/issuer/issuers/{}'.format(slug))
             self.assertEqual(response.status_code, 200)
 
