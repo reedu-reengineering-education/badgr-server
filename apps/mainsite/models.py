@@ -197,6 +197,10 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
                 setattr(self, prop, self.signup_redirect)
         return super(BadgrApp, self).save(*args, **kwargs)
 
+    def publish(self):
+        super(BadgrApp, self).publish()
+        self.publish_by('cors')
+
 
 @deconstructible
 class DefinedScopesValidator(object):
