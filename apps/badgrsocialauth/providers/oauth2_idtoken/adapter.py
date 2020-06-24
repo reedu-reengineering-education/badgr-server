@@ -62,7 +62,9 @@ class IdTokenOAuth2Adapter(OAuth2Adapter):
         public_key = self.get_public_key(unverified_header.get('kid'))
 
         # verify signature, iat, exp
-        header, claims = jwt.verify_jwt(data['id_token'], public_key, ['RS256'], timedelta(minutes=1))
+        header, claims = jwt.verify_jwt(
+            data['id_token'], public_key, ['RS256'], timedelta(minutes=1), checks_optional=True
+        )
 
         # verify we are the aud
         if self.intended_aud != claims.get('aud'):
