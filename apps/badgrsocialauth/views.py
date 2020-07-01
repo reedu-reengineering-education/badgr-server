@@ -247,26 +247,6 @@ def saml2_render_or_redirect(request, idp_name):
 
 @csrf_exempt
 def assertion_consumer_service(request, idp_name):
-    from saml2.saml import SubjectLocality, SubjectLocalityType_
-    from saml2.validate import valid_ipv4, valid_ipv6, valid_domain_name, ShouldValueError
-
-    def new_verify(self):
-        address = getattr(self, 'address', 'address did not exists')
-        logger.info("SAML assertion_consumer_service: subject_locality address:{}".format(self.address))
-
-        if self.address:
-            # dotted-decimal IPv4 or RFC3513 IPv6 address
-            if valid_ipv4(self.address) or valid_ipv6(self.address):
-                pass
-            else:
-                raise ShouldValueError("Not an IPv4 or IPv6 address")
-        elif self.dns_name:
-            valid_domain_name(self.dns_name)
-
-        return SubjectLocalityType_.verify(self)
-
-    SubjectLocality.verify = new_verify
-
     saml_client, config = saml2_client_for(idp_name)
 
     saml_info = "assertion_consumer_service: saml_client entityid:{}, reponse: {}".format(
