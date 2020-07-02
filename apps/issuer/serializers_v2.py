@@ -448,7 +448,7 @@ class BadgeRecipientSerializerV2(BaseSerializerV2):
         representation = super(BadgeRecipientSerializerV2, self).to_representation(instance)
         if instance.hashed:
             representation['salt'] = instance.salt
-            representation['identity'] = generate_sha256_hashstring(instance.recipient_identifier.lower(), instance.salt)
+            representation['identity'] = generate_sha256_hashstring(instance.recipient_identifier, instance.salt)
 
         return representation
 
@@ -657,7 +657,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
             badge_instance_properties.append('badgeclass')
 
         if sum([el in badgeclass_identifiers for el in badge_instance_properties]) > 1:
-            raise serializers.ValidationError('Multiple badge class identifiers. Exactly one of the following badge blass identifiers are allowed: badgeclass, badgeclassName, or badgeclassOpenBadgeId')
+            raise serializers.ValidationError('Multiple badge class identifiers. Exactly one of the following badge class identifiers are allowed: badgeclass, badgeclassName, or badgeclassOpenBadgeId')
 
         if request and request.method != 'PUT':
             # recipient and badgeclass are only required on create, ignored on update

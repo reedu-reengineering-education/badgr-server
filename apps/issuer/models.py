@@ -1134,7 +1134,7 @@ class BadgeInstance(BaseAuditedModel,
             json['recipient'] = {
                 "hashed": True,
                 "type": self.recipient_type,
-                "identity": generate_sha256_hashstring(self.recipient_identifier.lower(), self.salt),
+                "identity": generate_sha256_hashstring(self.recipient_identifier, self.salt),
             }
             if self.salt:
                 json['recipient']['salt'] = self.salt

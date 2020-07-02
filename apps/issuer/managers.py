@@ -12,6 +12,7 @@ from django.core.files.storage import DefaultStorage
 from django.db import models, transaction
 from django.urls import resolve, Resolver404
 
+from issuer.utils import sanitize_id
 from mainsite.utils import fetch_remote_file_to_storage, list_of, OriginSetting
 from pathway.tasks import award_badges_for_pathway_completion
 
@@ -300,7 +301,6 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         badgr_app=None,
         **kwargs
     ):
-
         """
         Convenience method to award a badge to a recipient_id
         :param allow_uppercase: bool
@@ -311,7 +311,7 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         :type evidence: list of dicts(url=string, narrative=string)
         """
         recipient_identifier = kwargs.pop('recipient_identifier')
-        recipient_identifier = recipient_identifier if allow_uppercase else recipient_identifier.lower()
+        recipient_identifier = sanitize_id(recipient_identifier, kwargs.get('recipient_type', 'email'), allow_uppercase=allow_uppercase)
 
         badgeclass = kwargs.pop('badgeclass', None)
         issuer = kwargs.pop('issuer', badgeclass.issuer)

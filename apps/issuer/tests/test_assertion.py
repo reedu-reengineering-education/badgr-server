@@ -1136,6 +1136,68 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
         ), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 201)
 
+    def test_v2_issue_uppercase_email(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'TEST3@example.com'
+            },
+            'badgeclassOpenBadgeId': test_badgeclass.jsonld_id
+        }
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 201)
+        assertion_data = response.data['result'][0]
+        recipient_id = assertion_data['recipient']['plaintextIdentity']
+        self.assertEqual(
+            recipient_id, new_assertion_props['recipient']['identity'].lower(),
+            "Reported recipient ID is lowercase")
+        assertion_from_db = BadgeInstance.objects.get(entity_id=assertion_data['entityId'])
+        self.assertEqual(
+            assertion_from_db.recipient_identifier, new_assertion_props['recipient']['identity'].lower(),
+            "Stored recipient ID is lowercase")
+
+    def test_v2_issue_uppercase_url(self):
+        """
+        Unlike emails, URLs are presumed to be case sensitive as reported to us.
+        """
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'https://eXaMpLe.CoM/UPPERCASEPATH',
+                'type': 'url'
+            },
+            'badgeclassOpenBadgeId': test_badgeclass.jsonld_id
+        }
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 201)
+        assertion_data = response.data['result'][0]
+        recipient_id = assertion_data['recipient']['plaintextIdentity']
+        self.assertEqual(
+            recipient_id, 'https://example.com/UPPERCASEPATH',
+            "Reported recipient ID URL is not automatically lowercased")
+        assertion_from_db = BadgeInstance.objects.get(entity_id=assertion_data['entityId'])
+        self.assertEqual(
+            assertion_from_db.recipient_identifier, 'https://example.com/UPPERCASEPATH',
+            "Stored recipient ID is not automatically lowercased")
+
+        new_assertion_props['recipient']['identity'] = 'NOTAURL/NOTAVALIDONE/butlookslikeone?sorta=True'
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['fieldErrors']['recipient']['non_field_errors'][0], 'Enter a valid URL.')
+        # TODO this might be nicer if it were just a fieldError for recipient.identity or just was a non_field_error:[str] to begin with
+
     def test_v2_issue_by_badgeclassOpenBadgeId_permissions(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)

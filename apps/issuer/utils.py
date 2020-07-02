@@ -1,11 +1,9 @@
-
 import aniso8601
 import hashlib
 import pytz
 import re
+from urllib.parse import urlparse, urlunparse
 
-from django.apps import apps
-from django.conf import settings
 from django.urls import resolve, Resolver404
 from django.utils import timezone
 
@@ -141,3 +139,19 @@ def request_authenticated_with_server_admin_token(request):
         return 'rw:serverAdmin' in set(request.auth.scope.split())
     except AttributeError:
         return False
+
+
+def sanitize_id(recipient_identifier, identifier_type, allow_uppercase=False):
+    if identifier_type == 'email':
+        return recipient_identifier if allow_uppercase else recipient_identifier.lower()
+    elif identifier_type == 'url':
+        p = urlparse(recipient_identifier)
+        return urlunparse((
+            p.scheme,
+            p.netloc.lower(),
+            p.path,
+            p.params,
+            p.query,
+            p.fragment,
+        ))
+    return recipient_identifier
