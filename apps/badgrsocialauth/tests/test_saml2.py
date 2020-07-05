@@ -23,7 +23,11 @@ from mainsite import TOP_DIR
 
 from saml2 import config, saml, BINDING_SOAP, BINDING_HTTP_REDIRECT, BINDING_HTTP_POST
 from saml2.authn_context import authn_context_class_ref
-from saml2.metadata import create_metadata_string
+
+# TODO: Revert to library code once library is fixed for python3
+# from saml2.metadata import create_metadata_string
+from badgrsocialauth.saml2_utils import create_metadata_string
+
 from saml2.saml import AuthnContext, AuthnStatement, NAME_FORMAT_URI, NAMEID_FORMAT_PERSISTENT, \
     NAME_FORMAT_BASIC, AUTHN_PASSWORD_PROTECTED
 from saml2.server import Server
@@ -295,9 +299,7 @@ class SAML2Tests(BadgrTestCase):
         self.config.use_signed_authn_request = True
         self.config.save()
 
-        with override_settings(
-            SAML_KEY_FILE=self.ipd_key_path,
-            SAML_CERT_FILE=self.ipd_cert_path):
+        with override_settings(SAML_KEY_FILE=self.ipd_key_path, SAML_CERT_FILE=self.ipd_cert_path):
             saml2config = self.config
             sp_config = config.SPConfig()
             sp_config.load(create_saml_config_for(saml2config))
@@ -338,7 +340,7 @@ class SAML2Tests(BadgrTestCase):
                 authn_statement=authn_statement
             )
 
-        base64_encoded_response_metadata = base64.b64encode(authn_response)
+        base64_encoded_response_metadata = base64.b64encode(authn_response.encode('utf-8'))
         base_64_utf8_response_metadata = base64_encoded_response_metadata.decode('utf-8')
 
         request = self.client.post(

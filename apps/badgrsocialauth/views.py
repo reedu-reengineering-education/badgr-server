@@ -1,7 +1,9 @@
 import urllib.request, urllib.parse, urllib.error
 import urllib.parse
 
-from saml2.metadata import create_metadata_string
+# TODO: Revert to library code once library is fixed for python3
+# from saml2.metadata import create_metadata_string
+from .saml2_utils import create_metadata_string
 
 from allauth.account.adapter import get_adapter
 from allauth.socialaccount.providers.base import AuthProcess

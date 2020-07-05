@@ -68,7 +68,7 @@ class IdTokenOAuth2Adapter(OAuth2Adapter):
 
         # verify we are the aud
         if self.intended_aud != claims.get('aud'):
-            raise OAuth2Error("JTW aud {} does not match intended audience {}".format(
+            raise OAuth2Error("JWT aud {} does not match intended audience {}".format(
                 claims.get('aud'), self.intended_aud)
             )
 
