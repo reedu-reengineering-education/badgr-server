@@ -126,6 +126,26 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.post(reverse('oauth2_code_exchange'), dict(code=expired_authcode))
         self.assertEqual(response.status_code, 400)
 
+    def test_extra_badge_connect_data_is_exposed(self):
+        test_user = self.setup_user(authenticate=True)
+        application = Application.objects.create(user=test_user)
+        app_info = ApplicationInfo.objects.create(
+            application=application,
+            trust_email_verification=True,
+            policy_uri='www.test.com/policy',
+            terms_uri='www.test.com/terms'
+        )
+        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
+            test_user,
+            application=application
+        )
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer {}'.format(accesstoken.token))
+        response = self.client.get('/v2/auth/tokens')
+        response_app_info = response.data['result'][0]['application']
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response_app_info['policyUri'], app_info.policy_uri)
+        self.assertEqual(response_app_info['termsUri'], app_info.terms_uri)
+
     def _base64_data_uri_encode(self, file, mime):
         encoded = base64.b64encode(file.read())
         return "data:{};base64,{}".format(mime, encoded)

@@ -157,7 +157,8 @@ class ApplicationInfoSerializer(serializers.Serializer):
     image = serializers.URLField(read_only=True, source='get_icon_url')
     website_url = serializers.URLField(read_only=True)
     clientId = serializers.CharField(read_only=True, source='application.client_id')
-
+    policyUri = serializers.URLField(read_only=True, source='policy_uri')
+    termsUri = serializers.URLField(read_only=True, source='terms_uri')
 
 class AccessTokenSerializerV2(DetailSerializerV2):
     application = ApplicationInfoSerializer(source='applicationinfo')
