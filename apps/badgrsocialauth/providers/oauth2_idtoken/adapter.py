@@ -35,7 +35,7 @@ class IdTokenOAuth2Adapter(OAuth2Adapter):
             self.access_token_url = app_settings.PROVIDERS[self.provider_id]['access_token_url']
             self.authorize_url = app_settings.PROVIDERS[self.provider_id]['authorize_url']
             self.jwks_url = app_settings.PROVIDERS[self.provider_id]['jwks_url']
-            self.intended_aud = app_settings.PROVIDERS[self.provider_id]['aud']
+            self.intended_aud = app_settings.PROVIDERS[self.provider_id].get('aud', None)
             self.response_type = app_settings.PROVIDERS[self.provider_id].get('response_type', 'code')
         except KeyError as e:
             raise ImproperlyConfigured(self.provider_id)
@@ -56,7 +56,7 @@ class IdTokenOAuth2Adapter(OAuth2Adapter):
         except (TypeError, KeyError, IndexError) as e:
             raise OAuth2Error("Couldn't get JWKS File and process it: {}".format(e.message))
 
-    def parse_token(self, data):
+    def parse_token(self, data, app=None):
         # parse token header and get relevant public key
         unverified_header, unverified_claims = jwt.process_jwt(data['id_token'])
         public_key = self.get_public_key(unverified_header.get('kid'))
@@ -66,8 +66,11 @@ class IdTokenOAuth2Adapter(OAuth2Adapter):
             data['id_token'], public_key, ['RS256'], timedelta(minutes=1), checks_optional=True
         )
 
-        # verify we are the aud
-        if self.intended_aud != claims.get('aud'):
+        # Verify we are the intended audience for the token
+        intended_audiences = [self.intended_aud]
+        if app is not None:
+            intended_audiences.append(app.client_id)
+        if claims.get('aud') is not None and claims.get('aud') not in intended_audiences:
             raise OAuth2Error("JWT aud {} does not match intended audience {}".format(
                 claims.get('aud'), self.intended_aud)
             )
