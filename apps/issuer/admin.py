@@ -1,7 +1,7 @@
 
 
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.http import HttpResponseRedirect
 
 from django_object_actions import DjangoObjectActions
@@ -167,7 +167,7 @@ class BadgeInstanceAdmin(DjangoObjectActions, ModelAdmin):
     raw_id_fields = ('badgeclass', 'issuer')
     fieldsets = (
         ('Metadata', {
-            'fields': ('source', 'source_url', 'created_by', 'created_at', 'updated_at', 'entity_id', 'slug', 'salt'),
+            'fields': ('source', 'source_url', 'created_by', 'created_at', 'updated_at', 'slug', 'salt'),
             'classes': ("collapse",)
         }),
         ('Badgeclass', {

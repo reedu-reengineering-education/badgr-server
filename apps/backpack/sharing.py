@@ -19,9 +19,8 @@ class TwitterShareProvider(ShareProvider):
 
     def share_url(self, obj, **kwargs):
         if isinstance(obj, BadgeInstance):
-            issuer_name = obj.cached_issuer.name.encode('utf-8')
             text = "I earned a badge from {issuer}! {url}".format(
-                issuer=issuer_name,
+                issuer=obj.cached_issuer.name,
                 url=obj.get_share_url(**kwargs)
             )
         else:
@@ -46,7 +45,7 @@ class PinterestShareProvider(ShareProvider):
     provider_name = 'Pinterest'
 
     def share_url(self, badge_instance, **kwargs):
-        summary = badge_instance.cached_badgeclass.name.encode('utf8')
+        summary = badge_instance.cached_badgeclass.name
         return "http://www.pinterest.com/pin/create/button/?url={url}&media={image}&description={summary}".format(
             url=urllib.parse.quote(badge_instance.get_share_url(**kwargs)),
             image=badge_instance.image_url(),
@@ -72,11 +71,11 @@ class LinkedinShareProvider(ShareProvider):
 
     def feed_share_url(self, badge_instance, title=None, summary=None, **kwargs):
         if title is None:
-            issuer_name = badge_instance.issuer.name.encode('utf8')
+            issuer_name = badge_instance.issuer.name
             title = "I earned a badge from {issuer}!".format(issuer=issuer_name)
 
         if summary is None:
-            summary = badge_instance.cached_badgeclass.name.encode('utf8')
+            summary = badge_instance.cached_badgeclass.name
         return "https://www.linkedin.com/shareArticle?mini=true&url={url}&title={title}&summary={summary}".format(
             url=urllib.parse.quote(badge_instance.get_share_url(**kwargs)),
             title=urllib.parse.quote(title),

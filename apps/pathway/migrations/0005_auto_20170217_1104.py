@@ -2,6 +2,7 @@
 
 
 from django.db import models, migrations
+import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -14,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='pathwayelement',
             name='completion_badgeclass',
-            field=models.ForeignKey(related_name='completion_elements', blank=True, to='issuer.BadgeClass', null=True),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='completion_elements', blank=True, to='issuer.BadgeClass', null=True),
             preserve_default=True,
         ),
     ]

@@ -2,6 +2,7 @@
 
 
 from django.db import models, migrations
+import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -14,13 +15,13 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='badgeclass',
             name='issuer',
-            field=models.ForeignKey(related_name='badgeclasses', to='issuer.Issuer'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='badgeclasses', to='issuer.Issuer'),
             preserve_default=True,
         ),
         migrations.AlterField(
             model_name='badgeinstance',
             name='badgeclass',
-            field=models.ForeignKey(related_name='badgeinstances', to='issuer.BadgeClass'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='badgeinstances', to='issuer.BadgeClass'),
             preserve_default=True,
         ),
     ]

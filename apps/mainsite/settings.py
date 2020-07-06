@@ -59,11 +59,10 @@ INSTALLED_APPS = [
     'composition',
 ]
 
-MIDDLEWARE_CLASSES = [
+MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'oauth2_provider.middleware.OAuth2TokenMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -212,9 +211,9 @@ AUTH_PASSWORD_VALIDATORS = [
 #
 ##
 
-CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_ALLOW_ALL = True
 CORS_URLS_REGEX = r'^.*$'
-CORS_MODEL = 'mainsite.BadgrApp'
+BADGR_CORS_MODEL = 'mainsite.BadgrApp'
 
 CORS_EXPOSE_HEADERS = (
     'link',
@@ -358,8 +357,9 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'DEFAULT_VERSION': 'v1',
-    'ALLOWED_VERSIONS': ['v1','v2'],
+    'ALLOWED_VERSIONS': ['v1','v2', 'bcv1'],
     'EXCEPTION_HANDLER': 'entity.views.exception_handler',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
 }
 
@@ -429,6 +429,11 @@ OAUTH2_PROVIDER = {
         'rw:issuer:*':  'Create and update badge classes, and award assertions for a single issuer',
         'rw:serverAdmin': 'Superuser trusted operations on most objects',
         'r:assertions': 'Batch receive assertions',
+
+        # Badge Connect API Scopes
+        'https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly': 'List assertions in a User\'s Backpack',
+        'https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.create': 'Add badges into a User\'s Backpack',
+        'https://purl.imsglobal.org/spec/ob/v2p1/scope/profile.readonly': 'See who you are',
     },
     'DEFAULT_SCOPES': ['r:profile'],
 
@@ -487,6 +492,6 @@ AUTHCODE_SECRET_KEY = Fernet.generate_key()
 AUTHCODE_EXPIRES_SECONDS = 600  # needs to be long enough to fetch information from socialauth providers
 
 # SAML Settings
-SAML_EMAIL_KEYS = ['Email', 'mail']
-SAML_FIRST_NAME_KEYS = ['FirstName', 'givenName']
-SAML_LAST_NAME_KEYS = ['LastName', 'sn']
+SAML_EMAIL_KEYS = ['Email', 'mail', 'emailaddress', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress']
+SAML_FIRST_NAME_KEYS = ['FirstName', 'givenName', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname']
+SAML_LAST_NAME_KEYS = ['LastName', 'sn', 'surname', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname']

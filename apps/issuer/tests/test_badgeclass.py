@@ -6,7 +6,7 @@ import json
 from urllib.parse import quote_plus
 
 from django.core.files.images import get_image_dimensions
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.utils import timezone
 
 from issuer.models import BadgeClass, IssuerStaff

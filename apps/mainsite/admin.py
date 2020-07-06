@@ -114,6 +114,8 @@ RefreshToken = get_refresh_token_model()
 class ApplicationInfoInline(StackedInline):
     model = ApplicationInfo
     extra = 1
+    fields = ('name', 'icon', 'website_url', 'allowed_scopes', 'trust_email_verification', 'default_launch_url',)
+    readonly_fields = ('default_launch_url',)
 
 
 class ApplicationInfoAdmin(DjangoObjectActions, ApplicationAdmin):
@@ -126,7 +128,7 @@ class ApplicationInfoAdmin(DjangoObjectActions, ApplicationAdmin):
         if obj.authorization_grant_type != Application.GRANT_AUTHORIZATION_CODE:
             messages.add_message(request, messages.INFO, "This is not a Auth Code Application. Cannot Launch.")
             return
-        launch_url = BadgrApp.objects.get_current(request).get_path('/auth/oauth2/authorize')
+        launch_url = BadgrApp.objects.get_current().get_path('/auth/oauth2/authorize')
         launch_url = set_url_query_params(
             launch_url, client_id=obj.client_id, redirect_uri=obj.default_redirect_uri,
             scope=obj.applicationinfo.allowed_scopes

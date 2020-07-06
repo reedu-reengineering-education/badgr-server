@@ -696,7 +696,7 @@ class PaginatedAssertionsSinceSerializer(CursorPaginatedListSerializer):
 
 class AssertionsChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
-    valid_scopes = ["r:issuer", "rw:serverAdmin"]
+    valid_scopes = ["r:issuer", "rw:issuer", "rw:serverAdmin"]
 
     def get_queryset(self, request, since=None):
         user = request.user
@@ -750,7 +750,7 @@ class PaginatedBadgeClassesSinceSerializer(CursorPaginatedListSerializer):
 
 class BadgeClassesChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
-    valid_scopes = ["r:issuer", "rw:serverAdmin"]
+    valid_scopes = ["r:issuer", "rw:issuer", "rw:serverAdmin"]
 
     def get_queryset(self, request, since=None):
         user = request.user
@@ -802,7 +802,7 @@ class PaginatedIssuersSinceSerializer(CursorPaginatedListSerializer):
 
 class IssuersChangedSince(BaseEntityView):
     permission_classes = (BadgrOAuthTokenHasScope,)
-    valid_scopes = ["r:issuer", "rw:serverAdmin"]
+    valid_scopes = ["r:issuer", "rw:issuer", "rw:serverAdmin"]
 
     def get_queryset(self, request, since=None):
         user = request.user

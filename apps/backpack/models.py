@@ -8,7 +8,7 @@ from collections import OrderedDict
 import cachemodel
 from basic_models.models import CreatedUpdatedAt
 from django.conf import settings
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db import models, transaction
 from django.db.models import Q
 
@@ -168,9 +168,12 @@ class BackpackCollection(BaseAuditedModel, BaseVersionedEntity):
 
 
 class BackpackCollectionBadgeInstance(cachemodel.CacheModel):
-    collection = models.ForeignKey('backpack.BackpackCollection')
-    badgeuser = models.ForeignKey('badgeuser.BadgeUser', null=True, default=None)
-    badgeinstance = models.ForeignKey('issuer.BadgeInstance')
+    collection = models.ForeignKey('backpack.BackpackCollection',
+                                   on_delete=models.CASCADE)
+    badgeuser = models.ForeignKey('badgeuser.BadgeUser', null=True, default=None,
+                                  on_delete=models.CASCADE)
+    badgeinstance = models.ForeignKey('issuer.BadgeInstance',
+                                      on_delete=models.CASCADE)
 
     def publish(self):
         super(BackpackCollectionBadgeInstance, self).publish()
@@ -202,14 +205,16 @@ class BaseSharedModel(cachemodel.CacheModel, CreatedUpdatedAt):
 
 
 class BackpackBadgeShare(BaseSharedModel):
-    badgeinstance = models.ForeignKey("issuer.BadgeInstance", null=True)
+    badgeinstance = models.ForeignKey("issuer.BadgeInstance", null=True,
+                                      on_delete=models.CASCADE)
 
     def get_share_url(self, provider, **kwargs):
         return SharingManager.share_url(provider, self.badgeinstance, **kwargs)
 
 
 class BackpackCollectionShare(BaseSharedModel):
-    collection = models.ForeignKey('backpack.BackpackCollection', null=False)
+    collection = models.ForeignKey('backpack.BackpackCollection', null=False,
+                                   on_delete=models.CASCADE)
 
     def get_share_url(self, provider, **kwargs):
         return SharingManager.share_url(provider, self.collection, **kwargs)

@@ -9,7 +9,7 @@ import hmac
 from basic_models.models import CreatedUpdatedBy, CreatedUpdatedAt, IsActive
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db import models, transaction
 from django.utils import timezone
 from oauthlib.common import generate_token
@@ -19,6 +19,9 @@ from django.db.models import Manager
 from django.utils.deconstruct import deconstructible
 from oauth2_provider.models import AccessToken, Application, RefreshToken
 from rest_framework.authtoken.models import Token
+
+from mainsite.utils import set_url_query_params
+
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
@@ -57,7 +60,7 @@ class EmailBlacklist(models.Model):
         return hmac.compare_digest(hashed.hexdigest(), str(signature))
 
 
-class BadgrAppManager(Manager):
+class BadgrAppManager(cachemodel.CacheModelManager):
     def get_current(self, request=None, raise_exception=False):
         """
         A safe method for getting the current BadgrApp related to a request. It will always return a BadgrApp if
@@ -143,7 +146,8 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
     public_pages_redirect = models.URLField(null=True)
     oauth_authorization_redirect = models.URLField(null=True)
     use_auth_code_exchange = models.BooleanField(default=False)
-    oauth_application = models.ForeignKey("oauth2_provider.Application", null=True, blank=True)
+    oauth_application = models.ForeignKey("oauth2_provider.Application", null=True, blank=True,
+                                          on_delete=models.CASCADE)
 
     objects = BadgrAppManager()
 
@@ -179,7 +183,11 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
     def save(self, *args, **kwargs):
         if self.is_default:
             # Set all other BadgrApp instances as no longer the default.
-            self.__class__.objects.filter(is_default=True).exclude(id=self.pk).update(is_default=False)
+            existing_default = self.__class__.objects.filter(is_default=True).exclude(id=self.pk)
+            if existing_default.exists():
+                for b in existing_default:
+                    b.is_default = False
+                    b.save()
         else:
             if not self.__class__.objects.filter(is_default=True).exists():
                 self.is_default = True
@@ -188,6 +196,10 @@ class BadgrApp(CreatedUpdatedBy, CreatedUpdatedAt, IsActive, cachemodel.CacheMod
             if not getattr(self, prop):
                 setattr(self, prop, self.signup_redirect)
         return super(BadgrApp, self).save(*args, **kwargs)
+
+    def publish(self):
+        super(BadgrApp, self).publish()
+        self.publish_by('cors')
 
 
 @deconstructible
@@ -202,17 +214,29 @@ class DefinedScopesValidator(object):
             raise ValidationError(self.message, code=self.code)
         pass
 
+    def __hash__(self):
+        return hash((self.code, self.message))
+
     def __eq__(self, other):
         return isinstance(other, self.__class__)
 
 
 class ApplicationInfo(cachemodel.CacheModel):
-    application = models.OneToOneField('oauth2_provider.Application')
+    application = models.OneToOneField('oauth2_provider.Application',
+                                       on_delete=models.CASCADE)
     icon = models.FileField(blank=True, null=True)
     name = models.CharField(max_length=254, blank=True, null=True, default=None)
     website_url = models.URLField(blank=True, null=True, default=None)
     allowed_scopes = models.TextField(blank=False, validators=[DefinedScopesValidator()])
     trust_email_verification = models.BooleanField(default=False)
+
+    # Badge Connect Extra Data
+    logo_uri = models.URLField(blank=True, null=True)
+    terms_uri = models.URLField(blank=True, null=True)
+    policy_uri = models.URLField(blank=True, null=True)
+    software_id = models.CharField(max_length=254, blank=True, null=True, default=None)
+    software_version = models.CharField(max_length=254, blank=True, null=True, default=None)
+    issue_refresh_token = models.BooleanField(default=True)
 
     def get_visible_name(self):
         if self.name:
@@ -222,6 +246,19 @@ class ApplicationInfo(cachemodel.CacheModel):
     def get_icon_url(self):
         if self.icon:
             return self.icon.url
+
+    @property
+    def default_launch_url(self):
+        application = self.application
+        if application.authorization_grant_type != Application.GRANT_AUTHORIZATION_CODE:
+            # This is not a Auth Code Application. Cannot Launch.
+            return ''
+        launch_url = BadgrApp.objects.get_current().get_path('/auth/oauth2/authorize')
+        launch_url = set_url_query_params(
+            launch_url, client_id=application.client_id, redirect_uri=application.default_redirect_uri,
+            scope=self.allowed_scopes
+        )
+        return launch_url
 
     @property
     def scope_list(self):
@@ -300,6 +337,10 @@ class AccessTokenProxy(AccessToken):
         b64_trimmed = re.sub(r'=+$', '', b64_string)
         return b64_trimmed
 
+    @property
+    def client_id(self):
+        return self.application.client_id
+
     def get_entity_class_name(self):
         return 'AccessToken'
 
@@ -329,7 +370,8 @@ class AccessTokenProxy(AccessToken):
 
 
 class AccessTokenScope(models.Model):
-    token = models.ForeignKey(AccessToken)
+    token = models.ForeignKey(AccessToken,
+                              on_delete=models.CASCADE)
     scope = models.CharField(max_length=255)
 
     class Meta:

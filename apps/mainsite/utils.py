@@ -21,7 +21,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import SuspiciousFileOperation
 from django.core.files.storage import DefaultStorage
-from django.core.urlresolvers import get_callable
+from django.urls import get_callable
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
@@ -253,13 +253,7 @@ def throttleable(f):
         if backoff is not None and max_backoff != 0 and not _request_authenticated_with_admin_scope(request):
             backoff_until = backoff.get('until', None)
             if backoff_until > timezone.now():
-
-                cache.set(
-                    backoff_cache_key(username, client_ip),
-                    iterate_backoff_count(backoff),
-                    timeout=max_backoff
-                )
-
+                # Don't increase the backoff count, just return 429.
                 return HttpResponse(json.dumps({
                     "error_description": "Too many login attempts. Please wait and try again.",
                     "error": "login attempts throttled",
@@ -350,3 +344,11 @@ def _request_authenticated_with_admin_scope(request):
     if token is None:
         return False
     return 'rw:serverAdmin' in getattr(token, 'scope', '')
+
+
+def netloc_to_domain(netloc):
+    # Authorization specified in URL
+    domain = netloc.split('@')[-1]
+    # Port specified in URL
+    domain = domain.split(':')[0]
+    return domain

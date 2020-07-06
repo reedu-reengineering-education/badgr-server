@@ -6,6 +6,7 @@ import os
 
 import dateutil.parser
 import responses
+import mock
 from django.db import IntegrityError
 from django.urls import reverse
 from openbadges.verifier.openbadges_context import (OPENBADGES_CONTEXT_V2_URI, OPENBADGES_CONTEXT_V1_URI,
@@ -22,14 +23,14 @@ from .utils import setup_basic_0_5_0, setup_basic_1_0, setup_basic_1_0_bad_image
 
 class TestShareProviders(SetupIssuerHelper, BadgrTestCase):
     # issuer name with ascii
-    issuer_name_with_ascii = base64.b64decode('w45zc8O8w6ly')
+    issuer_name_non_ascii = base64.b64decode('w45zc8O8w6ly').decode('utf-8')
     # name with ascii
-    badge_class_name_with_ascii = base64.b64decode('w45zc8O8w6lycyBDb3Jw')
+    badge_class_name_non_ascii = base64.b64decode('w45zc8O8w6lycyBDb3Jw').decode('utf-8')
 
     def test_twitter_share_with_ascii_issuer(self):
         provider = 'twitter'
         test_user = self.setup_user(authenticate=True)
-        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_with_ascii)
+        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_non_ascii)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
         share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
@@ -39,7 +40,7 @@ class TestShareProviders(SetupIssuerHelper, BadgrTestCase):
         provider = 'pinterest'
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
-        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_with_ascii)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_non_ascii)
         test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
         share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
         share_url = share.get_share_url(provider, include_identifier=True)
@@ -47,8 +48,8 @@ class TestShareProviders(SetupIssuerHelper, BadgrTestCase):
     def test_linked_in_share_with_ascii_summary_and_issuer(self):
         provider = 'linkedin'
         test_user = self.setup_user(authenticate=True)
-        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_with_ascii)
-        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_with_ascii)
+        test_issuer = self.setup_issuer(owner=test_user, name=self.issuer_name_non_ascii)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer, name=self.badge_class_name_non_ascii)
         test_assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
         share = BackpackBadgeShare(provider=provider, badgeinstance=test_assertion, source='unknown')
         share_url = share.get_share_url(provider, include_identifier=True)
@@ -85,9 +86,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
@@ -149,9 +152,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
@@ -176,9 +181,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges?json_format=plain', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges?json_format=plain', post_input
+            )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(
             response.data.get('json').get('badge').get('description'),
@@ -197,9 +204,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 400)
         self.assertIsNotNone(first_node_match(response.data, dict(
             messageLevel='ERROR',
@@ -224,9 +233,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/baked_image'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
@@ -249,9 +260,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'image': image
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
@@ -348,7 +361,10 @@ class TestBadgeUploads(BadgrTestCase):
         self.assertDictEqual(json.loads(unbake(original_image)), assertion_metadata)
 
         original_image.seek(0)
-        response = self.client.post('/v1/earner/badges', {'image': original_image})
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post('/v1/earner/badges',
+                                        {'image': original_image})
         self.assertEqual(response.status_code, 201)
 
         public_url = response.data.get('shareUrl')
@@ -383,9 +399,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'image': encoded
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input, format='json'
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input, format='json'
+            )
         self.assertEqual(response.status_code, 201)
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
@@ -407,9 +425,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'assertion': open(os.path.join(CURRENT_DIRECTORY, 'testfiles/1_0_basic_instance.json'), 'r').read()
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
@@ -437,9 +457,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance3',
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
 
         get_response = self.client.get('/v1/earner/badges')
@@ -467,9 +489,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 400)
         self.assertIsNotNone(first_node_match(response.data, dict(
             messageLevel='ERROR',
@@ -488,9 +512,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 400)
         self.assertIsNotNone(first_node_match(response.data, dict(
             messageLevel='ERROR',
@@ -515,9 +541,11 @@ class TestBadgeUploads(BadgrTestCase):
             'url': 'http://a.com/instance'
         }
 
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
 
         self.assertEqual(response.status_code, 400)
         self.assertIsNotNone(first_node_match(response.data, dict(
@@ -538,9 +566,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://oldstyle.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
@@ -559,9 +589,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'assertion': open(os.path.join(CURRENT_DIRECTORY, 'testfiles', '0_5_basic_instance.json'), 'r').read()
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 400)
         # TODO Update to support 0.5 badges
 
@@ -581,17 +613,22 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
 
         post2_input = {
             'url': 'http://a.com/instance2'
         }
-        response2 = self.client.post(
-           '/v1/earner/badges', post2_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response2 = self.client.post(
+            '/v1/earner/badges', post2_input
+            )
         self.assertEqual(response2.status_code, 201)
 
         self.assertEqual(BadgeClass.objects.all().count(), badgeclass_count+1)
@@ -626,9 +663,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instancebaddate'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 400)
 
         self.assertIsNotNone(first_node_match(response.data, dict(
@@ -650,9 +689,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 400)
 
         self.assertIsNotNone(first_node_match(response.data, dict(
@@ -672,9 +713,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 400)
 
         # openbadges returns FETCH_HTTP_NODE error when retrieving invalid json
@@ -700,7 +743,10 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'assertion': json.dumps(assertion)
         }
-        response = self.client.post('/v1/earner/badges', post_input, format='json')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post('/v1/earner/badges', post_input,
+                                        format='json')
         self.assertEqual(response.status_code, 201)
 
     @responses.activate
@@ -715,9 +761,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)
@@ -735,9 +783,11 @@ class TestBadgeUploads(BadgrTestCase):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(BadgeInstance.objects.count(), 0)
 
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
 
     @responses.activate
@@ -752,9 +802,11 @@ class TestBadgeUploads(BadgrTestCase):
         post_input = {
             'url': 'http://a.com/instance'
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
 
         self.assertEqual(response.status_code, 400)
 
@@ -771,7 +823,10 @@ class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
 
         test_recipient = self.setup_user(email='test_recipient@email.test', authenticate=True)
-        assertion = test_badgeclass.issue(recipient_id='test_recipient@email.test', recipient_type='email')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            assertion = test_badgeclass.issue(
+                recipient_id='test_recipient@email.test', recipient_type='email')
 
         response = self.client.get(
             '/v1/earner/badges'
@@ -812,9 +867,11 @@ class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
         post_input = {
             'url': assertion.jsonld_id
         }
-        response = self.client.post(
-            '/v1/earner/badges', post_input
-        )
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post(
+                '/v1/earner/badges', post_input
+            )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['id'], assertion.entity_id)
         get_response = self.client.get('/v1/earner/badges')
@@ -844,7 +901,11 @@ class TestDeleteLocalAssertion(BadgrTestCase, SetupIssuerHelper):
             {'url': json.loads(issuer_data)['id'], 'response_body': issuer_data},
         ])
 
-        response = self.client.post('/v2/backpack/import', {'url': json.loads(assertion_data)['id']}, format='json')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post('/v2/backpack/import', {
+                'url': json.loads(assertion_data)['id']
+            }, format='json')
         self.assertEqual(response.status_code, 201)
 
 
@@ -855,7 +916,11 @@ class TestAcceptanceHandling(BadgrTestCase, SetupIssuerHelper):
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
 
         test_recipient = self.setup_user(email='test_recipient@email.test', authenticate=True, token_scope='rw:backpack')
-        assertion = test_badgeclass.issue(recipient_id='test_recipient@email.test', recipient_type='email')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            assertion = test_badgeclass.issue(
+                recipient_id='test_recipient@email.test',
+                recipient_type='email')
 
         response = self.client.put(
             '/v2/backpack/assertions/{}'.format(assertion.entity_id),
@@ -1021,12 +1086,17 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         CachedEmailAddress.objects.add_email(test_user, unverified_email)
         post_input = {"url": "http://a.com/assertion-embedded1"}
 
-        post_resp = self.client.post('/v2/backpack/import', post_input, format='json')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            post_resp = self.client.post('/v2/backpack/import', post_input,
+                                         format='json')
         assertion = BadgeInstance.objects.first()
 
         test_issuer_one = self.setup_issuer(name="Test Issuer 1", owner=test_user)
         test_badgeclass_one = self.setup_badgeclass(name='Test Badgeclass 1', issuer=test_issuer_one)
-        test_badgeclass_one.issue(recipient_id='verified@example.com')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            test_badgeclass_one.issue(recipient_id='verified@example.com')
 
         get_resp = self.client.get('/v2/backpack/assertions?include_pending=1')
 
@@ -1063,7 +1133,10 @@ class TestPendingBadges(BadgrTestCase, SetupIssuerHelper):
         test_user = self.setup_user(email='verified@example.com', authenticate=True)
         CachedEmailAddress.objects.add_email(test_user, unverified_email)
         post_input = {"url": "http://a.com/assertion-embedded1"}
-        post_resp = self.client.post('/v1/earner/badges', post_input, format='json')
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            post_resp = self.client.post('/v1/earner/badges', post_input,
+                                         format='json')
         self.assertEqual(post_resp.status_code, 201)
         assertion = BadgeInstance.objects.first()
 

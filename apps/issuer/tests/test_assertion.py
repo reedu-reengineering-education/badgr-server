@@ -12,7 +12,7 @@ import re
 from urllib.parse import quote_plus
 
 from django.core import mail
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.utils import timezone
 from django.test import override_settings
 from oauth2_provider.models import Application
@@ -1136,6 +1136,68 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
         ), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 201)
 
+    def test_v2_issue_uppercase_email(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'TEST3@example.com'
+            },
+            'badgeclassOpenBadgeId': test_badgeclass.jsonld_id
+        }
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 201)
+        assertion_data = response.data['result'][0]
+        recipient_id = assertion_data['recipient']['plaintextIdentity']
+        self.assertEqual(
+            recipient_id, new_assertion_props['recipient']['identity'].lower(),
+            "Reported recipient ID is lowercase")
+        assertion_from_db = BadgeInstance.objects.get(entity_id=assertion_data['entityId'])
+        self.assertEqual(
+            assertion_from_db.recipient_identifier, new_assertion_props['recipient']['identity'].lower(),
+            "Stored recipient ID is lowercase")
+
+    def test_v2_issue_uppercase_url(self):
+        """
+        Unlike emails, URLs are presumed to be case sensitive as reported to us.
+        """
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        new_assertion_props = {
+            'recipient': {
+                'identity': 'https://eXaMpLe.CoM/UPPERCASEPATH',
+                'type': 'url'
+            },
+            'badgeclassOpenBadgeId': test_badgeclass.jsonld_id
+        }
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 201)
+        assertion_data = response.data['result'][0]
+        recipient_id = assertion_data['recipient']['plaintextIdentity']
+        self.assertEqual(
+            recipient_id, 'https://example.com/UPPERCASEPATH',
+            "Reported recipient ID URL is not automatically lowercased")
+        assertion_from_db = BadgeInstance.objects.get(entity_id=assertion_data['entityId'])
+        self.assertEqual(
+            assertion_from_db.recipient_identifier, 'https://example.com/UPPERCASEPATH',
+            "Stored recipient ID is not automatically lowercased")
+
+        new_assertion_props['recipient']['identity'] = 'NOTAURL/NOTAVALIDONE/butlookslikeone?sorta=True'
+        response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
+            issuer=test_issuer.entity_id
+        ), new_assertion_props, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['fieldErrors']['recipient']['non_field_errors'][0], 'Enter a valid URL.')
+        # TODO this might be nicer if it were just a fieldError for recipient.identity or just was a non_field_error:[str] to begin with
+
     def test_v2_issue_by_badgeclassOpenBadgeId_permissions(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -1230,7 +1292,7 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
         response = self.client.post('/o/token', data=dict(
             grant_type=application.authorization_grant_type.replace('-','_'),
             client_id=application.client_id,
-            scope="rw:issuer r:assertions",
+            scope="rw:issuer",
             username=issuer_user.email,
             password='secret'
         ))
@@ -1240,7 +1302,7 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
         response = self.client.post('/o/token', data=dict(
             grant_type=application.authorization_grant_type.replace('-', '_'),
             client_id=application.client_id,
-            scope="r:assertions",
+            scope="rw:issuer",
             username=application_user.email,
             password='secret'
         ))
@@ -1449,9 +1511,9 @@ class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
         assertion = test_badgeclass.issue(
             'test3@example.com', expires_at=timezone.now() - timezone.timedelta(days=1)
         )
-        _ = assertion.badgeclass
-        self.assertTrue(hasattr(assertion, '_badgeclass_cache'))
+        _ = assertion.badgeclass  # call the foreign key attribute to ensure the related object is cached
+        self.assertIsNotNone(assertion._state.fields_cache.get('badgeclass'))
 
         cached_assertion = BadgeInstance.cached.get(entity_id=assertion.entity_id)
-        self.assertFalse(hasattr(cached_assertion, '_badgeclass_cache'))
-        self.assertFalse(hasattr(cached_assertion, '_issuer_cache'))
+        self.assertIsNone(cached_assertion._state.fields_cache.get('badgeclass'))
+        self.assertIsNone(cached_assertion._state.fields_cache.get('issuer'))

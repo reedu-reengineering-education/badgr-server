@@ -5,7 +5,7 @@ import time
 import urllib.request, urllib.parse, urllib.error
 from urllib.parse import urlparse
 
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import override_settings
 
 from mainsite.tests import SetupIssuerHelper, BadgrTestCase, BadgeUser
@@ -89,19 +89,6 @@ class AssertionsChangedSinceTests(SetupIssuerHelper, BadgrTestCase):
         url = reverse('v2_api_assertions_changed_list')
         response = self.client.get(url)
         self.assertEqual(len(response.data['result']), 0)
-
-    def test_user_cant_fetch_changed_assertions(self):
-        staff = self.setup_user(email='staff@example.com')
-        recipient = self.setup_user(email='recipient@example.com', authenticate=True)
-
-        issuer = self.setup_issuer(owner=staff)
-        badgeclass = self.setup_badgeclass(issuer=issuer)
-        badgeclass.issue(recipient_id=recipient.email)
-        badgeclass.issue(recipient_id=staff.email)
-        url = reverse('v2_api_assertions_changed_list')
-
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
 
     def test_application_can_fetch_changed_assertions(self):
         #as per update in BP-2347, this token should not be able to get anything anymore

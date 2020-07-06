@@ -12,6 +12,8 @@ SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
 
 @rules.predicate
 def is_owner(user, issuer):
+    if not hasattr(issuer, 'cached_issuerstaff'):
+        return False
     for staff_record in issuer.cached_issuerstaff():
         if staff_record.user_id == user.id and staff_record.role == IssuerStaff.ROLE_OWNER:
             return True
@@ -20,6 +22,8 @@ def is_owner(user, issuer):
 
 @rules.predicate
 def is_editor(user, issuer):
+    if not hasattr(issuer, 'cached_issuerstaff'):
+        return False
     for staff_record in issuer.cached_issuerstaff():
         if staff_record.user_id == user.id and staff_record.role in (IssuerStaff.ROLE_OWNER, IssuerStaff.ROLE_EDITOR):
             return True
@@ -28,6 +32,8 @@ def is_editor(user, issuer):
 
 @rules.predicate
 def is_staff(user, issuer):
+    if not hasattr(issuer, 'cached_issuerstaff'):
+        return False
     for staff_record in issuer.cached_issuerstaff():
         if staff_record.user_id == user.id:
             return True
@@ -272,4 +278,7 @@ class BadgrOAuthTokenHasEntityScope(permissions.BasePermission):
             return scope
 
     def _get_valid_scopes(self, request, view):
-        return getattr(view, "valid_scopes")
+        view_scopes = getattr(view, "valid_scopes")
+        if isinstance(view_scopes, dict):
+            return view_scopes.get(request.method.lower(), [])
+        return view_scopes

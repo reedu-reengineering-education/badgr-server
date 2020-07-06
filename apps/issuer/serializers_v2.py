@@ -156,15 +156,15 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
             image.name = 'issuer_logo_' + str(uuid.uuid4()) + img_ext
         return image
 
-    def validate_badgrDomain(self, val):
-        if not request_authenticated_with_server_admin_token(self.context.get('request')):
-            return None
-        return val
-
     def validate_createdBy(self, val):
         if not request_authenticated_with_server_admin_token(self.context.get('request')):
             return None
         return val
+
+    def validate(self, data):
+        if data.get('badgrapp') and not request_authenticated_with_server_admin_token(self.context.get('request')):
+            data.pop('badgrapp')
+        return data
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -407,6 +407,30 @@ class BadgeRecipientSerializerV2(BaseSerializerV2):
 
     }
 
+    class Meta:
+        apispec_definition = ('BadgeRecipient', {
+            'properties': OrderedDict([
+                ('identity', {
+                    'type': 'string',
+                    'format': 'string',
+                    'description': 'Either the hash of the identity or the plaintext value'
+                }),
+                ('type', {
+                    'type': 'string',
+                    'enum': [c[0] for c in BadgeInstance.RECIPIENT_TYPE_CHOICES],
+                    'description': "Type of identifier used to identify recipient"
+                }),
+                ('hashed', {
+                    'type': 'boolean',
+                    'description': "Whether or not the identity value is hashed."
+                }),
+                ('plaintextIdentity', {
+                    'type': 'string',
+                    'description': "The plaintext identity"
+                }),
+            ]),
+        })
+
     def validate(self, attrs):
         recipient_type = attrs.get('recipient_type')
         recipient_identifier = attrs.get('recipient_identifier')
@@ -424,7 +448,7 @@ class BadgeRecipientSerializerV2(BaseSerializerV2):
         representation = super(BadgeRecipientSerializerV2, self).to_representation(instance)
         if instance.hashed:
             representation['salt'] = instance.salt
-            representation['identity'] = generate_sha256_hashstring(instance.recipient_identifier.lower(), instance.salt)
+            representation['identity'] = generate_sha256_hashstring(instance.recipient_identifier, instance.salt)
 
         return representation
 
@@ -584,30 +608,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                 }),
                 ('recipient', {
                     'type': 'object',
-                    'properties': OrderedDict([
-                        ('identity', {
-                            'type': 'string',
-                            'format': 'string',
-                            'description': 'Either the hash of the identity or the plaintext value',
-                            'required': True,
-                        }),
-                        ('type', {
-                            'type': 'string',
-                            'enum': [c[0] for c in BadgeInstance.RECIPIENT_TYPE_CHOICES],
-                            'description': "Type of identifier used to identify recipient",
-                            'required': False,
-                        }),
-                        ('hashed', {
-                            'type': 'boolean',
-                            'description': "Whether or not the identity value is hashed.",
-                            'required': False,
-                        }),
-                        ('plaintextIdentity', {
-                            'type': 'string',
-                            'description': "The plaintext identity",
-                            'required': False,
-                        }),
-                    ]),
+                    '$ref': '#/definitions/BadgeRecipient',
                     'description': "Recipient that was issued the Assertion",
                     'required': False,
                 }),
@@ -656,7 +657,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
             badge_instance_properties.append('badgeclass')
 
         if sum([el in badgeclass_identifiers for el in badge_instance_properties]) > 1:
-            raise serializers.ValidationError('Multiple badge class identifiers. Exactly one of the following badge blass identifiers are allowed: badgeclass, badgeclassName, or badgeclassOpenBadgeId')
+            raise serializers.ValidationError('Multiple badge class identifiers. Exactly one of the following badge class identifiers are allowed: badgeclass, badgeclassName, or badgeclassOpenBadgeId')
 
         if request and request.method != 'PUT':
             # recipient and badgeclass are only required on create, ignored on update

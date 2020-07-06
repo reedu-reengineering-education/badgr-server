@@ -1,24 +1,34 @@
 import urllib.request, urllib.parse, urllib.error
 import urllib.parse
 
+# TODO: Revert to library code once library is fixed for python3
+# from saml2.metadata import create_metadata_string
+from .saml2_utils import create_metadata_string
+
 from allauth.account.adapter import get_adapter
 from allauth.socialaccount.providers.base import AuthProcess
 from django.contrib.auth import logout
-from django.core.exceptions import ValidationError
-from django.core.urlresolvers import reverse, NoReverseMatch
-from django.http import HttpResponseBadRequest, HttpResponseForbidden
+from django.core.exceptions import ValidationError, ImproperlyConfigured
+from django.urls import reverse, NoReverseMatch
+from django.http import HttpResponseBadRequest, HttpResponseForbidden, HttpResponse
 from django.views.generic import RedirectView
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render_to_response
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework import status
+
+from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
+
+import logging
+
 import requests
 
 import base64
 
-from badgeuser.authcode import authcode_for_accesstoken
+from badgeuser.authcode import authcode_for_accesstoken, accesstoken_for_authcode
 from badgeuser.models import CachedEmailAddress, BadgeUser
 from badgrsocialauth.models import Saml2Account, Saml2Configuration
-from badgrsocialauth.utils import (set_session_badgr_app, get_session_badgr_app,
+from badgrsocialauth.utils import (set_session_badgr_app, get_session_authcode,
                                    get_session_verification_email, set_session_authcode,)
 from django.conf import settings
 from mainsite.models import BadgrApp
@@ -31,6 +41,8 @@ from saml2 import (
 from saml2.client import Saml2Client
 from saml2.config import Config as Saml2Config
 from mainsite.models import AccessTokenProxy
+
+logger = logging.getLogger(__name__)
 
 
 class BadgrSocialLogin(RedirectView):
@@ -117,7 +129,7 @@ class BadgrAccountConnected(RedirectView):
 
 """
 
-SAML2 Authentication Flow 
+SAML2 Authentication Flow
 
 """
 
@@ -126,9 +138,19 @@ def saml2_client_for(idp_name=None):
     '''
     Given the name of an Identity Provider look up the Saml2Configuration and build a SAML Client. Return these.
     '''
-
-    # SAML metadata changes very rarely, check for cached version first
     config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_config = create_saml_config_for(config)
+    spConfig = Saml2Config()
+    spConfig.load(saml_config)
+    spConfig.allow_unknown_attributes = True
+    saml_client = Saml2Client(config=spConfig)
+    return saml_client, config
+
+
+def create_saml_config_for(config):
+    # SAML metadata changes very rarely, check for cached version first
+    should_sign_authn_request = config.use_signed_authn_request
+
     metadata = None
     if config:
         metadata = config.cached_metadata
@@ -137,14 +159,14 @@ def saml2_client_for(idp_name=None):
         r = requests.get(config.metadata_conf_url)
         metadata = r.text
 
-    origin = getattr(settings, 'HTTP_ORIGIN').split('://')[1]
-    https_acs_url = 'https://' + origin + reverse('assertion_consumer_service', args=[idp_name])
+    origin = getattr(settings, 'HTTP_ORIGIN')
+    https_acs_url = origin + reverse('assertion_consumer_service', args=[config.slug])
 
     setting = {
         'metadata': {
             'inline': [metadata],
         },
-        'entityid': "badgrserver",
+        'entityid': https_acs_url,
         'service': {
             'sp': {
                 'endpoints': {
@@ -155,28 +177,90 @@ def saml2_client_for(idp_name=None):
                 # Don't verify that the incoming requests originate from us via
                 # the built-in cache for authn request ids in pysaml2
                 'allow_unsolicited': True,
-                # Don't sign authn requests, since signed requests only make
-                # sense in a situation where you control both the SP and IdP
-                'authn_requests_signed': False,
+                'authn_requests_signed': should_sign_authn_request,
                 'logout_requests_signed': True,
                 'want_assertions_signed': True,
                 'want_response_signed': False,
             },
         },
     }
+    if should_sign_authn_request:
+        key_file = getattr(settings, 'SAML_KEY_FILE', None)
+        if key_file is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to a PEM formatted file containing the certificates private key")
+
+        cert_file = getattr(settings, 'SAML_CERT_FILE', None)
+        if cert_file is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to a PEM formatted file containing the certificates public key")
+
+        xmlsec_binary_path = getattr(settings, 'XMLSEC_BINARY_PATH', None)
+        if xmlsec_binary_path is None:
+            raise ImproperlyConfigured(
+                "Signed Authn request requires the path to the xmlsec binary")
+
+        setting['key_file'] = key_file
+        setting['cert_file'] = cert_file
+        # requires xmlsec binaries per https://pysaml2.readthedocs.io/en/latest/examples/sp.html
+        setting['xmlsec_binary'] = xmlsec_binary_path
+    return setting
+
+
+def saml2_sp_metadata(request, idp_name):
+    config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_config = create_saml_config_for(config)
     spConfig = Saml2Config()
-    spConfig.load(setting)
-    spConfig.allow_unknown_attributes = True
-    saml_client = Saml2Client(config=spConfig)
-    return saml_client, config
+    spConfig.load(saml_config)
+
+    metadata = create_metadata_string('', config=spConfig, sign=config.use_signed_authn_request)
+    return HttpResponse(metadata, content_type="text/xml")
+
+
+def saml2_render_or_redirect(request, idp_name):
+    config = Saml2Configuration.objects.get(slug=idp_name)
+    saml_client, _ = saml2_client_for(idp_name)
+    response = None
+
+    if config.use_signed_authn_request:
+        reqid, info = saml_client.prepare_for_authenticate(
+            binding=BINDING_HTTP_POST,
+            sign=True
+        )
+        response = HttpResponse(info['data'])
+    else:
+        reqid, info = saml_client.prepare_for_authenticate(binding=BINDING_HTTP_REDIRECT)
+        redirect_url = None
+        # Select the IdP URL to send the AuthN request to
+        for key, value in info['headers']:
+            if key == 'Location':
+                redirect_url = value
+        response = redirect(redirect_url)
+        #  Read http://stackoverflow.com/a/5494469 and
+        #  http://docs.oasis-open.org/security/saml/v2.0/saml-bindings-2.0-os.pdf
+        #  We set those headers here as a "belt and suspenders" approach.
+        response['Cache-Control'] = 'no-cache, no-store'
+        response['Pragma'] = 'no-cache'
+
+    badgr_app = BadgrApp.objects.get_current(request)
+    request.session['badgr_app_pk'] = badgr_app.pk
+    return response
 
 
 @csrf_exempt
 def assertion_consumer_service(request, idp_name):
     saml_client, config = saml2_client_for(idp_name)
+
+    saml_info = "assertion_consumer_service: saml_client entityid:{}, reponse: {}".format(
+        saml_client.config.entityid,
+        request.POST.get('SAMLResponse')
+    )
+    logger.info(saml_info)
+
     authn_response = saml_client.parse_authn_request_response(
         request.POST.get('SAMLResponse'),
         entity.BINDING_HTTP_POST)
+
     authn_response.get_identity()
     if len(set(settings.SAML_EMAIL_KEYS) & set(authn_response.ava.keys())) == 0:
         raise ValidationError('Missing email in SAML assertions, received {}'.format(list(authn_response.ava.keys())))
@@ -187,15 +271,18 @@ def assertion_consumer_service(request, idp_name):
     email = [authn_response.ava[key][0] for key in settings.SAML_EMAIL_KEYS if key in authn_response.ava][0]
     first_name = [authn_response.ava[key][0] for key in settings.SAML_FIRST_NAME_KEYS if key in authn_response.ava][0]
     last_name = [authn_response.ava[key][0] for key in settings.SAML_LAST_NAME_KEYS if key in authn_response.ava][0]
-    badgr_app = BadgrApp.objects.get(pk=request.session.get('badgr_app_pk'))
+    badgr_app = BadgrApp.objects.get_current(request=request)
     return auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name)
 
 
 def auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name):
-    def login(user):
-        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
-            user,
-            scope='rw:backpack rw:profile rw:issuer')
+    def login(user, token=None):
+        if token is not None and not token.is_expired():
+            accesstoken = token
+        else:
+            accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
+                user,
+                scope='rw:backpack rw:profile rw:issuer')
 
         if badgr_app.use_auth_code_exchange:
             authcode = authcode_for_accesstoken(accesstoken)
@@ -204,23 +291,23 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
             params = dict(authToken=accesstoken.token)
         return redirect(set_url_query_params(badgr_app.ui_login_redirect, **params))
 
-    def new_account(email):
+    def new_account(requested_email):
         new_user = BadgeUser.objects.create(
-            email=email,
+            email=requested_email,
             first_name=first_name,
             last_name=last_name,
             request=request,
             send_confirmation=False
         )
         # Auto verify emails
-        cached_email = CachedEmailAddress.objects.get(email=email)
+        cached_email = CachedEmailAddress.objects.get(email=requested_email)
         cached_email.verified = True
         cached_email.save()
-        Saml2Account.objects.create(config=config, user=new_user, uuid=email)
+        Saml2Account.objects.create(config=config, user=new_user, uuid=requested_email)
         return new_user
 
     # Get/Create account and redirect with token or with error message
-    saml2_account = Saml2Account.objects.filter(uuid=email).first()
+    saml2_account = Saml2Account.objects.filter(uuid=email, config=config).first()
     if saml2_account:
         return login(saml2_account.user)
 
@@ -228,38 +315,35 @@ def auto_provision(request, email, first_name, last_name, badgr_app, config, idp
         existing_email = CachedEmailAddress.cached.get(email=email)
         if not existing_email.verified:
             # Email exists but is not verified, auto-provision account and log in
-            return login(new_account(email))
-        Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
-        # Email exists and is already verified
-        url = set_url_query_params(
-            badgr_app.ui_signup_failure_redirect,
-            authError='An account already exists with provided email address',
-            email=str(base64.urlsafe_b64encode(email.encode('utf-8')), 'utf'),
-            socialAuthSlug=idp_name
-        )
-        return redirect(url)
+            new_account = new_account(email)
+            return login(new_account)
+        elif existing_email.verified:
+            # Email exists and is already verified
+
+            # Override: user has an appropriate authcode for the return flight to the UI
+            authcode = get_session_authcode(request)
+            if authcode is not None:
+                token = accesstoken_for_authcode(authcode)
+                if token is not None and not token.is_expired() and token.user == existing_email.user:
+                    saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
+                    return login(saml2_account.user, token)
+
+            # Fail: user does not have an appropriate authcode
+            url = set_url_query_params(
+                badgr_app.ui_signup_failure_redirect,
+                authError='An account already exists with provided email address',
+                email=str(base64.urlsafe_b64encode(email.encode('utf-8')), 'utf'),
+                socialAuthSlug=idp_name
+            )
+            return redirect(url)
     except CachedEmailAddress.DoesNotExist:
-        # Email does not exist, auto-provision account and log in
+        authcode = get_session_authcode(request)
+        if authcode is not None:
+            token = accesstoken_for_authcode(authcode)
+            if token is not None and not token.is_expired():
+                saml2_account = Saml2Account.objects.create(config=config, user=token.user, uuid=email)
+                new_mail = CachedEmailAddress.objects.create(email=email, user=token.user, verified=True, primary=False)
+                return login(saml2_account.user, token)
+
+        # Email does not exist, nor does existing account. auto-provision new account and log in
         return login(new_account(email))
-
-
-def saml2_redirect(request, idp_name):
-    saml_client, _ = saml2_client_for(idp_name)
-    reqid, info = saml_client.prepare_for_authenticate()
-    redirect_url = None
-    # Select the IdP URL to send the AuthN request to
-    for key, value in info['headers']:
-        if key == 'Location':
-            redirect_url = value
-    response = redirect(redirect_url)
-    #  Read http://stackoverflow.com/a/5494469 and
-    #  http://docs.oasis-open.org/security/saml/v2.0/saml-bindings-2.0-os.pdf
-    #  We set those headers here as a "belt and suspenders" approach.
-    response['Cache-Control'] = 'no-cache, no-store'
-    response['Pragma'] = 'no-cache'
-    badgr_app = BadgrApp.objects.get_current(request)
-    request.session['badgr_app_pk'] = badgr_app.pk
-    return response
-
-
-

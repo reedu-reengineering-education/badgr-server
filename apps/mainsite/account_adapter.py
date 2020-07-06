@@ -9,7 +9,7 @@ from allauth.exceptions import ImmediateHttpResponse
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
-from django.core.urlresolvers import resolve, Resolver404, reverse
+from django.urls import resolve, Resolver404, reverse
 
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import CachedEmailAddress
@@ -166,7 +166,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         """
         If successfully logged in, redirect to the front-end, including an authToken query parameter.
         """
-        if request.user.is_authenticated():
+        if request.user.is_authenticated:
             badgr_app = BadgrApp.objects.get_current(self.request)
 
             if badgr_app is not None:

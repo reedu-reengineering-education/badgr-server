@@ -18,7 +18,7 @@ from oauth2_provider.models import Application
 
 from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import Issuer, BadgeClass, IssuerStaff
-from mainsite.models import ApplicationInfo, AccessTokenProxy
+from mainsite.models import ApplicationInfo, AccessTokenProxy, BadgrApp
 from mainsite.tests import SetupOAuth2ApplicationHelper
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
 
@@ -72,10 +72,12 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(badge_object['email'], self.example_issuer_props['email'])
         self.assertIsNotNone(badge_object.get('id'))
         self.assertIsNotNone(badge_object.get('@context'))
+        slug = response.data.get('slug')
 
+        issuer = Issuer.cached.get(entity_id=slug)
+        badgrapp = issuer.cached_badgrapp  # warm the cache
         # assert that the issuer was published to and fetched from the cache
         with self.assertNumQueries(0):
-            slug = response.data.get('slug')
             response = self.client.get('/v1/issuer/issuers/{}'.format(slug))
             self.assertEqual(response.status_code, 200)
 
@@ -117,6 +119,19 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testfiles', '300x300.png')
         self._create_issuer_with_image_and_test_resizing(image_path, 300, 300)
 
+    def test_get_issuer_detail_unauthenticated_fails(self):
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_issuer.created_by = None
+        test_issuer.source_url = 'https://example.com/issuer1'
+        test_issuer.save()
+        IssuerStaff.objects.last().delete()
+
+        response = self.client.get('/v2/issuers/{}'.format(test_issuer.entity_id), headers={
+            'Accept': 'text/html'
+        })
+        self.assertEqual(response.status_code, 401)
+
     def test_issuer_update_resizes_image(self):
         desired_width = desired_height = 400
 
@@ -152,6 +167,31 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(update_image_width, desired_width)
         self.assertEqual(update_image_height, desired_height)
 
+    def test_update_issuer_does_not_clear_badgrDomain(self):
+        badgr_app_two = BadgrApp.objects.create(cors='somethingelse.example.com', name='two')
+        test_user = self.setup_user(authenticate=True)
+        issuer = self.setup_issuer(owner=test_user)
+        issuer.badgrapp = self.badgr_app
+        issuer.save()
+
+        issuer_data = self.client.get('/v2/issuers/{}'.format(issuer.entity_id)).data['result'][0]
+        put_data = {
+            'name': 'Test Issuer Updated',
+            'url': issuer_data['url'],
+            'email': issuer_data['email'],
+            'badgrDomain': issuer_data['badgrDomain']
+        }
+        response = self.client.put('/v2/issuers/{}'.format(issuer.entity_id), put_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            put_data['badgrDomain'], response.data['result'][0]['badgrDomain'], "badgrDomain has not been harmed"
+        )
+        put_data['badgrDomain'] = 'somethingelse.example.com'
+        response = self.client.put('/v2/issuers/{}'.format(issuer.entity_id), put_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            issuer_data['badgrDomain'], response.data['result'][0]['badgrDomain'], "badgrDomain has not been changed"
+        )
 
     def test_can_update_issuer_if_authenticated(self):
         test_user = self.setup_user(authenticate=True)

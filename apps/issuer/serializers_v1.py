@@ -3,7 +3,7 @@ import pytz
 import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.core.validators import EmailValidator, URLValidator
 from django.db.models import Q
 from django.utils.html import strip_tags
@@ -55,7 +55,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     description = StripTagsCharField(max_length=16384, required=False)
     url = serializers.URLField(max_length=1024, required=True)
     staff = IssuerStaffSerializerV1(read_only=True, source='cached_issuerstaff', many=True)
-    badgrapp = serializers.CharField(read_only=True, max_length=255)
+    badgrapp = serializers.CharField(read_only=True, max_length=255, source='cached_badgrapp')
 
     class Meta:
         apispec_definition = ('Issuer', {})

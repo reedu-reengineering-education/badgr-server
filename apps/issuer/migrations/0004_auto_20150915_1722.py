@@ -52,7 +52,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='badgeinstance',
             name='issuer',
-            field=models.ForeignKey(to='issuer.Issuer'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='issuer.Issuer'),
             preserve_default=True,
         ),
         migrations.AlterField(

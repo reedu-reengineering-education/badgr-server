@@ -24,7 +24,7 @@ class Command(BaseCommand):
                 emails = CachedEmailAddress.objects.filter(user=user)
 
                 # handle users who don't have an EmailAddress record
-                if emails.count() < 1:
+                if emails.count() < 1 and user.email:
                     try:
                         existing_email = CachedEmailAddress.objects.get(email=user.email)
                     except CachedEmailAddress.DoesNotExist:

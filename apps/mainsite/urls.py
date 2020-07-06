@@ -1,12 +1,18 @@
 from django.apps import apps
 from django.conf import settings
 from django.conf.urls import include, url
+from django.urls import path
 
 from mainsite.admin import badgr_admin
-from mainsite.oauth2_api import AuthorizationApiView, TokenView, AuthCodeExchange
+from backpack.badge_connect_api import BadgeConnectManifestView, BadgeConnectManifestRedirectView
+from mainsite.oauth2_api import AuthorizationApiView, TokenView, AuthCodeExchange, RegisterApiView
 
 badgr_admin.autodiscover()
 # make sure that any view/model/form imports occur AFTER admin.autodiscover
+
+def django2_include(three_tuple_urlconf):
+    (urls, app_name, namespace) = three_tuple_urlconf
+    return include((urls, app_name), namespace=namespace)
 
 from django.views.generic.base import RedirectView, TemplateView
 from oauth2_provider.urls import base_urlpatterns as oauth2_provider_base_urlpatterns
@@ -31,7 +37,13 @@ urlpatterns = [
     url(r'^o/authorize/?$', AuthorizationApiView.as_view(), name='oauth2_api_authorize'),
     url(r'^o/token/?$', TokenView.as_view(), name='oauth2_provider_token'),
     url(r'^o/code/?$', AuthCodeExchange.as_view(), name='oauth2_code_exchange'),
-    url(r'^o/', include(oauth2_provider_base_urlpatterns, namespace='oauth2_provider')),
+    url(r'^o/register/?$', RegisterApiView.as_view(), name='oauth2_api_register'),
+    path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
+
+    # Badge Connect URLs
+    url(r'^bcv1/manifest/(?P<domain>[^/]+)$', BadgeConnectManifestView.as_view(), name='badge_connect_manifest'),
+    url(r'^\.well-known/badgeconnect.json$', BadgeConnectManifestRedirectView.as_view(), name='default_bc_manifest_redirect'),
+    url(r'^bcv1/', include('backpack.badge_connect_urls'), kwargs={'version': 'bcv1'}),
 
     # Home
     url(r'^$', info_view, name='index'),
@@ -39,7 +51,7 @@ urlpatterns = [
 
     # Admin URLs
     url(r'^staff/sidewide-actions$', SitewideActionFormView.as_view(), name='badgr_admin_sitewide_actions'),
-    url(r'^staff/', include(badgr_admin.urls)),
+    url(r'^staff/', django2_include(badgr_admin.urls)),
 
     # Service health endpoint
     url(r'^health', include('health.urls')),
