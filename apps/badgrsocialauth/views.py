@@ -113,7 +113,7 @@ class BadgrSocialAccountVerifyEmail(RedirectView):
         if verification_email is not None:
             verification_email = urllib.parse.quote(verification_email.encode('utf-8'))
         else:
-            verification_email = ''
+            verification_email = b''
 
         if badgr_app is not None:
             base_64_email = base64.urlsafe_b64encode(verification_email)
