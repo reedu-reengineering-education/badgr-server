@@ -79,7 +79,7 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
             if serializer.data.get('scopes'):
                 scopes = ' '.join(serializer.data.get("scopes"))
             else:
-                scops = serializer.data.get('scope')
+                scopes = serializer.data.get('scope')
             allow = serializer.data.get("allow")
 
             success_url = self.get_authorization_redirect_url(scopes, credentials, allow)
