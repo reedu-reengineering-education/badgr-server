@@ -1,7 +1,9 @@
 # encoding: utf-8
-from __future__ import unicode_literals
-
+import base64
+import hashlib
 import json
+import random
+import string
 from urllib import parse
 
 from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V2_URI, OPENBADGES_CONTEXT_V2_DICT
@@ -42,8 +44,7 @@ class ManifestFileTests(BadgrTestCase):
 
 
 class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
-    @responses.activate
-    def test_can_register_and_auth_badge_connect_app(self):
+    def _perform_registration_and_authentication(self, **kwargs):
         requested_scopes = [
             "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly",
             "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.create",
@@ -68,21 +69,30 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
             "response_types": [
                 "code"
             ],
-            "scope": ' ' .join(requested_scopes)
+            "scope": ' '.join(requested_scopes)
         }
 
         user = self.setup_user(email='test@example.com', authenticate=True)
 
         response = self.client.post('/o/register', registration_data)
         client_id = response.data['client_id']
+        for required_property in ['client_id', 'client_secret', 'client_id_issued_at', 'client_secret_expires_at']:
+            self.assertIn(required_property, response.data)
+
+        # At this point the client would trigger the user's agent to make a GET request to the authorize UI endpooint
+        # which would in turn make sure the user is authenticated and then trigger a post to the API to obtain a
+        # success URL that includes a code. Then the user is redirected to that success URL so the client can continue.
         url = '/o/authorize'
+        verifier = ''.join(random.choices(string.ascii_lowercase + string.digits, k=16))
         data = {
             "allow": True,
             "response_type": "code",
             "client_id": response.data['client_id'],
             "redirect_uri": registration_data['redirect_uris'][0],
             "scopes": requested_scopes,
-            "state": ""
+            "state": "",
+            "code_challenge": base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('='),
+            "code_challenge_method": 'S256'
         }
         response = self.client.post(url, data=data)
         self.assertEqual(response.status_code, 200)
@@ -90,14 +100,23 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         url = parse.urlparse(response.data['success_url'])
         code = parse.parse_qs(url.query)['code'][0]
 
+        # Now the client has retrieved the code and will attempt to exchange it for an access token.
+        if kwargs.get('pkce_fail') is True:
+            verifier = "swisscheese"
+
         data = {
             'grant_type': 'authorization_code',
             'code': code,
             'client_id': client_id,
             'redirect_uri': registration_data['redirect_uris'][0],
             'scope': ' '.join(requested_scopes),
+            'code_verifier': verifier
         }
         response = self.client.post('/o/token', data=data)
+        if kwargs.get('pkce_fail') is True:
+            self.assertEqual(response.status_code, 400)
+            return
+
         self.assertEqual(response.status_code, 200)
 
         self.client.logout()
@@ -166,6 +185,14 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
                 }
             ]
         })
+
+    @responses.activate
+    def test_can_register_and_auth_badge_connect_app(self):
+        self._perform_registration_and_authentication()
+
+    @responses.activate
+    def test_cannot_register_and_auth_badge_connect_app_if_pkce_verification_fails(self):
+        self._perform_registration_and_authentication(pkce_fail=True)
 
     def test_reject_duplicate_redirect_uris(self):
         registration_data = {

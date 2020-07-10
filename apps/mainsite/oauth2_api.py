@@ -37,6 +37,8 @@ class AuthorizationSerializer(serializers.Serializer):
     scopes = serializers.ListField(child=serializers.CharField())
     scope = serializers.CharField(required=False, default=None, allow_null=True)
     allow = serializers.BooleanField(required=True)
+    code_challenge = serializers.CharField(required=False)
+    code_challenge_method = serializers.CharField(required=False)
 
 
 class AuthorizationApiView(OAuthLibMixin, APIView):
@@ -70,6 +72,10 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
                 "response_type": serializer.data.get("response_type", None),
                 "state": serializer.data.get("state", None),
             }
+            if serializer.data.get('code_challenge', False):
+                credentials['code_challenge'] = serializer.data.get('code_challenge')
+                credentials['code_challenge_method'] = serializer.data.get('code_challenge_method', 'S256')
+
             if serializer.data.get('scopes'):
                 scopes = ' '.join(serializer.data.get("scopes"))
             else:
@@ -172,11 +178,12 @@ class RegistrationSerializer(serializers.Serializer):
     response_types = serializers.ListField(child=serializers.CharField(), required=False)
     scope = serializers.CharField(required=False)
 
+
 class RegistrationResponseSerializer(serializers.Serializer):
     client_id = serializers.CharField(source='application.client_id')
     client_secret = serializers.CharField(source='application.client_secret')
     client_id_issued_at = serializers.SerializerMethodField()
-    client_id_expires_at = serializers.IntegerField(default=0)
+    client_secret_expires_at = serializers.IntegerField(default=0)
 
     def get_client_id_issued_at(self, obj):
         return int(obj.application.created.strftime('%s'))
@@ -184,6 +191,7 @@ class RegistrationResponseSerializer(serializers.Serializer):
 
 class RegisterApiView(APIView):
     permission_classes = []
+
     def post(self, request):
         serializer = RegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -193,6 +201,7 @@ class RegisterApiView(APIView):
         # All domains in URIs must be HTTPS and match
         uris = set()
         schemes = set()
+
         def parse_uri(uri):
             parsed = urlparse(uri)
             uris.add(parsed.netloc)
