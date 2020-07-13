@@ -27,6 +27,8 @@ def exception_handler(exc, context):
             description = 'bad request'
             validation_errors = [exc.detail]
 
+            response_code = status.HTTP_400_BAD_REQUEST
+
         elif isinstance(exc, exceptions.ValidationError):
             description = 'bad request'
 
