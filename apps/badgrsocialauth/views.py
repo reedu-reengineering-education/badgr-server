@@ -117,7 +117,9 @@ class BadgrSocialAccountVerifyEmail(RedirectView):
 
         if badgr_app is not None:
             base_64_email = base64.urlsafe_b64encode(verification_email)
-            return urllib.parse.urljoin(badgr_app.ui_signup_success_redirect.rstrip('/') + '/', base_64_email)
+            return urllib.parse.urljoin(
+                badgr_app.ui_signup_success_redirect.rstrip('/') + '/', base_64_email.decode('utf-8')
+            )
 
 
 class BadgrAccountConnected(RedirectView):
