@@ -82,34 +82,25 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             else:
                 more_pages_present = False
 
-    @skip("test does not pass when using FileStorage, but does when using S3BotoStorage, and behavior works as expected in server")
     def test_can_rebake_assertion(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
 
-        import issuer.utils
-
-        # issue badge that gets baked with 1_1, while current version is 2_0
-        issuer.utils.CURRENT_OBI_VERSION = '2_0'
-        issuer.utils.UNVERSIONED_BAKED_VERSION = '1_1'
         test_assertion = test_badgeclass.issue(recipient_id='test1@email.test')
-        v1_data = json.loads(str(unbake(test_assertion.image)))
+        data = str(unbake(test_assertion.image))
 
-        self.assertDictContainsSubset({
-            '@context': 'https://w3id.org/openbadges/v1'
-        }, v1_data)
+        self.assertIn('https://w3id.org/openbadges/v2', data)
 
         original_image_url = test_assertion.image_url()
         test_assertion.rebake()
-        self.assertEqual(original_image_url, test_assertion.image_url())
+        assertion = BadgeInstance.objects.get(entity_id=test_assertion.entity_id)
+        self.assertNotEqual(original_image_url, test_assertion.image_url(),
+                            "To ensure downstream caches don't have the old image saved, a new filename is used")
 
-        v2_datastr = unbake(test_assertion.image)
+        v2_datastr = unbake(assertion.image)
         self.assertTrue(v2_datastr)
-        v2_data = json.loads(v2_datastr)
-        self.assertDictContainsSubset({
-            '@context': 'https://w3id.org/openbadges/v2'
-        }, v2_data)
+        self.assertIn('https://w3id.org/openbadges/v2', v2_datastr)
 
     def test_put_rebakes_assertion(self):
         test_user = self.setup_user(authenticate=True)

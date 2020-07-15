@@ -36,8 +36,8 @@ from mainsite.mixins import ResizeUploadedImage, ScrubUploadedSvgImage
 from mainsite.models import BadgrApp, EmailBlacklist
 from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri
-from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_sha256_hashstring, get_obi_context,
-                    parse_original_datetime, UNVERSIONED_BAKED_VERSION)
+from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_rebaked_filename,
+                    generate_sha256_hashstring, get_obi_context, parse_original_datetime, UNVERSIONED_BAKED_VERSION)
 
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
@@ -902,7 +902,10 @@ class BadgeInstance(BaseAuditedModel,
             assertion_json_string=json_dumps(self.get_json(obi_version=obi_version), indent=2),
             output_file=new_image
         )
-        new_name = default_storage.save(self.image.name, ContentFile(new_image.read()))
+
+        new_filename = generate_rebaked_filename(self.image.name)
+        new_name = default_storage.save(new_filename, ContentFile(new_image.read()))
+        default_storage.delete(self.image.name)
         self.image.name = new_name
         if save:
             self.save()

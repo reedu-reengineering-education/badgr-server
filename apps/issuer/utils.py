@@ -51,6 +51,12 @@ def generate_md5_hashstring(identifier, salt=None):
     return 'md5$' + hashlib.md5(key.encode('utf-8')).hexdigest()
 
 
+def generate_rebaked_filename(oldname):
+    parts = oldname.split('.')
+    ext = parts.pop()
+    parts.append('rebaked')
+    return 'assertion-{}.{}'.format(hashlib.md5(''.join(parts).encode('utf-8')).hexdigest(), ext)
+
 def is_probable_url(string):
     earl = re.compile(r'^https?')
     if string is None:
