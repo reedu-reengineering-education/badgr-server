@@ -111,13 +111,15 @@ class BadgrSocialAccountVerifyEmail(RedirectView):
         verification_email = get_session_verification_email(self.request)
 
         if verification_email is not None:
-            verification_email = urllib.parse.quote(verification_email.encode('utf-8'))
+            verification_email = urllib.parse.quote(verification_email).encode('utf-8')
         else:
             verification_email = b''
 
         if badgr_app is not None:
             base_64_email = base64.urlsafe_b64encode(verification_email)
-            return urllib.parse.urljoin(badgr_app.ui_signup_success_redirect.rstrip('/') + '/', base_64_email)
+            return urllib.parse.urljoin(
+                badgr_app.ui_signup_success_redirect.rstrip('/') + '/', base_64_email.decode('utf-8')
+            )
 
 
 class BadgrAccountConnected(RedirectView):
