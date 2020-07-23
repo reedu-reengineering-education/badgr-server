@@ -25,7 +25,7 @@ class IdTokenProvider(OAuth2Provider):
 
 
     def get_default_scope(self):
-        return ['openid']
+        return ['openid', 'profile', 'email']
 
     def extract_uid(self, data):
         logger.debug('{} | IdTokenProvider:extract_uid().data |  {}'.format(self.id, str(data)))
