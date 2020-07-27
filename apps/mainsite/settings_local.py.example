@@ -1,7 +1,7 @@
 # settings_local.py is for all instance specific settings
 
 import random
-from settings import *
+from .settings import *
 from mainsite import TOP_DIR
 
 DEBUG = True
