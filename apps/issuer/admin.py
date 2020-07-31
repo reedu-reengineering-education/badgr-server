@@ -222,6 +222,10 @@ class BadgeInstanceAdmin(DjangoObjectActions, ModelAdmin):
     redirect_issuer.label = "Issuer"
     redirect_issuer.short_description = "See this Issuer"
 
+    def save_model(self, request, obj, form, change):
+        obj.rebake(save=False)
+        super().save_model(request, obj, form, change)
+
 badgr_admin.register(BadgeInstance, BadgeInstanceAdmin)
 
 
