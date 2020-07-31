@@ -8,7 +8,7 @@ from badgeuser.models import BadgeUser, TermsVersion
 from badgeuser.utils import notify_on_password_change
 from entity.serializers import DetailSerializerV2, BaseSerializerV2, ListSerializerV2
 from mainsite.models import BadgrApp
-from mainsite.serializers import DateTimeWithUtcZAtEndField, StripTagsCharField
+from mainsite.serializers import ApplicationInfoSerializer, DateTimeWithUtcZAtEndField, StripTagsCharField
 from mainsite.validators import PasswordValidator
 
 
@@ -151,14 +151,6 @@ class BadgeUserTokenSerializerV2(BaseSerializerV2):
         # noop
         return instance
 
-
-class ApplicationInfoSerializer(serializers.Serializer):
-    name = serializers.CharField(read_only=True, source='get_visible_name')
-    image = serializers.URLField(read_only=True, source='get_icon_url')
-    website_url = serializers.URLField(read_only=True)
-    clientId = serializers.CharField(read_only=True, source='application.client_id')
-    policyUri = serializers.URLField(read_only=True, source='policy_uri')
-    termsUri = serializers.URLField(read_only=True, source='terms_uri')
 
 class AccessTokenSerializerV2(DetailSerializerV2):
     application = ApplicationInfoSerializer(source='applicationinfo')

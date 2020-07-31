@@ -207,3 +207,23 @@ class CursorPaginatedListSerializer(serializers.ListSerializer):
 class DateTimeWithUtcZAtEndField(serializers.DateTimeField):
     timezone = pytz.utc
 
+
+class ApplicationInfoSerializer(serializers.Serializer):
+    name = serializers.CharField(read_only=True, source='get_visible_name')
+    image = serializers.URLField(read_only=True, source='get_icon_url')
+    website_url = serializers.URLField(read_only=True)
+    clientId = serializers.CharField(read_only=True, source='application.client_id')
+    policyUri = serializers.URLField(read_only=True, source='policy_uri')
+    termsUri = serializers.URLField(read_only=True, source='terms_uri')
+
+
+class AuthorizationSerializer(serializers.Serializer):
+    client_id = serializers.CharField(required=True)
+    redirect_uri = serializers.URLField(required=True)
+    response_type = serializers.CharField(required=False, default=None, allow_null=True)
+    state = serializers.CharField(required=False, default=None, allow_null=True)
+    scopes = serializers.ListField(child=serializers.CharField())
+    scope = serializers.CharField(required=False, default=None, allow_null=True)
+    allow = serializers.BooleanField(required=True)
+    code_challenge = serializers.CharField(required=False)
+    code_challenge_method = serializers.CharField(required=False)
