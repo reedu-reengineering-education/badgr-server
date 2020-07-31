@@ -263,6 +263,11 @@ def assertion_consumer_service(request, idp_name):
         request.POST.get('SAMLResponse'),
         entity.BINDING_HTTP_POST)
 
+    if authn_response is None:
+        raise ValidationError(
+            'SAMLResponse could not be procesed. See previous assertion_consumer_service log for details on POST data'
+        )
+
     authn_response.get_identity()
     if len(set(settings.SAML_EMAIL_KEYS) & set(authn_response.ava.keys())) == 0:
         raise ValidationError('Missing email in SAML assertions, received {}'.format(list(authn_response.ava.keys())))
