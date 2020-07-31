@@ -5,6 +5,8 @@ from django.urls import reverse
 from django.http import HttpResponseRedirect
 
 from django_object_actions import DjangoObjectActions
+from django.utils.safestring import mark_safe
+
 
 from mainsite.admin import badgr_admin
 
@@ -50,7 +52,7 @@ class IssuerAdmin(DjangoObjectActions, ModelAdmin):
 
     def img(self, obj):
         try:
-            return '<img src="{}" width="32"/>'.format(obj.image.url)
+            return mark_safe('<img src="{}" width="32"/>'.format(obj.image.url))
         except ValueError:
             return obj.image
     img.short_description = 'Image'
