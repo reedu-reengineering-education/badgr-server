@@ -114,7 +114,8 @@ RefreshToken = get_refresh_token_model()
 class ApplicationInfoInline(StackedInline):
     model = ApplicationInfo
     extra = 1
-    fields = ('name', 'icon', 'website_url', 'allowed_scopes', 'trust_email_verification', 'default_launch_url',)
+    fields = ('name', 'icon', 'website_url', 'terms_uri', 'policy_uri', 'software_id', 'software_version',
+              'allowed_scopes', 'trust_email_verification', 'default_launch_url', 'issue_refresh_token',)
     readonly_fields = ('default_launch_url',)
 
 
