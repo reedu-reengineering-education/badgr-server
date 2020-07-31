@@ -116,12 +116,12 @@ class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
     change_actions = ['redirect_issuer', 'redirect_instances', 'redirect_pathwaybadges']
 
     def badge_image(self, obj):
-        return '<img src="{}" width="32"/>'.format(obj.image.url) if obj.image else ''
+        return mark_safe('<img src="{}" width="32"/>'.format(obj.image.url)) if obj.image else ''
     badge_image.short_description = 'Badge'
     badge_image.allow_tags = True
 
     def issuer_link(self, obj):
-        return '<a href="{}">{}</a>'.format(reverse("admin:issuer_issuer_change", args=(obj.issuer.id,)), obj.issuer.name)
+        return mark_safe('<a href="{}">{}</a>'.format(reverse("admin:issuer_issuer_change", args=(obj.issuer.id,)), obj.issuer.name))
     issuer_link.allow_tags=True
 
     def redirect_instances(self, request, obj):
@@ -199,7 +199,7 @@ class BadgeInstanceAdmin(DjangoObjectActions, ModelAdmin):
 
     def badge_image(self, obj):
         try:
-            return '<img src="{}" width="32"/>'.format(obj.image.url)
+            return mark_safe('<img src="{}" width="32"/>'.format(obj.image.url))
         except ValueError:
             return obj.image
     badge_image.short_description = 'Badge'
