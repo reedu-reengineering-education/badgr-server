@@ -663,3 +663,26 @@ class ApprovedIssuersOnlyTests(SetupIssuerHelper, BadgrTestCase):
 
         response = self.client.post('/v2/issuers', self.example_issuer_props)
         self.assertEqual(response.status_code, 201)
+
+
+class UserDeletionTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase):
+    example_issuer_props = {
+        'name': 'Awesome Issuer',
+        'description': 'An issuer of awe-inspiring credentials',
+        'url': 'http://example.com',
+        'email': 'contact@example.org'
+    }
+
+    def setUp(self):
+        cache.clear()
+        super(UserDeletionTests, self).setUp()
+
+    def test_created_issuer_not_deleted_on_user_delete(self):
+        test_user = self.setup_user('first@example.com')
+        second_user = self.setup_user(email='second@example.com')
+        issuer = self.setup_issuer(owner=test_user)
+        entity_id = issuer.entity_id
+        IssuerStaff.objects.create(issuer=issuer, user=second_user, role=IssuerStaff.ROLE_OWNER)
+        IssuerStaff.objects.filter(issuer=issuer).first().delete()
+        test_user.delete()
+        self.assertTrue(Issuer.objects.filter(entity_id=entity_id).exists())
