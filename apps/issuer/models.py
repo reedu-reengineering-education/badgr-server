@@ -473,6 +473,13 @@ class BadgeClass(ResizeUploadedImage,
     class Meta:
         verbose_name_plural = "Badge classes"
 
+    def __init__(self, *args, **kwargs):
+        super(BadgeClass, self).__init__(*args, **kwargs)
+        if self.id is not None:
+            self.__original_image_name = self.image.name
+        else:
+            self.__original_image_name = None
+
     def publish(self):
         fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
         self._state.fields_cache = dict()
@@ -498,6 +505,16 @@ class BadgeClass(ResizeUploadedImage,
         issuer = self.issuer
         super(BadgeClass, self).delete(*args, **kwargs)
         issuer.publish(publish_staff=False)
+
+    def save(self, force_resize=False, *args, **kwargs):
+        super(BadgeClass, self).save(force_resize, *args, **kwargs)
+        if self.__original_image_name != self.image.name:
+            if self.__original_image_name is not None:
+                logger.logger.info("Rebaking assertions for badge {}".format(self.entity_id))
+                from issuer.tasks import rebake_all_assertions_for_badge_class
+                batch_size = getattr(settings, 'BADGE_ASSERTION_AUTO_REBAKE_BATCH_SIZE', 1000)
+                rebake_all_assertions_for_badge_class.delay(self, limit=batch_size, replay=True)
+            self.__original_image_name = self.image.name
 
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
