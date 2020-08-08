@@ -22,7 +22,7 @@ from rest_framework.authtoken.models import Token
 from backpack.models import BackpackCollection
 from badgeuser.tasks import process_post_recipient_id_deletion, process_post_recipient_id_verification_change
 from entity.models import BaseVersionedEntity
-from issuer.models import Issuer, BadgeInstance, BaseAuditedModel
+from issuer.models import Issuer, BadgeInstance, BaseAuditedModel, BaseAuditedModelDeletedWithUser
 from badgeuser.managers import CachedEmailAddressManager, BadgeUserManager
 from badgeuser.utils import generate_badgr_username
 from mainsite.models import ApplicationInfo
@@ -546,7 +546,7 @@ class TermsVersion(IsActive, BaseAuditedModel, cachemodel.CacheModel):
         TermsVersion.cached.publish_latest()
 
 
-class TermsAgreement(BaseAuditedModel, cachemodel.CacheModel):
+class TermsAgreement(BaseAuditedModelDeletedWithUser, cachemodel.CacheModel):
     user = models.ForeignKey('badgeuser.BadgeUser',
                              on_delete=models.CASCADE)
     terms_version = models.PositiveIntegerField()

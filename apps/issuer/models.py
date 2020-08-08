@@ -52,6 +52,23 @@ logger = badgrlog.BadgrLogger()
 class BaseAuditedModel(cachemodel.CacheModel):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+",
+                                   on_delete=models.SET_NULL)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    updated_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+",
+                                   on_delete=models.SET_NULL)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def cached_creator(self):
+        from badgeuser.models import BadgeUser
+        return BadgeUser.cached.get(id=self.created_by_id)
+
+
+class BaseAuditedModelDeletedWithUser(cachemodel.CacheModel):
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+",
                                    on_delete=models.CASCADE)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
     updated_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+",
