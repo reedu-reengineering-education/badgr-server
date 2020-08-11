@@ -196,14 +196,16 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
 
         # v1 api
         original_image_url_v1 = test_assertion_v1.image_url()
-        response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
-            issuer=test_assertion_v1.cached_issuer.entity_id,
-            badge=test_assertion_v1.cached_badgeclass.entity_id,
-        ), dict(
-            name="some name update",
-            description="some description",
-            criteria_text="some criteria"
-        ))
+        with open(self.get_test_image_path(), 'rb') as image:
+            response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_assertion_v1.cached_issuer.entity_id,
+                badge=test_assertion_v1.cached_badgeclass.entity_id,
+            ), dict(
+                name="some name update",
+                description="some description",
+                criteria_text="some criteria",
+                image=image
+            ))
         self.assertEqual(response.status_code, 200)
         sleep(2)
         updated_assertion_v1 = BadgeInstance.objects.get(entity_id=test_assertion_v1.entity_id)
@@ -211,12 +213,14 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
 
         # v2 api
         original_image_url_v2 = test_assertion_v2.image_url()
-        response = self.client.put('/v2/badgeclasses/{badge}'.format(
-            badge=test_assertion_v2.cached_badgeclass.entity_id
-        ), dict(
-            name="some name update 2",
-            description="some description 2"
-        ))
+        with open(self.get_test_image_path(), 'rb') as image:
+            response = self.client.put('/v2/badgeclasses/{badge}'.format(
+                badge=test_assertion_v2.cached_badgeclass.entity_id
+            ), dict(
+                name="some name update 2",
+                description="some description 2",
+                image=image
+            ))
         self.assertEqual(response.status_code, 200)
         sleep(2)
         updated_assertion_v2 = BadgeInstance.objects.get(entity_id=test_assertion_v2.entity_id)
