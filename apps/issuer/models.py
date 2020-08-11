@@ -524,14 +524,17 @@ class BadgeClass(ResizeUploadedImage,
     @property
     def _hash_for_image(self):
         # from https://nitratine.net/blog/post/how-to-hash-files-in-python/
-        block_size = 65536
-        file_hash = sha256()
-        with default_storage.open(self.image.name, 'rb') as image_data:
-            file_buffer = image_data.read(block_size)
-            while len(file_buffer) > 0:
-                file_hash.update(file_buffer)
+        try:
+            block_size = 65536
+            file_hash = sha256()
+            with default_storage.open(self.image.name, 'rb') as image_data:
                 file_buffer = image_data.read(block_size)
-            return file_hash.hexdigest()
+                while len(file_buffer) > 0:
+                    file_hash.update(file_buffer)
+                    file_buffer = image_data.read(block_size)
+                return file_hash.hexdigest()
+        except:
+            return None
 
     @property
     def public_url(self):
