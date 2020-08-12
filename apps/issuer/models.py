@@ -8,6 +8,7 @@ import dateutil
 import re
 import uuid
 from collections import OrderedDict
+from hashlib import sha256
 from itertools import chain
 
 import cachemodel
@@ -490,6 +491,13 @@ class BadgeClass(ResizeUploadedImage,
     class Meta:
         verbose_name_plural = "Badge classes"
 
+    def __init__(self, *args, **kwargs):
+        super(BadgeClass, self).__init__(*args, **kwargs)
+        if self.id is not None:
+            self.__original_image_hash = self._hash_for_image
+        else:
+            self.__original_image_hash = None
+
     def publish(self):
         fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
         self._state.fields_cache = dict()
@@ -516,8 +524,34 @@ class BadgeClass(ResizeUploadedImage,
         super(BadgeClass, self).delete(*args, **kwargs)
         issuer.publish(publish_staff=False)
 
+    def save(self, force_resize=False, *args, **kwargs):
+        super(BadgeClass, self).save(force_resize, *args, **kwargs)
+        updated_image_hash = self._hash_for_image #assign local cause we need this twice
+        if self.__original_image_hash != updated_image_hash:
+            if self.__original_image_hash is not None:
+                logger.logger.info("Rebaking assertions for badge {}".format(self.entity_id))
+                from issuer.tasks import rebake_all_assertions_for_badge_class
+                batch_size = getattr(settings, 'BADGE_ASSERTION_AUTO_REBAKE_BATCH_SIZE', 1000)
+                rebake_all_assertions_for_badge_class.delay(self, limit=batch_size, replay=True)
+            self.__original_image_hash = updated_image_hash
+
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
+
+    @property
+    def _hash_for_image(self):
+        # from https://nitratine.net/blog/post/how-to-hash-files-in-python/
+        try:
+            block_size = 65536
+            file_hash = sha256()
+            with default_storage.open(self.image.name, 'rb') as image_data:
+                file_buffer = image_data.read(block_size)
+                while len(file_buffer) > 0:
+                    file_hash.update(file_buffer)
+                    file_buffer = image_data.read(block_size)
+                return file_hash.hexdigest()
+        except:
+            return None
 
     @property
     def public_url(self):

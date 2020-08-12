@@ -77,6 +77,30 @@ def rebake_all_assertions(self, obi_version=CURRENT_OBI_VERSION, limit=None, off
         'message': "Enqueued {} assertions for rebaking".format(count)
     }
 
+@app.task(bind=True, queue=background_task_queue_name)
+def rebake_all_assertions_for_badge_class(self, badge_class, obi_version=CURRENT_OBI_VERSION, limit=None, offset=0, replay=False):
+    queryset = BadgeInstance.objects.filter(badgeclass=badge_class, source_url__isnull=True).order_by("pk")
+    if limit:
+        queryset = queryset[offset:offset+limit]
+    else:
+        queryset = queryset[offset:]
+    assertions = queryset.only("entity_id")
+
+    count = 0
+    for assertion in assertions:
+        rebake_assertion_image.delay(assertion_entity_id=assertion.entity_id, obi_version=obi_version)
+        count += 1
+
+    if limit and replay and count >= limit:
+        rebake_all_assertions_for_badge_class.delay(badge_class, obi_version=obi_version, limit=limit, offset=offset+limit, replay=True)
+
+    return {
+        'success': True,
+        'count': count,
+        'limit': limit,
+        'offset': offset,
+        'message': "Enqueued {} assertions for rebaking".format(count)
+    }
 
 @app.task(bind=True, queue=background_task_queue_name)
 def rebake_assertion_image(self, assertion_entity_id=None, obi_version=CURRENT_OBI_VERSION):
