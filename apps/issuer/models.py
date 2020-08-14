@@ -524,10 +524,10 @@ class BadgeClass(ResizeUploadedImage,
         super(BadgeClass, self).delete(*args, **kwargs)
         issuer.publish(publish_staff=False)
 
-    def save(self, force_resize=False, *args, **kwargs):
-        super(BadgeClass, self).save(force_resize, *args, **kwargs)
-        from issuer.tasks import evaluate_badgeclass_image_update
-        evaluate_badgeclass_image_update.delay(self)
+    # def save(self, force_resize=False, *args, **kwargs):
+    #     super(BadgeClass, self).save(force_resize, *args, **kwargs)
+    #     from issuer.tasks import evaluate_badgeclass_image_update
+    #     evaluate_badgeclass_image_update.delay(self)
 
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
