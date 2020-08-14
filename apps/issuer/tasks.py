@@ -55,7 +55,7 @@ def notify_badgerank_of_badgeclass(self, badgeclass_pk):
 @app.task(bind=True, queue=background_task_queue_name)
 def evaluate_badgeclass_image_update(self, badge_class_instance):
     rebake = False
-    updated_image_hash = badge_class_instance.hash_for_image #assign local cause we need this twice
+    updated_image_hash = badge_class_instance.hash_for_image() #assign local cause we need this twice
     if badge_class_instance.original_image_hash != updated_image_hash:
         if badge_class_instance.original_image_hash is not None:
             rebake = True

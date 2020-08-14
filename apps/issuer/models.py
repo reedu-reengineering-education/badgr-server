@@ -494,7 +494,7 @@ class BadgeClass(ResizeUploadedImage,
     def __init__(self, *args, **kwargs):
         super(BadgeClass, self).__init__(*args, **kwargs)
         if self.id is not None:
-            self.original_image_hash = self.hash_for_image
+            self.original_image_hash = self.hash_for_image()
         else:
             self.original_image_hash = None
 
@@ -532,7 +532,6 @@ class BadgeClass(ResizeUploadedImage,
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
 
-    @property
     def hash_for_image(self):
         # from https://nitratine.net/blog/post/how-to-hash-files-in-python/
         try:
