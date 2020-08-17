@@ -77,7 +77,7 @@ def email_unsubscribe(request, *args, **kwargs):
             request, 'Your unsubscription link has expired.', error=True)
 
     try:
-        email = base64.b64decode(kwargs['email_encoded'])
+        email = base64.b64decode(kwargs['email_encoded']).decode("utf-8")
     except TypeError:
         logger.event(badgrlog.BlacklistUnsubscribeInvalidLinkEvent(kwargs['email_encoded']))
         return email_unsubscribe_response(request, 'Invalid unsubscribe link.',
