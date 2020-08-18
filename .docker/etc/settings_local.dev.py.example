@@ -73,9 +73,14 @@ CELERY_ALWAYS_EAGER = True
 # Application Options Configuration
 #
 ###
-HTTP_ORIGIN = 'http://localhost:8080'
+HTTP_ORIGIN = 'http://localhost:8000'
 ALLOWED_HOSTS = ['*']
 STATIC_URL = HTTP_ORIGIN + '/static/'
+
+CORS_ORIGIN_ALLOW_ALL = False
+CORS_ORIGIN_WHITELIST = (
+    'http://localhost:4200',
+)
 
 # Optionally restrict issuer creation to accounts that have the 'issuer.add_issuer' permission
 BADGR_APPROVED_ISSUERS_ONLY = False
