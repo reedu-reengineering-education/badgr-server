@@ -182,7 +182,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             sleep(2)
             updated_assertion_v2 = BadgeInstance.objects.get(entity_id=test_assertion_v2.entity_id)
             self.assertNotEqual(updated_assertion_v2.image_url(), original_image_url_v2)
-            #test batching works in task
+            #  test batching works in task
             updated_assertion_v2_2 = BadgeInstance.objects.get(entity_id=test_assertion_v2_2.entity_id)
             self.assertNotEqual(updated_assertion_v2_2.image_url(), original_image_url_v2_2)
 
