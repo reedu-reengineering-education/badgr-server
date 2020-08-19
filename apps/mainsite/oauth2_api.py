@@ -24,21 +24,10 @@ from badgeuser.authcode import accesstoken_for_authcode
 from backpack.badge_connect_api import BADGE_CONNECT_SCOPES
 from mainsite.models import ApplicationInfo
 from mainsite.oauth_validator import BadgrRequestValidator, BadgrOauthServer
+from mainsite.serializers import ApplicationInfoSerializer, AuthorizationSerializer
 from mainsite.utils import client_ip_from_request, throttleable
 
 badgrlogger = badgrlog.BadgrLogger()
-
-
-class AuthorizationSerializer(serializers.Serializer):
-    client_id = serializers.CharField(required=True)
-    redirect_uri = serializers.URLField(required=True)
-    response_type = serializers.CharField(required=False, default=None, allow_null=True)
-    state = serializers.CharField(required=False, default=None, allow_null=True)
-    scopes = serializers.ListField(child=serializers.CharField())
-    scope = serializers.CharField(required=False, default=None, allow_null=True)
-    allow = serializers.BooleanField(required=True)
-    code_challenge = serializers.CharField(required=False)
-    code_challenge_method = serializers.CharField(required=False)
 
 
 class AuthorizationApiView(OAuthLibMixin, APIView):
@@ -109,19 +98,13 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
             kwargs["response_type"] = credentials["response_type"]
             kwargs["state"] = credentials["state"]
             try:
-                kwargs["application"] = {
-                    "name": application.applicationinfo.get_visible_name(),
-                }
-                if application.applicationinfo.icon:
-                    kwargs["application"]['image'] = application.applicationinfo.icon.url
-                if application.applicationinfo.website_url:
-                    kwargs["application"]["url"] = application.applicationinfo.website_url
+                application_info = ApplicationInfoSerializer(application.applicationinfo)
+                kwargs["application"] = application_info.data
                 app_scopes = [s for s in re.split(r'[\s\n]+', application.applicationinfo.allowed_scopes) if s]
             except ApplicationInfo.DoesNotExist:
                 app_scopes = ["r:profile"]
                 kwargs["application"] = dict(
-                    name=application.name,
-                    scopes=app_scopes
+                    name=application.name
                 )
 
             filtered_scopes = set(app_scopes) & set(scopes)

@@ -2,6 +2,8 @@
 
 
 import datetime
+from time import sleep
+
 import dateutil.parser
 import json
 from mock import patch
@@ -25,6 +27,7 @@ from mainsite.utils import OriginSetting
 from rest_framework import serializers
 
 
+@override_settings(BADGE_ASSERTION_AUTO_REBAKE_BATCH_SIZE=1)
 class AssertionTests(SetupIssuerHelper, BadgrTestCase):
     def test_local_pending(self):
         test_user = self.setup_user(authenticate=True)
@@ -137,6 +140,91 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         updated_assertion = BadgeInstance.objects.get(entity_id=test_assertion.entity_id)
         updated_obo = json.loads(str(unbake(updated_assertion.image)))
         self.assertEqual(updated_obo.get('issuedOn', None), updated_data.get('issuedOn'))
+
+    def test_updating_badgeclass_image_rebakes_assertions(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass_v1 = self.setup_badgeclass(name="for v1 test", issuer=test_issuer)
+        test_badgeclass_v2 = self.setup_badgeclass(name="for v2 test", issuer=test_issuer)
+        test_assertion_v1 = test_badgeclass_v1.issue(recipient_id='test1@email.test')
+        test_assertion_v2 = test_badgeclass_v2.issue(recipient_id='test2@email.test')
+        test_assertion_v2_2 = test_badgeclass_v2.issue(recipient_id='test3@email.test')
+
+        with open(self.get_test_svg_image_path(), 'rb') as image_update:
+            # v1 api
+            original_image_url_v1 = test_assertion_v1.image_url()
+            response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badgeclass}'.format(
+                issuer=test_assertion_v1.cached_issuer.entity_id,
+                badgeclass=test_assertion_v1.cached_badgeclass.entity_id,
+            ), dict(
+                image=image_update,
+                name=test_badgeclass_v1.name,
+                description=test_badgeclass_v1.description,
+                criteria_text="some criteria"
+            ))
+            self.assertEqual(response.status_code, 200)
+            sleep(2)
+            updated_assertion_v1 = BadgeInstance.objects.get(entity_id=test_assertion_v1.entity_id)
+            self.assertNotEqual(updated_assertion_v1.image_url(), original_image_url_v1)
+
+        with open(self.get_test_svg_image_path(), 'rb') as image_update:
+            # v2 api
+            original_image_url_v2 = test_assertion_v2.image_url()
+            original_image_url_v2_2 = test_assertion_v2_2.image_url()
+            response = self.client.put('/v2/badgeclasses/{badge}'.format(
+                badge=test_assertion_v2.cached_badgeclass.entity_id
+            ), dict(
+                name=test_badgeclass_v2.name,
+                description=test_badgeclass_v2.description,
+                image=image_update
+            ))
+            self.assertEqual(response.status_code, 200)
+            sleep(2)
+            updated_assertion_v2 = BadgeInstance.objects.get(entity_id=test_assertion_v2.entity_id)
+            self.assertNotEqual(updated_assertion_v2.image_url(), original_image_url_v2)
+            #test batching works in task
+            updated_assertion_v2_2 = BadgeInstance.objects.get(entity_id=test_assertion_v2_2.entity_id)
+            self.assertNotEqual(updated_assertion_v2_2.image_url(), original_image_url_v2_2)
+
+    def test_updating_badgeclass_non_image_does_not_rebake_assertions(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass_v1 = self.setup_badgeclass(name="for v1 test", issuer=test_issuer)
+        test_badgeclass_v2 = self.setup_badgeclass(name="for v2 test", issuer=test_issuer)
+        test_assertion_v1 = test_badgeclass_v1.issue(recipient_id='test1@email.test')
+        test_assertion_v2 = test_badgeclass_v2.issue(recipient_id='test2@email.test')
+
+        # v1 api
+        original_image_url_v1 = test_assertion_v1.image_url()
+        with open(self.get_test_image_path(), 'rb') as image:
+            response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_assertion_v1.cached_issuer.entity_id,
+                badge=test_assertion_v1.cached_badgeclass.entity_id,
+            ), dict(
+                name="some name update",
+                description="some description",
+                criteria_text="some criteria",
+                image=image
+            ))
+        self.assertEqual(response.status_code, 200)
+        sleep(2)
+        updated_assertion_v1 = BadgeInstance.objects.get(entity_id=test_assertion_v1.entity_id)
+        self.assertEqual(updated_assertion_v1.image_url(), original_image_url_v1)
+
+        # v2 api
+        original_image_url_v2 = test_assertion_v2.image_url()
+        with open(self.get_test_image_path(), 'rb') as image:
+            response = self.client.put('/v2/badgeclasses/{badge}'.format(
+                badge=test_assertion_v2.cached_badgeclass.entity_id
+            ), dict(
+                name="some name update 2",
+                description="some description 2",
+                image=image
+            ))
+        self.assertEqual(response.status_code, 200)
+        sleep(2)
+        updated_assertion_v2 = BadgeInstance.objects.get(entity_id=test_assertion_v2.entity_id)
+        self.assertEqual(updated_assertion_v2.image_url(), original_image_url_v2)
 
     def test_can_update_assertion(self):
         test_user = self.setup_user(authenticate=True)

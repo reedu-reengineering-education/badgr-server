@@ -252,16 +252,35 @@ def saml2_render_or_redirect(request, idp_name):
 @csrf_exempt
 def assertion_consumer_service(request, idp_name):
     saml_client, config = saml2_client_for(idp_name)
+    saml_response = request.POST.get('SAMLResponse')
+    badgr_app = BadgrApp.objects.get_current(request=request)
+
+    if saml_response is None:
+        logger.error(
+            'assertion_consumer_service: No SAMLResponse was sent to the system by the identity provider.'
+        )
+        return redirect(
+            set_url_query_params(badgr_app.ui_signup_failure_redirect,
+                                 **dict(authError="No SAMLResponse was sent to the system by the identity provider"))
+        )
 
     saml_info = "assertion_consumer_service: saml_client entityid:{}, reponse: {}".format(
         saml_client.config.entityid,
-        request.POST.get('SAMLResponse')
+        saml_response
     )
     logger.info(saml_info)
 
     authn_response = saml_client.parse_authn_request_response(
-        request.POST.get('SAMLResponse'),
+        saml_response,
         entity.BINDING_HTTP_POST)
+
+    if authn_response is None:
+        logger.error(
+            'assertion_consumer_service: SAMLResponse processing failed, resulting in no parsed data.'
+        )
+        return redirect(
+            set_url_query_params(badgr_app.ui_signup_failure_redirect, **dict(authError="Could not process SAMLResponse"))
+        )
 
     authn_response.get_identity()
     if len(set(settings.SAML_EMAIL_KEYS) & set(authn_response.ava.keys())) == 0:
@@ -273,7 +292,6 @@ def assertion_consumer_service(request, idp_name):
     email = [authn_response.ava[key][0] for key in settings.SAML_EMAIL_KEYS if key in authn_response.ava][0]
     first_name = [authn_response.ava[key][0] for key in settings.SAML_FIRST_NAME_KEYS if key in authn_response.ava][0]
     last_name = [authn_response.ava[key][0] for key in settings.SAML_LAST_NAME_KEYS if key in authn_response.ava][0]
-    badgr_app = BadgrApp.objects.get_current(request=request)
     return auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name)
 
 

@@ -29,7 +29,7 @@ from mainsite import TOP_DIR, blacklist
 from mainsite.serializers import DateTimeWithUtcZAtEndField
 from mainsite.tests import SetupIssuerHelper
 from mainsite.tests.base import BadgrTestCase
-from mainsite.utils import fetch_remote_file_to_storage
+from mainsite.utils import fetch_remote_file_to_storage, verify_svg
 
 
 class TestDateSerialization(BadgrTestCase):
@@ -120,6 +120,12 @@ class TestCacheSettings(TransactionTestCase):
                 retrieved = cache.get(long_key_string)
 
                 self.assertEqual(retrieved, "hello cached world")
+
+
+class TestUtils(BadgrTestCase, SetupIssuerHelper):
+    def test_svg_verify(self):
+        with open(self.get_test_svg_image_path(), 'rb') as svg_badge_image:
+            self.assertTrue(verify_svg(svg_badge_image))
 
 
 @override_settings(

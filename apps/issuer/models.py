@@ -8,6 +8,7 @@ import dateutil
 import re
 import uuid
 from collections import OrderedDict
+from hashlib import sha256
 from itertools import chain
 
 import cachemodel
@@ -50,6 +51,23 @@ logger = badgrlog.BadgrLogger()
 
 
 class BaseAuditedModel(cachemodel.CacheModel):
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+",
+                                   on_delete=models.SET_NULL)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    updated_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+",
+                                   on_delete=models.SET_NULL)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def cached_creator(self):
+        from badgeuser.models import BadgeUser
+        return BadgeUser.cached.get(id=self.created_by_id)
+
+
+class BaseAuditedModelDeletedWithUser(cachemodel.CacheModel):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, related_name="+",
                                    on_delete=models.CASCADE)
@@ -473,6 +491,13 @@ class BadgeClass(ResizeUploadedImage,
     class Meta:
         verbose_name_plural = "Badge classes"
 
+    def __init__(self, *args, **kwargs):
+        super(BadgeClass, self).__init__(*args, **kwargs)
+        if self.id is not None:
+            self.original_image_hash = self.hash_for_image()
+        else:
+            self.original_image_hash = None
+
     def publish(self):
         fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
         self._state.fields_cache = dict()
@@ -499,8 +524,27 @@ class BadgeClass(ResizeUploadedImage,
         super(BadgeClass, self).delete(*args, **kwargs)
         issuer.publish(publish_staff=False)
 
+    # def save(self, force_resize=False, *args, **kwargs):
+    #     super(BadgeClass, self).save(force_resize, *args, **kwargs)
+    #     from issuer.tasks import evaluate_badgeclass_image_update
+    #     evaluate_badgeclass_image_update.delay(self)
+
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
+
+    def hash_for_image(self):
+        # from https://nitratine.net/blog/post/how-to-hash-files-in-python/
+        try:
+            block_size = 65536
+            file_hash = sha256()
+            with default_storage.open(self.image.name, 'rb') as image_data:
+                file_buffer = image_data.read(block_size)
+                while len(file_buffer) > 0:
+                    file_hash.update(file_buffer)
+                    file_buffer = image_data.read(block_size)
+                return file_hash.hexdigest()
+        except:
+            return None
 
     @property
     def public_url(self):

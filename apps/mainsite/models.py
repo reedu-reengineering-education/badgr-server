@@ -40,8 +40,8 @@ class EmailBlacklist(models.Model):
         expiration = datetime.utcnow() + timedelta(days=7)  # In one week.
         timestamp = int((expiration - datetime(1970, 1, 1)).total_seconds())
 
-        email_encoded = base64.b64encode(email.encode('utf-8'))
-        hashed = hmac.new(secret_key.encode('utf-8'), email_encoded + str(timestamp).encode('utf-8'), sha1)
+        email_encoded = base64.b64encode(email.encode('utf-8')).decode("utf-8")
+        hashed = hmac.new(secret_key.encode('utf-8'), (email_encoded + str(timestamp)).encode('utf-8'), sha1)
 
         if badgrapp_pk is None:
             badgrapp_pk = BadgrApp.objects.get_by_id_or_default().pk
@@ -54,9 +54,10 @@ class EmailBlacklist(models.Model):
 
     @staticmethod
     def verify_email_signature(email_encoded, expiration, signature):
-        secret_key = settings.UNSUBSCRIBE_SECRET_KEY
+        secret_key = bytes(settings.UNSUBSCRIBE_SECRET_KEY, 'utf-8')
+        b_email_encoded_and_expired = bytes(email_encoded + expiration, 'utf-8')
 
-        hashed = hmac.new(secret_key, email_encoded + expiration, sha1)
+        hashed = hmac.new(secret_key, b_email_encoded_and_expired, sha1)
         return hmac.compare_digest(hashed.hexdigest(), str(signature))
 
 
