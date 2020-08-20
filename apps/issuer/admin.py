@@ -7,8 +7,8 @@ from django.http import HttpResponseRedirect
 from django_object_actions import DjangoObjectActions
 from django.utils.safestring import mark_safe
 
-
 from mainsite.admin import badgr_admin
+from mainsite.mixins import ResizeUploadedImage
 
 from .models import Issuer, BadgeClass, BadgeInstance, BadgeInstanceEvidence, BadgeClassAlignment, BadgeClassTag, \
     BadgeClassExtension, IssuerExtension, BadgeInstanceExtension
@@ -26,7 +26,8 @@ class IssuerExtensionInline(TabularInline):
     fields = ('name', 'original_json')
 
 
-class IssuerAdmin(DjangoObjectActions, ModelAdmin):
+class IssuerAdmin(ResizeUploadedImage, DjangoObjectActions, ModelAdmin):
+    image = None
     readonly_fields = ('created_by', 'created_at', 'updated_at', 'old_json', 'source', 'source_url', 'entity_id', 'slug')
     list_display = ('img', 'name', 'entity_id', 'created_by', 'created_at')
     list_display_links = ('img', 'name')
@@ -49,6 +50,13 @@ class IssuerAdmin(DjangoObjectActions, ModelAdmin):
         IssuerExtensionInline
     ]
     change_actions = ['redirect_badgeclasses']
+
+    def save_model(self, request, obj, form, change):
+        force_resize = False
+        if 'image' in form.changed_data:
+            self.image = form.files['image']
+            force_resize = True
+        obj.save(force_resize=force_resize)
 
     def img(self, obj):
         try:
@@ -86,7 +94,8 @@ class BadgeClassExtensionInline(TabularInline):
     fields = ('name', 'original_json')
 
 
-class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
+class BadgeClassAdmin(ResizeUploadedImage, DjangoObjectActions, ModelAdmin):
+    image = None
     readonly_fields = ('created_by', 'created_at', 'updated_at', 'old_json', 'source', 'source_url', 'entity_id', 'slug')
     list_display = ('badge_image', 'name', 'entity_id', 'issuer_link', 'recipient_count')
     list_display_links = ('badge_image', 'name',)
@@ -114,6 +123,13 @@ class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
         BadgeClassExtensionInline,
     ]
     change_actions = ['redirect_issuer', 'redirect_instances', 'redirect_pathwaybadges']
+
+    def save_model(self, request, obj, form, change):
+        force_resize = False
+        if 'image' in form.changed_data:
+            self.image = form.files['image']
+            force_resize = True
+        obj.save(force_resize=force_resize)
 
     def badge_image(self, obj):
         return mark_safe('<img src="{}" width="32"/>'.format(obj.image.url)) if obj.image else ''
