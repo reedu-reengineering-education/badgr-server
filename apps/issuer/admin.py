@@ -26,7 +26,7 @@ class IssuerExtensionInline(TabularInline):
     fields = ('name', 'original_json')
 
 
-class IssuerAdmin(ResizeUploadedImage, DjangoObjectActions, ModelAdmin):
+class IssuerAdmin(DjangoObjectActions, ModelAdmin):
     image = None
     readonly_fields = ('created_by', 'created_at', 'updated_at', 'old_json', 'source', 'source_url', 'entity_id', 'slug')
     list_display = ('img', 'name', 'entity_id', 'created_by', 'created_at')
@@ -54,7 +54,7 @@ class IssuerAdmin(ResizeUploadedImage, DjangoObjectActions, ModelAdmin):
     def save_model(self, request, obj, form, change):
         force_resize = False
         if 'image' in form.changed_data:
-            self.image = form.files['image']
+            self.image = obj.image
             force_resize = True
         obj.save(force_resize=force_resize)
 
@@ -94,7 +94,7 @@ class BadgeClassExtensionInline(TabularInline):
     fields = ('name', 'original_json')
 
 
-class BadgeClassAdmin(ResizeUploadedImage, DjangoObjectActions, ModelAdmin):
+class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
     image = None
     readonly_fields = ('created_by', 'created_at', 'updated_at', 'old_json', 'source', 'source_url', 'entity_id', 'slug')
     list_display = ('badge_image', 'name', 'entity_id', 'issuer_link', 'recipient_count')
@@ -127,7 +127,7 @@ class BadgeClassAdmin(ResizeUploadedImage, DjangoObjectActions, ModelAdmin):
     def save_model(self, request, obj, form, change):
         force_resize = False
         if 'image' in form.changed_data:
-            self.image = form.files['image']
+            self.image = obj.image
             force_resize = True
         obj.save(force_resize=force_resize)
 
