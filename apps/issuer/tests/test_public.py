@@ -164,10 +164,10 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
             with self.assertNumQueries(0):
                 response = self.client.get(test_collection.share_url, **headers)
                 self.assertEqual(response.status_code, 200)
-                self.assertNotContains(response, '<meta property="og:image" content="">', html=True)
-                self.assertNotContains(response, '<meta property="og:image:secure_url" content="">', html=True)
-                self.assertNotContains(response, '<meta property="og:image:width" content="">', html=True)
-                self.assertNotContains(response, '<meta property="og:image:height" content="">', html=True)
+                self.assertNotContains(response, '<meta property="og:image"', html=True)
+                self.assertNotContains(response, '<meta property="og:image:secure_url"', html=True)
+                self.assertNotContains(response, '<meta property="og:image:width"', html=True)
+                self.assertNotContains(response, '<meta property="og:image:height"', html=True)
                 self.assertNotContains(response, '<img src="">', html=True)
 
     def test_public_collection_json(self):
