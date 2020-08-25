@@ -415,13 +415,15 @@ class BackpackCollectionJson(JSONComponentView):
     entity_id_field_name = 'share_hash'
 
     def get_context_data(self, **kwargs):
-        chosen_assertion = sorted(self.current_object.cached_badgeinstances(), key=lambda b: b.issued_on)[0]
-        image_url = "{}{}?type=png".format(
-            OriginSetting.HTTP,
-            reverse('badgeinstance_image', kwargs={'entity_id': chosen_assertion.entity_id})
-        )
-        if self.is_wide_bot():
-            image_url = "{}&fmt=wide".format(image_url)
+        image_url = ''
+        if self.current_object.cached_badgeinstances().exists():
+            chosen_assertion = sorted(self.current_object.cached_badgeinstances(), key=lambda b: b.issued_on)[0]
+            image_url = "{}{}?type=png".format(
+                OriginSetting.HTTP,
+                reverse('badgeinstance_image', kwargs={'entity_id': chosen_assertion.entity_id})
+            )
+            if self.is_wide_bot():
+                image_url = "{}&fmt=wide".format(image_url)
 
         return dict(
             title=self.current_object.name,
