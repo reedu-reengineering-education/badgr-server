@@ -506,8 +506,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         ), assertion)
         self.assertEqual(response.status_code, 400)
 
-    @patch('issuer.models.logger')
-    def test_badge_recipient_notified_by_email_before_blacklisting_but_not_after(self,mocked_logger):
+    def test_badge_recipient_notified_by_email_before_blacklisting_but_not_after(self):
         # notify_earner tries: EmailBlacklist.objects.get(email=self.recipient_identifier)
         # if a matching email is found an event is logged and the recipient is not sent an email
         # If no matching email is found recipient is sent an email
@@ -516,7 +515,11 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
         user_email = 'test3@example.com'
-        new_assertion_props = {'recipient': {'identity': user_email},'badgeclassOpenBadgeId': test_badgeclass.jsonld_id}
+        new_assertion_props = {
+            'recipient': {'identity': user_email},
+            'badgeclassOpenBadgeId': test_badgeclass.jsonld_id,
+            'notify': True
+        }
 
         response = self.client.post('/v2/issuers/{issuer}/assertions'.format(
             issuer=test_issuer.entity_id
@@ -524,15 +527,16 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 201)
         instance = BadgeInstance.objects.get(entity_id=response.data['result'][0]['entityId'])
 
+        self.assertEqual(len(mail.outbox), 1)
+
         # No matching email is found, no logging, recipient is sent an email
         instance.notify_earner(self.badgr_app)
-        mocked_logger.event.assert_not_called()
+        self.assertEqual(len(mail.outbox), 2)
 
         # Matching email is found, an event is logged, recipient is not sent an email
         EmailBlacklist(email=user_email).save()
         instance.notify_earner(self.badgr_app)
-        mocked_logger.event.assert_called_once()
-
+        self.assertEqual(len(mail.outbox), 2)
 
     def test_issue_badge_with_ob1_evidence(self):
         test_user = self.setup_user(authenticate=True)
