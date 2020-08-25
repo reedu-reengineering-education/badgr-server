@@ -53,7 +53,6 @@ class IssuerAdmin(DjangoObjectActions, ModelAdmin):
     def save_model(self, request, obj, form, change):
         force_resize = False
         if 'image' in form.changed_data:
-            obj.image = form.files['image']
             force_resize = True
         obj.save(force_resize=force_resize)
 
@@ -125,7 +124,6 @@ class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
     def save_model(self, request, obj, form, change):
         force_resize = False
         if 'image' in form.changed_data:
-            obj.image = form.files['image']
             force_resize = True
         obj.save(force_resize=force_resize)
 
