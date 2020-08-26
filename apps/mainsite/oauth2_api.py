@@ -251,6 +251,11 @@ class TokenView(OAuth2ProviderTokenView):
 
     @throttleable
     def post(self, request, *args, **kwargs):
+        if len(request.GET.dict()):
+            return HttpResponse(
+                json.dumps({"error": "URL query parameters are not allowed"}), status=HTTP_400_BAD_REQUEST
+            )
+
         grant_type = request.POST.get('grant_type', 'password')
         username = request.POST.get('username')
 

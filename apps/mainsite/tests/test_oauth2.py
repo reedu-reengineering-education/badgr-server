@@ -45,8 +45,9 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.post(reverse('oauth2_provider_token'), data=request_data)
         self.assertEqual(response.status_code, 200)
 
-        response = self.client.post(reverse('oauth2_provider_token'), data=request_data)
-        self.assertEqual(response.status_code, 200)
+    def test_token_request_with_query_parmas_returns_400(self):
+        response = self.client.post('/o/token?username="testuser"&password="testpassword"')
+        self.assertEqual(response.status_code, 400)
 
     def test_can_rw_issuer_with_token(self):
         client_id = "test"
