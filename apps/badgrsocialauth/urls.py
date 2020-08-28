@@ -6,7 +6,7 @@ from django.conf.urls import url
 
 from badgrsocialauth.views import BadgrSocialLogin, BadgrSocialEmailExists, BadgrSocialAccountVerifyEmail, \
     BadgrSocialLoginCancel, BadgrAccountConnected, assertion_consumer_service, saml2_render_or_redirect, \
-    saml2_sp_metadata
+    saml2_sp_metadata, SamlEmailExistsRedirect, SamlFailureRedirect, SamlProvisionRedirect, SamlSuccessRedirect
 
 urlpatterns = [
     url(r'^sociallogin', BadgrSocialLogin.as_view(permanent=False), name='socialaccount_login'),
@@ -26,13 +26,17 @@ urlpatterns = [
     # SAML2 Identity Provider
     url(r'^saml2/(?P<idp_name>[\w\.\-]+)/$', saml2_render_or_redirect, name='saml2login'),
     url(r'^saml2/(?P<idp_name>[\w\.\-]+)/acs/', assertion_consumer_service, name='assertion_consumer_service'),
-    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/metadata$', saml2_sp_metadata, name='saml2_sp_metadata')
+    url(r'^saml2/(?P<idp_name>[\w\.\-]+)/metadata$', saml2_sp_metadata, name='saml2_sp_metadata'),
+    url(r'^saml2/loginfailure$', SamlFailureRedirect.as_view(permanent=False), name='saml2_failure'),
+    url(r'^saml2/loginsuccess$', SamlSuccessRedirect.as_view(permanent=False), name='saml2_success'),
+    url(r'^saml2/emailexists$', SamlEmailExistsRedirect.as_view(permanent=False), name='saml2_emailexists'),
+    url(r'^saml2/provision$', SamlProvisionRedirect.as_view(permanent=False), name='saml2_provision'),
 ]
 
 
 for provider in providers.registry.get_list():
     try:
-        prov_mod = importlib.import_module(provider.get_package() + '.urls')
+        prov_mod =importlib.import_module(provider.get_package() + '.urls')
     except ImportError:
         logging.getLogger(__name__).warning(
             'url import failed for %s socialaccount provider' % provider.id,

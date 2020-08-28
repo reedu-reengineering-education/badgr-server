@@ -1,3 +1,4 @@
+import json
 import urllib.request, urllib.parse, urllib.error
 import urllib.parse
 
@@ -25,7 +26,7 @@ import requests
 
 import base64
 
-from badgeuser.authcode import authcode_for_accesstoken, accesstoken_for_authcode
+from badgeuser.authcode import authcode_for_accesstoken, accesstoken_for_authcode, encrypt_authcode, decrypt_authcode
 from badgeuser.models import CachedEmailAddress, BadgeUser
 from badgrsocialauth.models import Saml2Account, Saml2Configuration
 from badgrsocialauth.utils import (set_session_badgr_app, get_session_authcode,
@@ -71,6 +72,7 @@ class BadgrSocialLogin(RedirectView):
         try:
             if 'saml2' in provider_name:
                 redirect_url = reverse('saml2login', args=[provider_name])
+                self.request.session['idp_name'] = provider_name
             else:
                 redirect_url = reverse('{}_login'.format(provider_name))
         except (NoReverseMatch, TypeError,):
@@ -134,8 +136,6 @@ class BadgrAccountConnected(RedirectView):
 SAML2 Authentication Flow
 
 """
-
-
 def saml2_client_for(idp_name=None):
     '''
     Given the name of an Identity Provider look up the Saml2Configuration and build a SAML Client. Return these.
@@ -249,20 +249,116 @@ def saml2_render_or_redirect(request, idp_name):
     return response
 
 
+def saml2_fail(**kwargs):
+    return set_url_query_params(
+        reverse('saml2_failure'), **kwargs
+    )
+
+
+def redirect_to_login_with_token(request, accesstoken):
+    badgr_app = BadgrApp.objects.get_current(request)
+
+    if badgr_app.use_auth_code_exchange:
+        authcode = authcode_for_accesstoken(accesstoken)
+        params = dict(authCode=authcode)
+    else:
+        params = dict(authToken=accesstoken.token)
+    if badgr_app is not None:
+        return set_url_query_params(badgr_app.ui_login_redirect, **params)
+
+
+class SamlSuccessRedirect(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        authcode = self.request.GET.get('authcode', get_session_authcode(self.request))
+        if not authcode:
+            return saml2_fail(authError="Could not complete Saml login")
+
+        accesstoken = accesstoken_for_authcode(authcode)
+        return redirect_to_login_with_token(self.request, accesstoken)
+
+
+class SamlProvisionRedirect(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        authcode = get_session_authcode(self.request)
+        accesstoken = accesstoken_for_authcode(authcode)
+
+        try:
+            data = json.loads(decrypt_authcode(self.request.GET['request_id']))
+            client, config = saml2_client_for(data['idp_name'])
+            email = data['email']
+            first_name = data['first_name']
+            last_name = data['last_name']
+
+        except (TypeError, ValueError, AttributeError, KeyError, Saml2Configuration.DoesNotExist,) as e:
+            return saml2_fail(authError="Could not process Saml2 Response.")
+
+        try:
+            existing_email = CachedEmailAddress.cached.get(email=email)
+        except CachedEmailAddress.DoesNotExist:
+            if accesstoken is not None and not accesstoken.is_expired():
+                saml2_account = Saml2Account.objects.create(config=config, user=accesstoken.user, uuid=email)
+                new_mail = CachedEmailAddress.objects.create(email=email, user=accesstoken.user, verified=True,
+                                                             primary=False)
+                return redirect_to_login_with_token(self.request, accesstoken)
+
+            # Email does not exist, nor does existing account. auto-provision new account and log in
+            return redirect_user_to_login(saml2_new_account(email, config, first_name, last_name, self.request))
+
+        else:
+            return saml2_fail(authError="Saml2 Response Processing interrupted. Email exists.")
+
+
+class SamlFailureRedirect(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        badgr_app = BadgrApp.objects.get_current(self.request)
+        if badgr_app is not None:
+            return set_url_query_params(badgr_app.ui_signup_failure_redirect, **kwargs)
+
+
+class SamlEmailExistsRedirect(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        self.badgr_app = BadgrApp.objects.get_current(self.request)
+
+        # Override: user has an appropriate authcode for the return flight to the UI
+        authcode = get_session_authcode(self.request)
+        email = self.request.GET.get('email')
+        idp_name = self.request.session.get('idp_name')
+
+        if not email or not authcode or not idp_name:
+            return saml2_fail(
+                authError="Could not associate SAML response with initial request", email=email, socialAuthSlug=idp_name
+            )
+
+        saml_client, config = saml2_client_for(idp_name)
+
+        decoded_email = base64.urlsafe_b64decode(email).decode('utf-8')
+        existing_email = CachedEmailAddress.cached.get(email=decoded_email)
+        token = accesstoken_for_authcode(authcode)
+        if token is not None and not token.is_expired() and token.user == existing_email.user:
+            saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
+            return redirect_user_to_login(saml2_account.user)
+
+        # Fail: user does not have an appropriate authcode
+        return saml2_fail(
+            authError='An account already exists with provided email address',
+            email=email,
+            socialAuthSlug=idp_name
+        )
+
+
 @csrf_exempt
 def assertion_consumer_service(request, idp_name):
     saml_client, config = saml2_client_for(idp_name)
     saml_response = request.POST.get('SAMLResponse')
-    badgr_app = BadgrApp.objects.get_current(request=request)
 
     if saml_response is None:
         logger.error(
             'assertion_consumer_service: No SAMLResponse was sent to the system by the identity provider.'
         )
-        return redirect(
-            set_url_query_params(badgr_app.ui_signup_failure_redirect,
-                                 **dict(authError="No SAMLResponse was sent to the system by the identity provider"))
-        )
+        return redirect(reverse(
+            'saml2_failure',
+            kwargs=dict(authError="No SAMLResponse was sent to the system by the identity provider")
+        ))
 
     saml_info = "assertion_consumer_service: saml_client entityid:{}, reponse: {}".format(
         saml_client.config.entityid,
@@ -278,9 +374,10 @@ def assertion_consumer_service(request, idp_name):
         logger.error(
             'assertion_consumer_service: SAMLResponse processing failed, resulting in no parsed data.'
         )
-        return redirect(
-            set_url_query_params(badgr_app.ui_signup_failure_redirect, **dict(authError="Could not process SAMLResponse"))
-        )
+        return redirect(reverse(
+            'saml2_failure',
+            kwargs=dict(authError="Could not process SAMLResponse.")
+        ))
 
     authn_response.get_identity()
     if len(set(settings.SAML_EMAIL_KEYS) & set(authn_response.ava.keys())) == 0:
@@ -292,78 +389,71 @@ def assertion_consumer_service(request, idp_name):
     email = [authn_response.ava[key][0] for key in settings.SAML_EMAIL_KEYS if key in authn_response.ava][0]
     first_name = [authn_response.ava[key][0] for key in settings.SAML_FIRST_NAME_KEYS if key in authn_response.ava][0]
     last_name = [authn_response.ava[key][0] for key in settings.SAML_LAST_NAME_KEYS if key in authn_response.ava][0]
-    return auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name)
+    return auto_provision(request, email, first_name, last_name, config)
 
 
-def auto_provision(request, email, first_name, last_name, badgr_app, config, idp_name):
-    def login(user, token=None):
-        if token is not None and not token.is_expired():
-            accesstoken = token
-        else:
-            accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
-                user,
-                scope='rw:backpack rw:profile rw:issuer')
-
-        if badgr_app.use_auth_code_exchange:
-            authcode = authcode_for_accesstoken(accesstoken)
-            params = dict(authCode=authcode)
-        else:
-            params = dict(authToken=accesstoken.token)
-        return redirect(set_url_query_params(badgr_app.ui_login_redirect, **params))
-
-    def new_account(requested_email):
-        new_user = BadgeUser.objects.create(
-            email=requested_email,
-            first_name=first_name,
-            last_name=last_name,
-            request=request,
-            send_confirmation=False
-        )
-        # Auto verify emails
-        cached_email = CachedEmailAddress.objects.get(email=requested_email)
-        cached_email.verified = True
-        cached_email.save()
-        Saml2Account.objects.create(config=config, user=new_user, uuid=requested_email)
-        return new_user
-
+def auto_provision(request, email, first_name, last_name, config):
     # Get/Create account and redirect with token or with error message
     saml2_account = Saml2Account.objects.filter(uuid=email, config=config).first()
     if saml2_account:
-        return login(saml2_account.user)
+        return redirect(redirect_user_to_login(saml2_account.user))
 
     try:
         existing_email = CachedEmailAddress.cached.get(email=email)
         if not existing_email.verified:
             # Email exists but is not verified, auto-provision account and log in
-            new_account = new_account(email)
-            return login(new_account)
+            new_account = saml2_new_account(email, config, first_name, last_name, request)
+            return redirect(redirect_user_to_login(new_account))
         elif existing_email.verified:
             # Email exists and is already verified
-
-            # Override: user has an appropriate authcode for the return flight to the UI
-            authcode = get_session_authcode(request)
-            if authcode is not None:
-                token = accesstoken_for_authcode(authcode)
-                if token is not None and not token.is_expired() and token.user == existing_email.user:
-                    saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
-                    return login(saml2_account.user, token)
-
-            # Fail: user does not have an appropriate authcode
-            url = set_url_query_params(
-                badgr_app.ui_signup_failure_redirect,
-                authError='An account already exists with provided email address',
-                email=str(base64.urlsafe_b64encode(email.encode('utf-8')), 'utf'),
-                socialAuthSlug=idp_name
+            return redirect(
+                set_url_query_params(
+                    reverse('saml2_emailexists'),
+                    email=base64.urlsafe_b64encode(email.encode('utf-8')).decode('utf-8')
+                )
             )
-            return redirect(url)
-    except CachedEmailAddress.DoesNotExist:
-        authcode = get_session_authcode(request)
-        if authcode is not None:
-            token = accesstoken_for_authcode(authcode)
-            if token is not None and not token.is_expired():
-                saml2_account = Saml2Account.objects.create(config=config, user=token.user, uuid=email)
-                new_mail = CachedEmailAddress.objects.create(email=email, user=token.user, verified=True, primary=False)
-                return login(saml2_account.user, token)
 
-        # Email does not exist, nor does existing account. auto-provision new account and log in
-        return login(new_account(email))
+    except CachedEmailAddress.DoesNotExist:
+        provision_data = json.dumps({
+            'first_name': first_name,
+            'last_name': last_name,
+            'email': email,
+            'idp_name': config.slug  # TODO: actual property
+        })
+        return redirect(
+            set_url_query_params(
+                reverse('saml2_provision'),
+                request_id=encrypt_authcode(provision_data),
+            )
+        )
+
+
+def saml2_new_account(requested_email, config, first_name='', last_name='', request=None):
+    new_user = BadgeUser.objects.create(
+        email=requested_email,
+        first_name=first_name,
+        last_name=last_name,
+        request=request,
+        send_confirmation=False
+    )
+    # Auto verify emails
+    cached_email = CachedEmailAddress.objects.get(email=requested_email)
+    cached_email.verified = True
+    cached_email.save()
+    Saml2Account.objects.create(config=config, user=new_user, uuid=requested_email)
+    return new_user
+
+
+def redirect_user_to_login(user, token=None):
+    if token is not None and not token.is_expired():
+        accesstoken = token
+    else:
+        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
+            user, scope='rw:backpack rw:profile rw:issuer'
+        )
+    authcode = authcode_for_accesstoken(accesstoken)
+
+    return set_url_query_params(
+        reverse('saml2_success'),
+        authcode=authcode
+    )

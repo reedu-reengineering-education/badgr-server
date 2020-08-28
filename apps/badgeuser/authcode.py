@@ -17,6 +17,9 @@ def authcode_for_accesstoken(accesstoken, expires_seconds=None, secret_key=None)
 
 
 def accesstoken_for_authcode(authcode, secret_key=None):
+    if authcode is None:
+        return None
+
     accesstoken_pk = decrypt_authcode(authcode, secret_key=secret_key)
     from mainsite.models import AccessTokenProxy
     try:
