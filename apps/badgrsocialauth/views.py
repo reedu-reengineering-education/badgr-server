@@ -337,6 +337,12 @@ class SamlEmailExistsRedirect(RedirectView):
         if token is not None and not token.is_expired() and token.user == existing_email.user:
             saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
             return redirect_user_to_login(saml2_account.user)
+        elif token is not None and token.is_expired():
+            return saml2_fail(
+                authError='Request is expired. Please try again.',
+                email=email,
+                socialAuthSlug=idp_name
+            )
 
         # Fail: user does not have an appropriate authcode
         return saml2_fail(
