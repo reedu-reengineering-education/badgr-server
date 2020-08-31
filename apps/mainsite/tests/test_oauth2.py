@@ -12,7 +12,7 @@ from mainsite.models import AccessTokenProxy
 from issuer.models import Issuer
 from mainsite.models import ApplicationInfo
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper
-from mainsite.utils import backoff_cache_key
+from mainsite.utils import backoff_cache_key, set_url_query_params
 
 
 class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
@@ -44,6 +44,38 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         )
         response = self.client.post(reverse('oauth2_provider_token'), data=request_data)
         self.assertEqual(response.status_code, 200)
+
+    def test_client_credentials_400_for_get_request(self):
+        client_id = "test"
+        client_secret = "secret"
+        client_user = self.setup_user(authenticate=False)
+        application = Application.objects.create(
+            client_id=client_id,
+            client_secret=client_secret,
+            user=client_user,
+            authorization_grant_type=Application.GRANT_CLIENT_CREDENTIALS,
+            name='test client app'
+        )
+        ApplicationInfo.objects.create(
+            application=application,
+            allowed_scopes='rw:issuer'
+        )
+
+        request_data = dict(
+            grant_type='client_credentials',
+            client_id=application.client_id,
+            client_secret=client_secret,
+            scope='rw:issuer'
+        )
+
+        # It doesn't necessarily reject your attempt if you include some query params in addition to the actual data
+        # though this is not advised.
+        response = self.client.post(set_url_query_params(reverse('oauth2_provider_token'), **request_data), data=request_data)
+        self.assertEqual(response.status_code, 200)
+
+        # It is not ok to include all the data in query params
+        response = self.client.post(set_url_query_params(reverse('oauth2_provider_token'), **request_data))
+        self.assertEqual(response.status_code, 400)
 
     def test_token_request_with_query_parmas_returns_400(self):
         response = self.client.post('/o/token?username="testuser"&password="testpassword"')
