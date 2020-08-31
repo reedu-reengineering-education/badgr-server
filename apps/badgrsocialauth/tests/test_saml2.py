@@ -65,7 +65,7 @@ class SAML2Tests(BadgrTestCase):
 
     def _initiate_login(self, idp_name, badgr_app, user=None):
         # Sets a BadgrApp in the session for later redirect, allows setting of a session authcode
-        set_url_query_params(reverse('socialaccount_login'), provider=idp_name)
+        url = set_url_query_params(reverse('socialaccount_login'), provider=idp_name)
 
         if user is not None:
             self.client.force_authenticate(user=user)
