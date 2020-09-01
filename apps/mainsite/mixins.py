@@ -27,9 +27,12 @@ class HashUploadedImage(models.Model):
 
     def save(self, *args, **kwargs):
         original_hash = self.image_hash
-        self.image_hash = self.hash_for_image()
-        if self.pk and self.image_hash != original_hash:
-            self.schedule_image_update_task()
+        pending_hash = self.hash_for_image_if_open()
+        if pending_hash is not None and pending_hash != self.image_hash:
+            self.image_hash = pending_hash
+
+            if self.pk:
+                self.schedule_image_update_task()
 
         return super(HashUploadedImage, self).save(*args, **kwargs)
 
@@ -47,6 +50,11 @@ class HashUploadedImage(models.Model):
             return file_hash.hexdigest()
         except:
             return ''
+
+    def hash_for_image_if_open(self):
+        if self.image and not self.image.closed:
+            return self.hash_for_image()
+        return None
 
     def schedule_image_update_task(self):
         """
