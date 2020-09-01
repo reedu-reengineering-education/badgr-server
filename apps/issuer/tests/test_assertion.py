@@ -182,7 +182,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             sleep(2)
             updated_assertion_v2 = BadgeInstance.objects.get(entity_id=test_assertion_v2.entity_id)
             self.assertNotEqual(updated_assertion_v2.image_url(), original_image_url_v2)
-            #test batching works in task
+            # test batching works in task
             updated_assertion_v2_2 = BadgeInstance.objects.get(entity_id=test_assertion_v2_2.entity_id)
             self.assertNotEqual(updated_assertion_v2_2.image_url(), original_image_url_v2_2)
 
@@ -221,6 +221,19 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
                 description="some description 2",
                 image=image
             ))
+        self.assertEqual(response.status_code, 200)
+        sleep(2)
+        updated_assertion_v2 = BadgeInstance.objects.get(entity_id=test_assertion_v2.entity_id)
+        self.assertEqual(updated_assertion_v2.image_url(), original_image_url_v2)
+
+        # v2 api
+        original_image_url_v2 = test_assertion_v2.image_url()
+        response = self.client.put('/v2/badgeclasses/{badge}'.format(
+            badge=test_assertion_v2.cached_badgeclass.entity_id
+        ), dict(
+            name="some name update 3",
+            description="some description 3"
+        ))
         self.assertEqual(response.status_code, 200)
         sleep(2)
         updated_assertion_v2 = BadgeInstance.objects.get(entity_id=test_assertion_v2.entity_id)

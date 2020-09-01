@@ -53,23 +53,6 @@ def notify_badgerank_of_badgeclass(self, badgeclass_pk):
 
 
 @app.task(bind=True, queue=background_task_queue_name)
-def evaluate_badgeclass_image_update(self, badge_class_instance):
-    rebake = False
-    updated_image_hash = badge_class_instance.hash_for_image() #assign local cause we need this twice
-    if badge_class_instance.original_image_hash != updated_image_hash:
-        if badge_class_instance.original_image_hash is not None:
-            rebake = True
-            batch_size = getattr(settings, 'BADGE_ASSERTION_AUTO_REBAKE_BATCH_SIZE', 100)
-            rebake_all_assertions_for_badge_class.delay(badge_class_instance, limit=batch_size, replay=True)
-        badge_class_instance.original_image_hash = updated_image_hash
-        badge_class_instance.publish()
-    return {
-        'success': True,
-        'message': "Checked badge {} for assertion rebake, needed {}".format(badge_class_instance.entity_id, rebake)
-    }
-
-
-@app.task(bind=True, queue=background_task_queue_name)
 def rebake_all_assertions(self, obi_version=CURRENT_OBI_VERSION, limit=None, offset=0, replay=False):
     queryset = BadgeInstance.objects.filter(source_url__isnull=True).order_by("pk")
     if limit:
@@ -94,9 +77,10 @@ def rebake_all_assertions(self, obi_version=CURRENT_OBI_VERSION, limit=None, off
         'message': "Enqueued {} assertions for rebaking".format(count)
     }
 
+
 @app.task(bind=True, queue=background_task_queue_name)
-def rebake_all_assertions_for_badge_class(self, badge_class, obi_version=CURRENT_OBI_VERSION, limit=None, offset=0, replay=False):
-    queryset = BadgeInstance.objects.filter(badgeclass=badge_class, source_url__isnull=True).order_by("pk")
+def rebake_all_assertions_for_badge_class(self, badge_class_id, obi_version=CURRENT_OBI_VERSION, limit=None, offset=0, replay=False):
+    queryset = BadgeInstance.objects.filter(badgeclass_id=badge_class_id, source_url__isnull=True).order_by("pk")
     if limit:
         queryset = queryset[offset:offset+limit]
     else:
@@ -109,7 +93,7 @@ def rebake_all_assertions_for_badge_class(self, badge_class, obi_version=CURRENT
         count += 1
 
     if limit and replay and count >= limit:
-        rebake_all_assertions_for_badge_class.delay(badge_class, obi_version=obi_version, limit=limit, offset=offset+limit, replay=True)
+        rebake_all_assertions_for_badge_class.delay(badge_class_id, obi_version=obi_version, limit=limit, offset=offset+limit, replay=True)
 
     return {
         'success': True,
@@ -118,6 +102,7 @@ def rebake_all_assertions_for_badge_class(self, badge_class, obi_version=CURRENT
         'offset': offset,
         'message': "Enqueued {} assertions for rebaking".format(count)
     }
+
 
 @app.task(bind=True, queue=background_task_queue_name)
 def rebake_assertion_image(self, assertion_entity_id=None, obi_version=CURRENT_OBI_VERSION):
