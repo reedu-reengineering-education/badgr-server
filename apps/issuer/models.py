@@ -1,5 +1,3 @@
-
-
 import io
 import datetime
 import urllib.request, urllib.parse, urllib.error
@@ -8,7 +6,6 @@ import dateutil
 import re
 import uuid
 from collections import OrderedDict
-from hashlib import sha256
 from itertools import chain
 
 import cachemodel
@@ -33,7 +30,7 @@ import badgrlog
 from entity.models import BaseVersionedEntity
 from issuer.managers import BadgeInstanceManager, IssuerManager, BadgeClassManager, BadgeInstanceEvidenceManager
 from mainsite.managers import SlugOrJsonIdCacheModelManager
-from mainsite.mixins import ResizeUploadedImage, ScrubUploadedSvgImage
+from mainsite.mixins import HashUploadedImage, ResizeUploadedImage, ScrubUploadedSvgImage
 from mainsite.models import BadgrApp, EmailBlacklist
 from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri
@@ -449,6 +446,7 @@ def get_user_or_none(recipient_id, recipient_type):
 
 class BadgeClass(ResizeUploadedImage,
                  ScrubUploadedSvgImage,
+                 HashUploadedImage,
                  BaseAuditedModel,
                  BaseVersionedEntity,
                  BaseOpenBadgeObjectModel):
@@ -491,13 +489,6 @@ class BadgeClass(ResizeUploadedImage,
     class Meta:
         verbose_name_plural = "Badge classes"
 
-    def __init__(self, *args, **kwargs):
-        super(BadgeClass, self).__init__(*args, **kwargs)
-        if self.id is not None:
-            self.original_image_hash = self.hash_for_image()
-        else:
-            self.original_image_hash = None
-
     def publish(self):
         fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
         self._state.fields_cache = dict()
@@ -524,27 +515,14 @@ class BadgeClass(ResizeUploadedImage,
         super(BadgeClass, self).delete(*args, **kwargs)
         issuer.publish(publish_staff=False)
 
-    # def save(self, force_resize=False, *args, **kwargs):
-    #     super(BadgeClass, self).save(force_resize, *args, **kwargs)
-    #     from issuer.tasks import evaluate_badgeclass_image_update
-    #     evaluate_badgeclass_image_update.delay(self)
+    def schedule_image_update_task(self):
+        from issuer.tasks import rebake_all_assertions_for_badge_class
+        batch_size = getattr(settings, 'BADGE_ASSERTION_AUTO_REBAKE_BATCH_SIZE', 100)
+        rebake_all_assertions_for_badge_class.delay(self.pk, limit=batch_size, replay=True)
 
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
 
-    def hash_for_image(self):
-        # from https://nitratine.net/blog/post/how-to-hash-files-in-python/
-        try:
-            block_size = 65536
-            file_hash = sha256()
-            with default_storage.open(self.image.name, 'rb') as image_data:
-                file_buffer = image_data.read(block_size)
-                while len(file_buffer) > 0:
-                    file_hash.update(file_buffer)
-                    file_buffer = image_data.read(block_size)
-                return file_hash.hexdigest()
-        except:
-            return None
 
     @property
     def public_url(self):

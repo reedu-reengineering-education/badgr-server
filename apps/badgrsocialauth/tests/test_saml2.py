@@ -13,13 +13,14 @@ from django.test.client import RequestFactory
 
 from badgrsocialauth.models import Saml2Configuration, Saml2Account
 from badgrsocialauth.views import auto_provision, saml2_client_for, create_saml_config_for
-from badgrsocialauth.utils import set_session_authcode
+from badgrsocialauth.utils import set_session_authcode, set_session_badgr_app
 
 from badgeuser.models import CachedEmailAddress, BadgeUser
 
 from mainsite.models import BadgrApp
 from mainsite.tests import BadgrTestCase
 from mainsite import TOP_DIR
+from mainsite.utils import set_url_query_params
 
 from saml2 import config, saml, BINDING_SOAP, BINDING_HTTP_REDIRECT, BINDING_HTTP_POST
 from saml2.authn_context import authn_context_class_ref
@@ -61,6 +62,21 @@ class SAML2Tests(BadgrTestCase):
         xmlsec_binary_path = getattr(settings, 'XMLSEC_BINARY_PATH', None)
         if xmlsec_binary_path is None:
             self.skipTest("SKIPPING: In order to test XML Signing, XMLSEC_BINARY_PATH to xmlsec1 must be configured.")
+
+    def _initiate_login(self, idp_name, badgr_app, user=None):
+        # Sets a BadgrApp in the session for later redirect, allows setting of a session authcode
+        url = set_url_query_params(reverse('socialaccount_login'), provider=idp_name)
+
+        if user is not None:
+            self.client.force_authenticate(user=user)
+            preflight_response = self.client.get(
+                reverse('v2_api_user_socialaccount_connect') + '?provider={}'.format(idp_name)
+            )
+            location = urlparse(preflight_response.data['result']['url'])
+            url = '?'.join([location.path, location.query])  # strip server info from location
+
+        return self.client.get(url, HTTP_REFERER=badgr_app.ui_login_redirect)
+
 
     def test_signed_authn_request_option_creates_signed_metadata(self):
         self._skip_if_xmlsec_binary_missing()
@@ -123,7 +139,9 @@ class SAML2Tests(BadgrTestCase):
         email.save()
         Saml2Account.objects.create(config=self.config, user=new_user, uuid=email)
         badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com", cors='example.com')
-        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
+        resp = auto_provision(None, email, first_name, last_name, self.config)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
@@ -132,7 +150,11 @@ class SAML2Tests(BadgrTestCase):
         first_name = "firsty"
         last_name = "lastington"
         badgr_app = self.badgr_app
-        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
+        resp = auto_provision(None, email, first_name, last_name, self.config)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
@@ -146,8 +168,12 @@ class SAML2Tests(BadgrTestCase):
 
         # email does not exist
         resp = auto_provision(
-            None, "different425@example.com", first_name, last_name, badgr_app, self.config, self.config.slug
+            None, "different425@example.com", first_name, last_name, self.config
         )
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
         self.assertEqual(Saml2Account.objects.all().count(), 1)
@@ -162,7 +188,9 @@ class SAML2Tests(BadgrTestCase):
             last_name=last_name,
             send_confirmation=False
         )
-        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
+        resp = auto_provision(None, email, first_name, last_name, self.config)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
         email_address = CachedEmailAddress.objects.get(email=email)
@@ -170,7 +198,9 @@ class SAML2Tests(BadgrTestCase):
         self.assertTrue(email_address.primary)
 
         # Can auto provision again
-        resp = auto_provision(None, email, first_name, last_name, badgr_app, self.config, self.config.slug)
+        resp = auto_provision(None, email, first_name, last_name, self.config)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
@@ -185,7 +215,11 @@ class SAML2Tests(BadgrTestCase):
         cachedemail.verified = True
         cachedemail.save()
         saml_account_count = Saml2Account.objects.count()
-        resp = auto_provision(None, email2, first_name, last_name, badgr_app, self.config, self.config.slug)
+
+        self._initiate_login(idp_name, badgr_app)
+        resp = auto_provision(None, email2, first_name, last_name, self.config)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authError", resp.url)
         self.assertIn(self.config.slug, resp.url)
@@ -226,8 +260,12 @@ class SAML2Tests(BadgrTestCase):
         set_session_authcode(fake_request, authcode)
 
         resp = auto_provision(
-            fake_request, email, test_user.first_name, test_user.last_name, self.badgr_app, self.config, self.config.slug
+            fake_request, email, test_user.first_name, test_user.last_name, self.config
         )
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
         account = Saml2Account.objects.get(user=test_user)
@@ -348,7 +386,6 @@ class SAML2Tests(BadgrTestCase):
             {'SAMLResponse': base_64_utf8_response_metadata}
         )
 
-
     def test_add_samlaccount_to_existing_user_with_varying_email(self):
         email = 'exampleuser@example.com'
         t_user = self.setup_user(
@@ -378,15 +415,21 @@ class SAML2Tests(BadgrTestCase):
             reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
             {'saml_assertion': 'very fake'}
         )
-        fake_request.session = dict()
-        set_session_authcode(fake_request, authcode)
+
 
         email2 = 'exampleuser_alt@example.com'
-        resp = auto_provision(
-            fake_request, email2, t_user.first_name, t_user.last_name, self.badgr_app, self.config, self.config.slug
-        )
+        resp = auto_provision(fake_request, email2, t_user.first_name, t_user.last_name, self.config)
+        self.assertEqual(resp.status_code, 302)
+
+        fake_request.session = dict()
+        set_session_authcode(fake_request, authcode)
+        set_session_badgr_app(fake_request, self.badgr_app)
+        fake_request.session['idp_name'] = self.config.slug
+
+        resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
+        self.assertIn(self.badgr_app.ui_login_redirect, resp.url)
         Saml2Account.objects.get(user=t_user)  # There is a Saml account associated with the user.
         CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)  # User has the email.
 
