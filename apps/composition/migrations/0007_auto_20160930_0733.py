@@ -31,8 +31,8 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='composition.LocalBadgeInstance', null=True),
             preserve_default=True,
         ),
-        migrations.AlterUniqueTogether(
-            name='localbadgeinstancecollection',
-            unique_together=set([('instance', 'issuer_instance', 'collection')]),
-        ),
+        # migrations.AlterUniqueTogether(
+        #     name='localbadgeinstancecollection',
+        #     unique_together=set([('instance', 'issuer_instance', 'collection')]),
+        # ),
     ]
