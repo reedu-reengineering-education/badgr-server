@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
+from django.conf import settings
 from django.db import models, migrations
 import django.db.models.deletion
 
@@ -30,9 +31,13 @@ class Migration(migrations.Migration):
             name='instance',
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='composition.LocalBadgeInstance', null=True),
             preserve_default=True,
-        ),
-        # migrations.AlterUniqueTogether(
-        #     name='localbadgeinstancecollection',
-        #     unique_together=set([('instance', 'issuer_instance', 'collection')]),
-        # ),
+        )
     ]
+    if settings.DATABASES['default'].get('ENGINE', '') != 'sql_server.pyodbc':
+        # only include this migration if not sql server, it doesn't like it.
+        operations += [
+            migrations.AlterUniqueTogether(
+                name='localbadgeinstancecollection',
+                unique_together=set([('instance', 'issuer_instance', 'collection')]),
+            )
+        ]
