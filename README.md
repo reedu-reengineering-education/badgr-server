@@ -3,10 +3,17 @@
 
 Badgr-server is the Python/Django API backend for issuing [Open Badges](http://openbadges.org). In addition to a powerful Issuer API and browser-based user interface for issuing, Badgr offers integrated badge management and sharing for badge earners. Free accounts are hosted by Concentric Sky at [Badgr.com](http://info.badgr.com), but for complete control over your own issuing environment, Badgr Server is available open source as a Python/Django application.
 
-See also [badgr-ui](https://github.com/concentricsky/badgr-ui), the Angular front end that serves as users' interface for this project.
+See also [badgr-ui](https://github.com/concentricsky/badgr-ui), the front end written in Angular that serves as users' interface for this project.
 
 ### About the Badgr Project
 Badgr was developed by [Concentric Sky](https://concentricsky.com), starting in 2015 to serve as an open source reference implementation of the Open Badges Specification. It provides functionality to issue portable, verifiable Open Badges as well as to allow users to manage badges they have been awarded by any issuer that uses this open data standard. Since 2015, Badgr has grown to be used by hundreds of educational institutions and other people and organizations worldwide. See [Project Homepage](https://badgr.org) for more details about contributing to and integrating with Badgr.
+
+### Open Badges Implementation
+Badgr-server hosts standard-compliant endpoints that implement the [Open Badges 2.0 specification](https://openbadgespec.org). For each of the core Open Badges objects Issuer, BadgeClass and Assertion, there is a standards-compliant public JSON endpoint handled by the Django application as well as an image redirect path. 
+
+Each JSON endpoint, such as `/public/assertions/{entity_id}`, performs content negotiation. It will return a standardized JSON-LD payload when the path is requested with no `Accept` header or when JSON payloads are requested. Additionally, User-Agent detection allows bots attempting to render a preview card for social sharing can access a clean HTML response that includes [Open Graph](https://ogp.me/) meta tags. Other clients requesting `text/html` will receive a redirect to the corresponding public route on the UI application that runs in parallel to Badgr-server where humans can be presented with a representation of the badge data in their browser. 
+
+Each image endpoint typically redirects to an image within the associated storage system. The system can convert from SVG to PNG and adapt images to a common "wide" radio for the images needed for card-based previews in many social network systems.
 
 ## How to get started on your local development environment.
 Prerequisites:
