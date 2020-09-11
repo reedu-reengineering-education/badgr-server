@@ -68,10 +68,9 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
             scope='rw:issuer'
         )
 
-        # It doesn't necessarily reject your attempt if you include some query params in addition to the actual data
-        # though this is not advised.
+        # Including query parameters is just wrong for the token claim process.
         response = self.client.post(set_url_query_params(reverse('oauth2_provider_token'), **request_data), data=request_data)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
 
         # It is not ok to include all the data in query params
         response = self.client.post(set_url_query_params(reverse('oauth2_provider_token'), **request_data))
