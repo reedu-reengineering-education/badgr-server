@@ -1,5 +1,6 @@
 from django import http
 from django.utils import deprecation
+from django.utils.deprecation import MiddlewareMixin
 from mainsite import settings
 
 
@@ -23,3 +24,10 @@ class TrailingSlashMiddleware(deprecation.MiddlewareMixin):
             if request.path != '/' and request.path[-1] == '/':
                 return http.HttpResponsePermanentRedirect(request.path[:-1])
         return None
+
+
+class XframeExempt500Middleware(MiddlewareMixin):
+    def process_response(self, request, response):
+        if response.status_code == 500:
+            response.xframe_options_exempt = True
+        return response
