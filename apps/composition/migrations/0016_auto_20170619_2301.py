@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 
-from django.db import migrations, models
+from django.conf import settings
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -54,11 +55,17 @@ class Migration(migrations.Migration):
         migrations.RemoveField(
             model_name='localbadgeinstance',
             name='recipient_user',
-        ),
-        migrations.AlterUniqueTogether(
-            name='localbadgeinstancecollection',
-            unique_together=set([]),
-        ),
+        )
+    ]
+    if settings.DATABASES['default'].get('ENGINE', '') != 'sql_server.pyodbc':
+        # only include this migration if not sql server, it doesn't like it.
+        operations += [
+            migrations.AlterUniqueTogether(
+                name='localbadgeinstancecollection',
+                unique_together=set([]),
+            )
+        ]
+    operations += [
         migrations.RemoveField(
             model_name='localbadgeinstancecollection',
             name='collection',
