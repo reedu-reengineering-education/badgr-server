@@ -986,7 +986,7 @@ class BadgeInstance(BaseAuditedModel,
             except ImportError:
                 pass
 
-    def notify_earner(self, badgr_app=None):
+    def notify_earner(self, badgr_app=None, renotify=False):
         """
         Sends an email notification to the badge earner.
         This process involves creating a badgeanalysis.models.OpenBadge
@@ -1033,10 +1033,12 @@ class BadgeInstance(BaseAuditedModel,
                 'download_url': self.public_url + "?action=download",
                 'site_name': badgr_app.name,
                 'site_url': badgr_app.signup_redirect,
-                'badgr_app': badgr_app,
+                'badgr_app': badgr_app
             }
             if badgr_app.cors == 'badgr.io':
                 email_context['promote_mobile'] = True
+            if renotify:
+                email_context['renotify'] = 'Reminder'
         except KeyError as e:
             # A property isn't stored right in json
             raise e
