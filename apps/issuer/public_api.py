@@ -8,7 +8,6 @@ import urllib.parse
 import cairosvg
 import openbadges
 from PIL import Image
-from PIL.Image import BICUBIC
 from django.conf import settings
 from django.core.files.storage import DefaultStorage
 from django.urls import resolve, reverse, Resolver404, NoReverseMatch
@@ -16,7 +15,6 @@ from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import redirect, render_to_response
 from django.views.generic import RedirectView
 from entity.serializers import BaseSerializerV2
-from resizeimage.resizeimage import resize_contain
 from rest_framework import status, permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -216,14 +214,12 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
             return int(math.floor((new_size - desired_height)/2))
 
         def _fit_to_height(img, ar, height=400):
-
-            img.thumbnail((height,height))
+            img.thumbnail((height, height))
             new_size = (int(ar[0]*height), int(ar[1]*height))
             resized_dimension = new_size[1]
-            resized_img = img.resize((resized_dimension, resized_dimension), BICUBIC)
+            resized_img = img.resize((resized_dimension, resized_dimension), Image.BICUBIC)
             new_img = Image.new("RGBA", new_size, 0)
             new_img.paste(resized_img, (_fit_dimension(new_size[0], height), _fit_dimension(new_size[1], height)))
-            new_img.show()
             return new_img
 
         if image_type == 'original' and image_fmt == 'square':
