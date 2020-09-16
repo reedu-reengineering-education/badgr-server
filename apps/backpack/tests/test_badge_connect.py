@@ -42,6 +42,13 @@ class ManifestFileTests(BadgrTestCase):
         data = response.data
         self.assertEqual(data['badgeConnectAPI'][0]['name'], ba.name)
 
+    def test_manifest_file_token_and_registration_values(self):
+        ba = BadgrApp.objects.create(name='test', cors='some.domain.com')
+        response = self.client.get('/bcv1/manifest/some.domain.com', headers={'Accept': 'application/json'})
+        data = response.data
+        self.assertIn('o/register', data['badgeConnectAPI'][0]['registrationUrl'])
+        self.assertIn('o/token', data['badgeConnectAPI'][0]['tokenUrl'])
+
 
 class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
     def _perform_registration_and_authentication(self, **kwargs):

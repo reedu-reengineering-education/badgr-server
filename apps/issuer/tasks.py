@@ -1,7 +1,7 @@
 # encoding: utf-8
 
-
 import dateutil
+import itertools
 import requests
 from celery.utils.log import get_task_logger
 from django.conf import settings
@@ -298,4 +298,21 @@ def remove_backpack_duplicate_issuer(self, issuer_entity_id=None, report_only=Fa
         'issuer_entity_id': issuer_entity_id,
         'badgeclass_count': badgeclass_count,
         'assertion_count': assertion_count,
+    }
+
+
+@app.task(bind=True, queue=background_task_queue_name)
+def resend_notifications(self, badgeinstance_entity_ids):
+    current = 0
+    page = 100
+    while len(badgeinstance_entity_ids[current:current+page]):
+        queryset = BadgeInstance.objects.filter(entity_id__in=badgeinstance_entity_ids[current:current+page])
+        for bi in queryset:
+            bi.notify_earner(renotify=True)
+        current = current + page
+
+    return {
+        'success': True,
+        'message': "{} notification requests processed".format(len(badgeinstance_entity_ids)),
+        'entity_ids': badgeinstance_entity_ids
     }

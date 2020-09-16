@@ -51,7 +51,7 @@ def badge_connect_api_info(domain):
             "scopesOffered": BADGE_CONNECT_SCOPES,
             "registrationUrl": "{}{}".format(
                 settings.HTTP_ORIGIN,
-                reverse('oauth2_provider_token')
+                reverse('oauth2_api_register')
             ),
             "authorizationUrl": "https://{}/auth/oauth2/authorize".format(domain),
             "tokenUrl": "{}{}".format(

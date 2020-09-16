@@ -1,1 +1,1 @@
-Congratulations, you earned a badge!
+{% if renotify %}Reminder: {% endif %}Congratulations, you earned a badge!
