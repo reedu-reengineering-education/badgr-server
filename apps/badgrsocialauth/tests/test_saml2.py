@@ -225,6 +225,9 @@ class SAML2Tests(BadgrTestCase):
         self.assertIn(self.config.slug, resp.url)
         self.assertEqual(saml_account_count, Saml2Account.objects.count(), "A Saml2Account must not have been created.")
 
+        resp = self.client.get(resp.url)
+        self.assertIn(self.config.slug, resp.url, "Query params are included in the response all the way back to the UI")
+
     def test_add_samlaccount_to_existing_user(self):
         # email exists, but is verified
         email = 'exampleuser@example.com'
