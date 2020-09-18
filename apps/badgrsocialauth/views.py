@@ -312,7 +312,7 @@ class SamlFailureRedirect(RedirectView):
     def get_redirect_url(self, *args, **kwargs):
         badgr_app = BadgrApp.objects.get_current(self.request)
         if badgr_app is not None:
-            return set_url_query_params(badgr_app.ui_signup_failure_redirect, **kwargs)
+            return set_url_query_params(badgr_app.ui_signup_failure_redirect, **self.request.GET)
 
 
 class SamlEmailExistsRedirect(RedirectView):
