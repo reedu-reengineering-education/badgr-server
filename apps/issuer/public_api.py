@@ -20,6 +20,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+
 import badgrlog
 from . import utils
 from backpack.models import BackpackCollection
@@ -213,11 +214,12 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
             return int(math.floor((new_size - desired_height)/2))
 
         def _fit_to_height(img, ar, height=400):
-            img.thumbnail((height,height))
+            img.thumbnail((height, height))
             new_size = (int(ar[0]*height), int(ar[1]*height))
-            new_img = Image.new("RGBA", new_size)
-            new_img.paste(img, (_fit_dimension(new_size[0], height), _fit_dimension(new_size[1], height)))
-            new_img.show()
+            resized_dimension = new_size[1]
+            resized_img = img.resize((resized_dimension, resized_dimension), Image.BICUBIC)
+            new_img = Image.new("RGBA", new_size, 0)
+            new_img.paste(resized_img, (_fit_dimension(new_size[0], height), _fit_dimension(new_size[1], height)))
             return new_img
 
         if image_type == 'original' and image_fmt == 'square':
@@ -240,10 +242,10 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
             image_url = storage.url(new_name)
         else:
             if not storage.exists(new_name):
-                with storage.open(image_prop.name, 'rb') as input_svg:
+                with storage.open(image_prop.name, 'rb') as input_png:
                     out_buf = io.BytesIO()
-                    img = Image.open(input_svg)
-
+                    # height and width set to the Height and Width of the original badge
+                    img = Image.open(input_png)
                     img = _fit_to_height(img, supported_fmts[image_fmt])
 
                     img.save(out_buf, format='png')

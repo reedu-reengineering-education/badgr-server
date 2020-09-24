@@ -23,7 +23,7 @@ from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from issuer.models import BadgeInstance, EmailBlacklist, IssuerStaff, Issuer
 from issuer.utils import parse_original_datetime
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper, SetupOAuth2ApplicationHelper
-from mainsite.utils import OriginSetting
+from mainsite.utils import OriginSetting, hash_for_image
 from rest_framework import serializers
 
 
@@ -152,7 +152,8 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
 
         with open(self.get_test_svg_image_path(), 'rb') as image_update:
             # v1 api
-            original_image_url_v1 = test_assertion_v1.image_url()
+            original_image_hash_v1 = hash_for_image(test_assertion_v1.image)
+            self.assertNotEqual('', original_image_hash_v1)
             response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badgeclass}'.format(
                 issuer=test_assertion_v1.cached_issuer.entity_id,
                 badgeclass=test_assertion_v1.cached_badgeclass.entity_id,
@@ -165,12 +166,16 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(response.status_code, 200)
             sleep(2)
             updated_assertion_v1 = BadgeInstance.objects.get(entity_id=test_assertion_v1.entity_id)
-            self.assertNotEqual(updated_assertion_v1.image_url(), original_image_url_v1)
+            updated_image_hash_v1 = hash_for_image(updated_assertion_v1.image)
+            self.assertNotEqual('', updated_image_hash_v1)
+            self.assertNotEqual(updated_image_hash_v1, original_image_hash_v1)
 
         with open(self.get_test_svg_image_path(), 'rb') as image_update:
             # v2 api
-            original_image_url_v2 = test_assertion_v2.image_url()
-            original_image_url_v2_2 = test_assertion_v2_2.image_url()
+            original_image_hash_v2 = hash_for_image(test_assertion_v2.image)
+            self.assertNotEqual('', original_image_hash_v2)
+            original_image_hash_v2_2 = hash_for_image(test_assertion_v2_2.image)
+            self.assertNotEqual('', original_image_hash_v2_2)
             response = self.client.put('/v2/badgeclasses/{badge}'.format(
                 badge=test_assertion_v2.cached_badgeclass.entity_id
             ), dict(
@@ -181,10 +186,14 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(response.status_code, 200)
             sleep(2)
             updated_assertion_v2 = BadgeInstance.objects.get(entity_id=test_assertion_v2.entity_id)
-            self.assertNotEqual(updated_assertion_v2.image_url(), original_image_url_v2)
+            updated_image_hash_v2 = hash_for_image(updated_assertion_v2.image)
+            self.assertNotEqual('', updated_image_hash_v2)
+            self.assertNotEqual(updated_image_hash_v2, original_image_hash_v2)
             # test batching works in task
             updated_assertion_v2_2 = BadgeInstance.objects.get(entity_id=test_assertion_v2_2.entity_id)
-            self.assertNotEqual(updated_assertion_v2_2.image_url(), original_image_url_v2_2)
+            updated_image_hash_v2_2 = hash_for_image(updated_assertion_v2_2.image)
+            self.assertNotEqual('', updated_image_hash_v2_2)
+            self.assertNotEqual(updated_image_hash_v2_2, original_image_hash_v2_2)
 
     def test_updating_badgeclass_non_image_does_not_rebake_assertions(self):
         test_user = self.setup_user(authenticate=True)

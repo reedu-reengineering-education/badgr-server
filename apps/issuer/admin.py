@@ -1,5 +1,3 @@
-
-
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 from django.urls import reverse
 from django.http import HttpResponseRedirect
@@ -12,6 +10,7 @@ from mainsite.mixins import ResizeUploadedImage
 
 from .models import Issuer, BadgeClass, BadgeInstance, BadgeInstanceEvidence, BadgeClassAlignment, BadgeClassTag, \
     BadgeClassExtension, IssuerExtension, BadgeInstanceExtension
+from .tasks import resend_notifications
 
 
 class IssuerStaffInline(TabularInline):
@@ -197,7 +196,7 @@ class BadgeInstanceAdmin(DjangoObjectActions, ModelAdmin):
             'fields': ('old_json',)
         }),
     )
-    actions = ['rebake']
+    actions = ['rebake', 'resend_notifications']
     change_actions = ['redirect_issuer', 'redirect_badgeclass']
     inlines = [
         BadgeEvidenceInline,
@@ -233,6 +232,11 @@ class BadgeInstanceAdmin(DjangoObjectActions, ModelAdmin):
         )
     redirect_issuer.label = "Issuer"
     redirect_issuer.short_description = "See this Issuer"
+
+    def resend_notifications(self, request, queryset):
+        ids_dict = queryset.only('entity_id').values()
+        ids = [i['entity_id'] for i in ids_dict]
+        resend_notifications.delay(ids)
 
     def save_model(self, request, obj, form, change):
         obj.rebake(save=False)

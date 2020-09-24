@@ -1,12 +1,13 @@
 # encoding: utf-8
 
-
 import io
 import json
 import urllib.request, urllib.parse, urllib.error
 import mock
-
+from PIL import Image
 import responses
+
+from django.core.files.base import ContentFile
 from django.urls import reverse
 from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V1_URI, OPENBADGES_CONTEXT_V2_URI, \
     OPENBADGES_CONTEXT_V2_DICT
@@ -52,6 +53,30 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
         with self.assertNumQueries(0):
             response = self.client.get('/public/badges/{}/image'.format(test_badgeclass.entity_id))
             self.assertEqual(response.status_code, 302)
+
+    def test_get_badgeclass_image_wide(self):
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+
+        # Get badgeclass public page as a bot
+        headers = {'HTTP_USER_AGENT': 'Twitterbot/1.0'}
+        response = self.client.get('/public/badges/{}'.format(test_badgeclass.entity_id), **headers)
+        # should have received an html stub with og meta tags
+        self.assertTrue(response.get('content-type').startswith('text/html'))
+        self.assertContains(response, 'fmt=wide')  # ensure the image is linked properly with the wide format
+
+        with self.assertNumQueries(0):
+            response = self.client.get('/public/badges/{}/image?type=png&fmt=wide'.format(test_badgeclass.entity_id))
+            self.assertEqual(response.status_code, 302)
+
+        response = self.client.get(response.url)  # Get the actual image URL from media storage
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get('content-type').startswith('image/png'))
+        imagefile = ContentFile(b''.join(response.streaming_content))
+        image = Image.open(imagefile)
+        self.assertEqual(image.width, 764)
+        self.assertEqual(image.height, 400)
 
     def test_get_assertion_image_with_redirect(self):
         test_user = self.setup_user(authenticate=False)

@@ -352,3 +352,20 @@ def netloc_to_domain(netloc):
     # Port specified in URL
     domain = domain.split(':')[0]
     return domain
+
+
+def hash_for_image(imageFileField):
+    # image should be django.db.models.fields.files.FileField
+    # from https://nitratine.net/blog/post/how-to-hash-files-in-python/
+    try:
+        block_size = 65536
+        file_hash = hashlib.sha256()
+        image_data = imageFileField
+        file_buffer = image_data.read(block_size)
+        while len(file_buffer) > 0:
+            file_hash.update(file_buffer)
+            file_buffer = image_data.read(block_size)
+        image_data.seek(0)
+        return file_hash.hexdigest()
+    except:
+        return ''
