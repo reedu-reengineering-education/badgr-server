@@ -27,13 +27,13 @@ class HashUploadedImage(models.Model):
     def save(self, *args, **kwargs):
         original_hash = self.image_hash
         pending_hash = self.hash_for_image_if_open()
+        changed = pending_hash is not None and pending_hash != original_hash
+        if changed:
+            self.image_hash = pending_hash
         result = super(HashUploadedImage, self).save(*args, **kwargs)
 
-        if pending_hash is not None and pending_hash != self.image_hash:
-            self.image_hash = pending_hash
-
-            if self.pk:
-                self.schedule_image_update_task()
+        if changed and self.pk:
+            self.schedule_image_update_task()
 
         return result
 
