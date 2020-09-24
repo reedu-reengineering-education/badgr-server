@@ -29,7 +29,7 @@ class HashUploadedImage(models.Model):
         pending_hash = self.hash_for_image_if_open()
         result = super(HashUploadedImage, self).save(*args, **kwargs)
 
-        if pending_hash is not None and pending_hash != self.image_hash:
+        if pending_hash is not None and pending_hash != original_hash:
             self.image_hash = pending_hash
 
             if self.pk:
