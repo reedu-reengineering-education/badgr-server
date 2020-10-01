@@ -312,7 +312,8 @@ class SamlFailureRedirect(RedirectView):
     def get_redirect_url(self, *args, **kwargs):
         badgr_app = BadgrApp.objects.get_current(self.request)
         if badgr_app is not None:
-            return set_url_query_params(badgr_app.ui_signup_failure_redirect, **self.request.GET)
+            params = {k: self.request.GET.get(k) for k in self.request.GET.keys()}
+            return set_url_query_params(badgr_app.ui_signup_failure_redirect, **params)
 
 
 class SamlEmailExistsRedirect(RedirectView):
@@ -335,7 +336,7 @@ class SamlEmailExistsRedirect(RedirectView):
         existing_email = CachedEmailAddress.cached.get(email=decoded_email)
         token = accesstoken_for_authcode(authcode)
         if token is not None and not token.is_expired() and token.user == existing_email.user:
-            saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=email)
+            saml2_account = Saml2Account.objects.create(config=config, user=existing_email.user, uuid=decoded_email)
             return redirect_user_to_login(saml2_account.user)
         elif token is not None and token.is_expired():
             return saml2_fail(
