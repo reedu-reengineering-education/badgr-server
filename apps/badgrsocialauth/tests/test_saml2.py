@@ -221,7 +221,7 @@ class SAML2Tests(BadgrTestCase):
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
-        self.assertIn("authError", resp.url)
+        self.assertIn("authError=Could+not", resp.url)
         self.assertIn(self.config.slug, resp.url)
         self.assertEqual(saml_account_count, Saml2Account.objects.count(), "A Saml2Account must not have been created.")
 
