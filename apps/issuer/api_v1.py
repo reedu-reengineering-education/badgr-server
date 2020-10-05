@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 import badgrlog
-from badgeuser.models import CachedEmailAddress
+from badgeuser.models import CachedEmailAddress, UserRecipientIdentifier
 from entity.api import VersionedObjectMixin
 from issuer.models import Issuer, IssuerStaff
 from issuer.permissions import IsOwnerOrStaff, BadgrOAuthTokenHasEntityScope
@@ -127,12 +127,17 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
             - name: username
               type: string
               paramType: form
-              description: The username of the user to add or remove from this role.
+              description: The username of the user whose role will be added, removed or modified.
               required: false
             - name: email
               type: string
               paramType: form
-              description: A verified email address of the user to add or remove from this role.
+              description: A verified email address of the user whose role will be added, removed or modified.
+              required: false
+            - name: url
+              type: string
+              paramType: form
+              description: A verified user recipient identifier of the user whose role will be added, removed or modified. Must be of type url.
               required: false
             - name: role
               type: string
@@ -153,14 +158,19 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
             if serializer.validated_data.get('username'):
                 user_id = serializer.validated_data.get('username')
                 user_to_modify = get_user_model().objects.get(username=user_id)
+            elif serializer.validated_data.get('url'):
+                user_id = serializer.validated_data.get('url')
+                user_to_modify = UserRecipientIdentifier.objects.get(
+                    identifier=user_id, verified=True
+                ).user
             else:
                 user_id = serializer.validated_data.get('email')
                 user_to_modify = CachedEmailAddress.objects.get(
                     email=user_id, verified=True).user
-        except (get_user_model().DoesNotExist, CachedEmailAddress.DoesNotExist,):
+        except (get_user_model().DoesNotExist, CachedEmailAddress.DoesNotExist, UserRecipientIdentifier.DoesNotExist):
             error_text = "User not found. Email must correspond to an existing user."
             if user_id is None:
-                error_text = 'User not found. Neither email address or username was provided.'
+                error_text = 'User not found. Neither email address, username, or url was provided.'
             return Response(
                 error_text, status=status.HTTP_404_NOT_FOUND
             )
