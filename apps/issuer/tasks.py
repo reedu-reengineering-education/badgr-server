@@ -121,7 +121,7 @@ def rebake_assertion_image(self, assertion_entity_id=None, obi_version=CURRENT_O
             'error': "Skipping imported assertion={}  source_url={}".format(assertion_entity_id, assertion.source_url)
         }
 
-    assertion.rebake(obi_version=obi_version)
+    assertion.rebake(obi_version=obi_version, save=True)
 
     return {
         'success': True
