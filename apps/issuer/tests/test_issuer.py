@@ -440,7 +440,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         user = self.setup_user(first_name='user_first', last_name='user_last',)
         UserRecipientIdentifier.objects.create(identifier=recipient_url, user=user, verified=True)
 
-        # Attempting to add the staff role of an unverified user fails
+        # Attempting to add a staff role of a user with good recipient identifier succeeds
         response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
             'action': 'add',
             'url': recipient_url,
@@ -448,7 +448,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         })
         self.assertEqual(response.status_code, 200)
 
-        # Attempting to add a staff user role with who is not verified fails
+        # Attempting to add a staff user role that is not verified fails
         recipient_url = "http://example2.com"
         user_unverified = self.setup_user(first_name='user_unverified_first', last_name='user_unverified_last',)
         UserRecipientIdentifier.objects.create(identifier=recipient_url, user=user_unverified, verified=False)
@@ -456,6 +456,87 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         unverified_response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
             'action': 'modify',
             'url': recipient_url,
+            'role': IssuerStaff.ROLE_EDITOR
+        })
+        self.assertEqual(unverified_response.status_code, 404)
+
+    def test_add_a_user_staff_role_by_telephone_recipient_identifier(self):
+        owner = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=owner)
+        self.assertEqual(test_issuer.staff.count(), 1)
+
+        recipient_phone = "15413421111"
+        user = self.setup_user(first_name='user_first', last_name='user_last',)
+        UserRecipientIdentifier.objects.create(
+            identifier=recipient_phone,
+            user=user,
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
+            verified=True)
+
+        # Attempting to add a staff role of a user with good recipient identifier succeeds
+        response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
+            'action': 'add',
+            'telephone': recipient_phone,
+            'role': IssuerStaff.ROLE_EDITOR
+        })
+        self.assertEqual(response.status_code, 200)
+
+        # Attempting to add a staff user role that is not verified fails
+        recipient_phone = "15413422222"
+        user_unverified = self.setup_user(first_name='user_unverified_first', last_name='user_unverified_last',)
+        UserRecipientIdentifier.objects.create(
+            identifier=recipient_phone,
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
+            user=user_unverified,
+            verified=False)
+
+        unverified_response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
+            'action': 'modify',
+            'telephone': recipient_phone,
+            'role': IssuerStaff.ROLE_EDITOR
+        })
+        self.assertEqual(unverified_response.status_code, 404)
+
+
+    def test_modify_the_staff_role_of_a_user_by_url_recipient_identifier(self):
+        owner = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=owner)
+        self.assertEqual(test_issuer.staff.count(), 1)
+
+        # Create a user who has only a url identifier:
+        recipient_phone = "15413421111"
+        user = self.setup_user(first_name='user_first', last_name='user_last',)
+        UserRecipientIdentifier.objects.create(
+            identifier=recipient_phone,
+            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
+            user=user,
+            verified=True
+        )
+        IssuerStaff.objects.get_or_create(user=user, issuer=test_issuer, defaults={'role': IssuerStaff.ROLE_STAFF})
+
+        # Attempting to modify the staff role of a user with good recipient identifier succeeds
+        response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
+            'action': 'modify',
+            'telephone': recipient_phone,
+            'role': IssuerStaff.ROLE_EDITOR
+        })
+        self.assertEqual(response.status_code, 200)
+
+        # Attempting to modify the staff role of a user with bad recipient identifier fails
+        second_response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
+            'action': 'modify',
+            'telephone': "12223334444",
+            'role': IssuerStaff.ROLE_EDITOR
+        })
+        self.assertEqual(second_response.status_code, 404)
+
+        # Attempting to modify the staff role of an unverified user fails
+        user_unverified = UserRecipientIdentifier.objects.get(user_id=user.id)
+        user_unverified.verified = False
+        user_unverified.save()
+        unverified_response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
+            'action': 'modify',
+            'telephone': recipient_phone,
             'role': IssuerStaff.ROLE_EDITOR
         })
         self.assertEqual(unverified_response.status_code, 404)

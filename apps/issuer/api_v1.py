@@ -163,6 +163,11 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
                 user_to_modify = UserRecipientIdentifier.objects.get(
                     identifier=user_id, verified=True
                 ).user
+            elif serializer.validated_data.get('telephone'):
+                user_id = serializer.validated_data.get('telephone')
+                user_to_modify = UserRecipientIdentifier.objects.get(
+                    identifier=user_id, verified=True
+                ).user
             else:
                 user_id = serializer.validated_data.get('email')
                 user_to_modify = CachedEmailAddress.objects.get(

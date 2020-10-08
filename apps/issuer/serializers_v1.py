@@ -125,9 +125,10 @@ class IssuerRoleActionSerializerV1(serializers.Serializer):
         validators=[ChoicesValidator(list(dict(IssuerStaff.ROLE_CHOICES).keys()))],
         default=IssuerStaff.ROLE_STAFF)
     url = serializers.URLField(max_length=1024, required=False)
+    telephone = serializers.CharField(max_length=100, required=False)
 
     def validate(self, attrs):
-        identifiers = [attrs.get('username'), attrs.get('email'), attrs.get('url')]
+        identifiers = [attrs.get('username'), attrs.get('email'), attrs.get('url'), attrs.get('telephone')]
         identifier_count = len(list(filter(None.__ne__, identifiers)))
         if identifier_count > 1:
             raise serializers.ValidationError(
