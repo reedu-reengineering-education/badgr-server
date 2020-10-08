@@ -169,6 +169,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             updated_image_hash_v1 = hash_for_image(updated_assertion_v1.image)
             self.assertNotEqual('', updated_image_hash_v1)
             self.assertNotEqual(updated_image_hash_v1, original_image_hash_v1)
+            self.assertGreater(updated_assertion_v1.updated_at, test_assertion_v1.updated_at)
 
         with open(self.get_test_svg_image_path(), 'rb') as image_update:
             # v2 api
@@ -189,11 +190,13 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             updated_image_hash_v2 = hash_for_image(updated_assertion_v2.image)
             self.assertNotEqual('', updated_image_hash_v2)
             self.assertNotEqual(updated_image_hash_v2, original_image_hash_v2)
+            self.assertGreater(updated_assertion_v2.updated_at, test_assertion_v2.updated_at)
             # test batching works in task
             updated_assertion_v2_2 = BadgeInstance.objects.get(entity_id=test_assertion_v2_2.entity_id)
             updated_image_hash_v2_2 = hash_for_image(updated_assertion_v2_2.image)
             self.assertNotEqual('', updated_image_hash_v2_2)
             self.assertNotEqual(updated_image_hash_v2_2, original_image_hash_v2_2)
+            self.assertGreater(updated_assertion_v2_2.updated_at, test_assertion_v2_2.updated_at)
 
     def test_updating_badgeclass_non_image_does_not_rebake_assertions(self):
         test_user = self.setup_user(authenticate=True)
