@@ -139,6 +139,11 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
               paramType: form
               description: A verified user recipient identifier of the user whose role will be added, removed or modified. Must be of type url.
               required: false
+            - name: telephone
+              type: string
+              paramType: form
+              description: A verified user recipient identifier of the user whose role will be added, removed or modified. Must be of type telephone.
+              required: false
             - name: role
               type: string
               paramType: form
@@ -175,7 +180,7 @@ class IssuerStaffList(VersionedObjectMixin, APIView):
         except (get_user_model().DoesNotExist, CachedEmailAddress.DoesNotExist, UserRecipientIdentifier.DoesNotExist):
             error_text = "User not found. Email must correspond to an existing user."
             if user_id is None:
-                error_text = 'User not found. Neither email address, username, or url was provided.'
+                error_text = 'User not found. please provide a valid email address, username, url or telephone identifier.'
             return Response(
                 error_text, status=status.HTTP_404_NOT_FOUND
             )

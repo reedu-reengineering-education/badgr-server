@@ -132,7 +132,7 @@ class IssuerRoleActionSerializerV1(serializers.Serializer):
         identifier_count = len(list(filter(None.__ne__, identifiers)))
         if identifier_count > 1:
             raise serializers.ValidationError(
-                'Please provided only one of the following: a username, email address, or a user recipient identifier of type url.'
+                'Please provided only one of the following: a username, email address, url, or telephone recipient identifier.'
             )
         return attrs
 
