@@ -733,12 +733,15 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
             self.first_user.userrecipientidentifier_set.create(identifier='/relative/url')
 
     def test_phone_format_validation(self):
-        self.first_user.userrecipientidentifier_set.create(
-            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='3428456')
-        self.first_user.userrecipientidentifier_set.create(
-            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='5413428456')
-        self.first_user.userrecipientidentifier_set.create(
-            type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='15413428456')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(
+                type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='3428456')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(
+                type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='5413428456')
+        with self.assertRaisesRegex(ValidationError, 'valid'):
+            self.first_user.userrecipientidentifier_set.create(
+                type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='15413428456')
         self.first_user.userrecipientidentifier_set.create(
             type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='+15413428456')
 
@@ -750,7 +753,7 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
                 type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier='(541) 342-8456')
 
     def test_verified_phone_included_in_all_recipient_identifiers(self):
-        identifier = '3428456'
+        identifier = '+3428456'
         self.first_user.userrecipientidentifier_set.create(
             type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE, identifier=identifier, verified=True)
         self.assertIn(identifier, self.first_user.all_recipient_identifiers)

@@ -10,6 +10,7 @@ import base64
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.files.images import get_image_dimensions
 from django.test import override_settings
 from django.urls import reverse
@@ -311,7 +312,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
             'role': 'editor'
         })
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.data, 'User not found. Neither email address or username was provided.')
+        self.assertEqual(response.data, 'User not found. please provide a valid email address, username, url or telephone identifier.')
 
     def test_bad_action_issuer_editors_set(self):
         test_user = self.setup_user(authenticate=True)
@@ -465,7 +466,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         test_issuer = self.setup_issuer(owner=owner)
         self.assertEqual(test_issuer.staff.count(), 1)
 
-        recipient_phone = "15413421111"
+        recipient_phone = "+15415551111"
         user = self.setup_user(first_name='user_first', last_name='user_last',)
         UserRecipientIdentifier.objects.create(
             identifier=recipient_phone,
@@ -482,7 +483,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(response.status_code, 200)
 
         # Attempting to add a staff user role that is not verified fails
-        recipient_phone = "15413422222"
+        recipient_phone = "+15415552222"
         user_unverified = self.setup_user(first_name='user_unverified_first', last_name='user_unverified_last',)
         UserRecipientIdentifier.objects.create(
             identifier=recipient_phone,
@@ -498,15 +499,25 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(unverified_response.status_code, 404)
 
 
-    def test_modify_the_staff_role_of_a_user_by_url_recipient_identifier(self):
+    def test_modify_the_staff_role_of_a_user_by_telephone_recipient_identifier(self):
         owner = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=owner)
         self.assertEqual(test_issuer.staff.count(), 1)
 
-        # Create a user who has only a url identifier:
-        recipient_phone = "15413421111"
+        # Create a user who has only a telephone identifier:
+        recipient_phone = "15415551111"
         user = self.setup_user(first_name='user_first', last_name='user_last',)
-        UserRecipientIdentifier.objects.create(
+        with self.assertRaises(ValidationError):
+            UserRecipientIdentifier.objects.create(
+                identifier=recipient_phone,
+                type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
+                user=user,
+                verified=True
+            )
+
+        # Now with more feeling, and the right phone number format
+        recipient_phone = "+15415551111"
+        telephone_id = UserRecipientIdentifier.objects.create(
             identifier=recipient_phone,
             type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
             user=user,
@@ -525,7 +536,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         # Attempting to modify the staff role of a user with bad recipient identifier fails
         second_response = self.client.post('/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id), {
             'action': 'modify',
-            'telephone': "12223334444",
+            'telephone': "+12225554444",
             'role': IssuerStaff.ROLE_EDITOR
         })
         self.assertEqual(second_response.status_code, 404)
@@ -665,10 +676,10 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
 
         phone_staff = self.setup_user(email="", create_email_address=False)
         phone_for_staff = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
-                                                                 identifier='5555555555',
+                                                                 identifier='+5555555555',
                                                                  user=phone_staff, verified=True)
         phone_for_staff2 = UserRecipientIdentifier.objects.create(type=UserRecipientIdentifier.IDENTIFIER_TYPE_TELEPHONE,
-                                                                 identifier='5555555556',
+                                                                 identifier='+5555555556',
                                                                  user=phone_staff, verified=False)
 
         issuer = self.setup_issuer(owner=test_user)
