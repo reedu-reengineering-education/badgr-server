@@ -988,12 +988,7 @@ class BadgeInstance(BaseAuditedModel,
 
     def notify_earner(self, badgr_app=None, renotify=False):
         """
-        Sends an email notification to the badge earner.
-        This process involves creating a badgeanalysis.models.OpenBadge
-        returns the EarnerNotification instance.
-
-        TODO: consider making this an option on initial save and having a foreign key to
-        the notification model instance (which would link through to the OpenBadge)
+        Sends an email notification to the badge recipient.
         """
         if self.recipient_type != RECIPIENT_TYPE_EMAIL:
             return
