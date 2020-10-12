@@ -1,10 +1,10 @@
 from mainsite.models import BadgrApp
 
-from mainsite.tests.base import BadgrTestCase, SetupUserHelper, APITransactionTestCase, CachingTestCase
+from mainsite.tests.base import APITransactionTestCase, CachingTestCase, SetupIssuerHelper, SetupUserHelper
 
 
 
-class TestBadgrApp(SetupUserHelper, APITransactionTestCase, CachingTestCase):
+class TestBadgrApp(SetupUserHelper, SetupIssuerHelper, APITransactionTestCase, CachingTestCase):
     def test_badgr_app_unique_default(self):
         ba_one = BadgrApp.objects.create(
             cors='one.example.com',
@@ -77,8 +77,34 @@ class TestBadgrApp(SetupUserHelper, APITransactionTestCase, CachingTestCase):
         self.assertEqual(BadgrApp.objects.filter(is_default=True).count(), 1)
 
     def test_get_by_id_stupid_datatypes(self):
+        # Test that autocreation fallback replaces deleted BadgrApp
         for val in ['stupid', 0.5, '20']:
-            app = BadgrApp.objects.get_by_id_or_default('stupid')
+            app = BadgrApp.objects.get_by_id_or_default(val)
             self.assertEqual(BadgrApp.objects.count(), 1)
             self.assertEqual(app.cors, 'localhost:4200')
             app.delete()
+
+    def test_get_by_id_or_pk(self):
+        ba_one = BadgrApp.objects.get_by_id_or_default()
+        ba_two = BadgrApp.objects.create(
+            name='The Original and Best',
+            cors='one.example.com',
+            signup_redirect='https://one.example.com/start',
+            is_default=False
+        )
+
+        user = self.setup_user()
+        issuer = self.setup_issuer(owner=user)
+        issuer.badgrapp = ba_two
+        issuer.save()
+
+        cached_badgrapp_a = issuer.cached_badgrapp
+
+        ba_two.name = "A Pale Imitation"
+        ba_two.save()
+
+        cached_badgrapp_b = issuer.cached_badgrapp
+        cached_badgrapp_c = BadgrApp.objects.get_by_id_or_default(ba_two.id)
+
+        self.assertNotEqual(cached_badgrapp_a.name, cached_badgrapp_b.name)  # issuer.cached_badgrapp should have updated
+        self.assertEqual(cached_badgrapp_b.name, cached_badgrapp_c.name)

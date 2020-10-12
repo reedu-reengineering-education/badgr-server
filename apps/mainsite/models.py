@@ -100,7 +100,7 @@ class BadgrAppManager(cachemodel.CacheModelManager):
     def get_by_id_or_default(self, badgrapp_id=None):
         if badgrapp_id:
             try:
-                return self.get(id=badgrapp_id)
+                return self.get(pk=badgrapp_id)
             except (self.model.DoesNotExist, ValueError,):
                 pass
         try:
@@ -110,7 +110,7 @@ class BadgrAppManager(cachemodel.CacheModelManager):
             legacy_default_setting = getattr(settings, 'BADGR_APP_ID', None)
             if legacy_default_setting is not None:
                 try:
-                    badgrapp = self.get(id=legacy_default_setting)
+                    badgrapp = self.get(pk=legacy_default_setting)
                 except self.model.DoesNotExist:
                     pass
             else:
