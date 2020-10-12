@@ -124,11 +124,16 @@ class IssuerRoleActionSerializerV1(serializers.Serializer):
     role = serializers.CharField(
         validators=[ChoicesValidator(list(dict(IssuerStaff.ROLE_CHOICES).keys()))],
         default=IssuerStaff.ROLE_STAFF)
+    url = serializers.URLField(max_length=1024, required=False)
+    telephone = serializers.CharField(max_length=100, required=False)
 
     def validate(self, attrs):
-        if attrs.get('username') and attrs.get('email'):
+        identifiers = [attrs.get('username'), attrs.get('email'), attrs.get('url'), attrs.get('telephone')]
+        identifier_count = len(list(filter(None.__ne__, identifiers)))
+        if identifier_count > 1:
             raise serializers.ValidationError(
-                'Either a username or email address must be provided, not both.')
+                'Please provided only one of the following: a username, email address, url, or telephone recipient identifier.'
+            )
         return attrs
 
 

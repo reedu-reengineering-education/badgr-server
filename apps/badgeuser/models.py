@@ -167,7 +167,10 @@ class UserRecipientIdentifier(cachemodel.CacheModel):
     )
     IDENTIFIER_VALIDATORS = {
         IDENTIFIER_TYPE_URL: (URLValidator(),),
-        IDENTIFIER_TYPE_TELEPHONE: (RegexValidator(regex=r"^\+?[1-9]\d{1,14}$", message="Enter a valid Phone Number."),),
+        IDENTIFIER_TYPE_TELEPHONE: (RegexValidator(
+            regex=r"^\+[1-9]\d{1,14}$",
+            message="Enter a valid Phone Number in E.164 format, like +12225553333"
+        ),),
     }
     type = models.CharField(max_length=9, choices=IDENTIFIER_TYPE_CHOICES, default=IDENTIFIER_TYPE_URL)
     identifier = models.CharField(max_length=255)
