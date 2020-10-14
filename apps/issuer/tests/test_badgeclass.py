@@ -1163,6 +1163,28 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get('/public/assertions/{}.json?expand=badge&expand=badge.issuer'.format(assertion_slug))
         self.assertEqual(response.data['badge']['issuer']['name'], 'Issuer 1 updated')
 
+    def can_create_badgeclass_with_serverAdmin_token(self):
+        issuer_owner = self.setup_user(authenticate=False)
+        admin_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:serverAdmin')
+        test_issuer = self.setup_issuer(owner=issuer_owner)
+
+        badgeclass_data = {
+            'name': 'Test Badge',
+            'description': "A testing badge",
+            'image': self.get_test_image_base64(),
+            'criteria': 'http://wikipedia.org/Awesome',
+            'issuer': test_issuer.entity_id,
+        }
+
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 201)
+
+        entity_id = response.data['result'][0]['entityId']
+        badgeclass_data['name'] = 'Test Badge Version 2 Electric Badge-a-loo'
+        response = self.client.put('/v2/badgeclasses/{}'.format(entity_id), data=badgeclass_data, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['result'][0]['name'], badgeclass_data['name'])
+
 
 class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_badgeclasses(self):
