@@ -100,7 +100,7 @@ def rebake_all_assertions_for_badge_class(self, badge_class_id, obi_version=CURR
         'count': count,
         'limit': limit,
         'offset': offset,
-        'message': "Enqueued {} assertions for rebaking".format(count)
+        'message': "Enqueued {} assertions for rebaking due to badge class change".format(count)
     }
 
 
@@ -121,10 +121,11 @@ def rebake_assertion_image(self, assertion_entity_id=None, obi_version=CURRENT_O
             'error': "Skipping imported assertion={}  source_url={}".format(assertion_entity_id, assertion.source_url)
         }
 
-    assertion.rebake(obi_version=obi_version) #, save=True)
+    assertion.rebake(obi_version=obi_version)
 
     return {
-        'success': True
+        'success': True,
+        'message': "Rebaked image for {}".format(assertion_entity_id)
     }
 
 

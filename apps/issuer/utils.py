@@ -51,9 +51,10 @@ def generate_md5_hashstring(identifier, salt=None):
     return 'md5$' + hashlib.md5(key.encode('utf-8')).hexdigest()
 
 
-def generate_rebaked_filename(oldname):
+def generate_rebaked_filename(oldname, badgeclass_filename):
     parts = oldname.split('.')
-    ext = parts.pop()
+    badgeclass_filename_parts = badgeclass_filename.split('.')
+    ext = badgeclass_filename_parts.pop()
     parts.append('rebaked')
     return 'assertion-{}.{}'.format(hashlib.md5(''.join(parts).encode('utf-8')).hexdigest(), ext)
 
