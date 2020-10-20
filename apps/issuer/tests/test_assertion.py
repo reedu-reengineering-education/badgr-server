@@ -149,6 +149,9 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         test_assertion_v1 = test_badgeclass_v1.issue(recipient_id='test1@email.test')
         test_assertion_v2 = test_badgeclass_v2.issue(recipient_id='test2@email.test')
         test_assertion_v2_2 = test_badgeclass_v2.issue(recipient_id='test3@email.test')
+        self.assertEqual(test_assertion_v1.image.name.split(".").pop(), 'png')
+        self.assertEqual(test_assertion_v2.image.name.split(".").pop(), 'png')
+        self.assertEqual(test_assertion_v2_2.image.name.split(".").pop(), 'png')
 
         with open(self.get_test_svg_image_path(), 'rb') as image_update:
             # v1 api
@@ -169,6 +172,8 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             updated_image_hash_v1 = hash_for_image(updated_assertion_v1.image)
             self.assertNotEqual('', updated_image_hash_v1)
             self.assertNotEqual(updated_image_hash_v1, original_image_hash_v1)
+            self.assertGreater(updated_assertion_v1.updated_at, test_assertion_v1.updated_at)
+            self.assertEqual(updated_assertion_v1.image.name.split(".").pop(), 'svg')
 
         with open(self.get_test_svg_image_path(), 'rb') as image_update:
             # v2 api
@@ -189,11 +194,15 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             updated_image_hash_v2 = hash_for_image(updated_assertion_v2.image)
             self.assertNotEqual('', updated_image_hash_v2)
             self.assertNotEqual(updated_image_hash_v2, original_image_hash_v2)
+            self.assertGreater(updated_assertion_v2.updated_at, test_assertion_v2.updated_at)
+            self.assertEqual(updated_assertion_v2.image.name.split(".").pop(), 'svg')
             # test batching works in task
             updated_assertion_v2_2 = BadgeInstance.objects.get(entity_id=test_assertion_v2_2.entity_id)
             updated_image_hash_v2_2 = hash_for_image(updated_assertion_v2_2.image)
             self.assertNotEqual('', updated_image_hash_v2_2)
             self.assertNotEqual(updated_image_hash_v2_2, original_image_hash_v2_2)
+            self.assertGreater(updated_assertion_v2_2.updated_at, test_assertion_v2_2.updated_at)
+            self.assertEqual(updated_assertion_v2_2.image.name.split(".").pop(), 'svg')
 
     def test_updating_badgeclass_non_image_does_not_rebake_assertions(self):
         test_user = self.setup_user(authenticate=True)
