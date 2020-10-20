@@ -2,6 +2,7 @@ import importlib
 import logging
 
 from allauth.socialaccount import providers
+from django.conf import settings
 from django.conf.urls import url
 
 from badgrsocialauth.views import BadgrSocialLogin, BadgrSocialEmailExists, BadgrSocialAccountVerifyEmail, \
@@ -33,8 +34,9 @@ urlpatterns = [
     url(r'^saml2/provision$', SamlProvisionRedirect.as_view(permanent=False), name='saml2_provision'),
 ]
 
-
-for provider in providers.registry.get_list():
+provider_list = providers.registry.get_list()
+configured_providers = getattr(settings, 'SOCIALACCOUNT_PROVIDERS', dict()).keys()
+for provider in [p for p in provider_list if p.id in configured_providers]:
     try:
         prov_mod =importlib.import_module(provider.get_package() + '.urls')
     except ImportError:
