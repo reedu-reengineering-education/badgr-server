@@ -1027,7 +1027,7 @@ class BadgeInstance(BaseAuditedModel,
                 'image_url': self.public_url + '/image',
                 'download_url': self.public_url + "?action=download",
                 'site_name': badgr_app.name,
-                'site_url': badgr_app.signup_redirect,
+                'site_url': badgr_app.ui_login_redirect,
                 'badgr_app': badgr_app
             }
             if badgr_app.cors == 'badgr.io':
