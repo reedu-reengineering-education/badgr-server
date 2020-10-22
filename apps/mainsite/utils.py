@@ -204,12 +204,12 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
         if not derived_ext:
             raise SuspiciousFileOperation("could not determine a file extension")
 
+        string_to_write_to_file = stripped_svg_string or content
+
         storage_name = '{upload_to}/cached/{filename}{ext}'.format(
             upload_to=upload_to,
-            filename=hashlib.md5(remote_url.encode('utf-8')).hexdigest(),
+            filename=hashlib.sha256(string_to_write_to_file).hexdigest(),
             ext=derived_ext)
-
-        string_to_write_to_file = stripped_svg_string or content
 
         if not store.exists(storage_name):
             buf = io.BytesIO(string_to_write_to_file)
