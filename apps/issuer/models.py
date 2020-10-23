@@ -973,19 +973,6 @@ class BadgeInstance(BaseAuditedModel,
         self.image.delete()
         self.save()
 
-        # remove BadgeObjectiveAwards from badgebook if needed
-        if apps.is_installed('badgebook'):
-            try:
-                from badgebook.models import BadgeObjectiveAward, LmsCourseInfo
-                try:
-                    award = BadgeObjectiveAward.cached.get(badge_instance_id=self.id)
-                except BadgeObjectiveAward.DoesNotExist:
-                    pass
-                else:
-                    award.delete()
-            except ImportError:
-                pass
-
     def notify_earner(self, badgr_app=None, renotify=False):
         """
         Sends an email notification to the badge recipient.
