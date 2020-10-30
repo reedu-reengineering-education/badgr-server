@@ -1007,7 +1007,7 @@ class BadgeInstance(BaseAuditedModel,
             pass
 
 
-def notify_earner(self, badgr_app=None, renotify=False):
+    def notify_earner(self, badgr_app=None, renotify=False):
         """
         Sends an email notification to the badge recipient.
         """
