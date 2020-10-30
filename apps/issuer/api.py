@@ -248,7 +248,7 @@ class BadgeClassDetail(BaseEntityDetailView):
         response = super(BadgeClassDetail, self).put(request, **kwargs)
         if response.status_code == 200 and getattr(settings, 'BADGERANK_NOTIFY_ON_FIRST_ASSERTION', True):
             badgeclass = self.get_object(request, **kwargs)
-            if badgeclass.recipient_count() > 0:
+            if badgeclass.has_nonrevoked_assertions():
                 from issuer.tasks import notify_badgerank_of_badgeclass
                 notify_badgerank_of_badgeclass.delay(badgeclass_pk=badgeclass.pk)
         return response

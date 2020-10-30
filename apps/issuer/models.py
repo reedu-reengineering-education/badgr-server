@@ -214,7 +214,7 @@ class Issuer(ResizeUploadedImage,
         self._state.fields_cache = fields_cache  # restore the fields cache
 
     def delete(self, *args, **kwargs):
-        if self.recipient_count > 0:
+        if self.has_nonrevoked_assertions():
             raise ProtectedError("Issuer can not be deleted because it has previously issued badges.", self)
 
         # remove any unused badgeclasses owned by issuer
@@ -326,10 +326,6 @@ class Issuer(ResizeUploadedImage,
     @cachemodel.cached_method(auto_publish=True)
     def cached_recipient_groups(self):
         return self.recipientgroup_set.all()
-
-    @property
-    def recipient_count(self):
-        return sum(bc.recipient_count() for bc in self.cached_badgeclasses())
 
     @property
     def image_preview(self):
@@ -504,9 +500,9 @@ class BadgeClass(ResizeUploadedImage,
         self._state.fields_cache = fields_cache  # restore the fields cache
 
     def delete(self, *args, **kwargs):
-        # if there are some assertions and some have not expired
-        if self.recipient_count() > 0 and self.badgeinstances.filter(revoked=False).filter(
-                models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())).count() > 0:
+        # if there are some assertions that have not expired
+        if self.badgeinstances.filter(revoked=False).filter(
+                models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())).exists():
             raise ProtectedError("BadgeClass may only be deleted if all BadgeInstances have been revoked.", self)
 
         if self.pathway_element_count() > 0:
@@ -563,17 +559,8 @@ class BadgeClass(ResizeUploadedImage,
     def cached_issuer(self):
         return Issuer.cached.get(pk=self.issuer_id)
 
-    @property
-    def recipient_count(self):
-        # If this value is not in the cache, calculate it using a SQL query.
-        # Once populated, the cached value is incremented and decremented by badge instance operations
-        key = cache_keys.recipient_count(self.pk)
-        data = cache.get(key)
-        if data is None:
-            data = self.badgeinstances.filter(revoked=False).count()
-            cache.set(key, data, CACHE_FOREVER_TIMEOUT)
-
-        return data
+    def has_nonrevoked_assertions(self):
+        return self.badgeinstances.filter(revoked=False).exists()
 
     def pathway_element_count(self):
         return len(self.cached_pathway_elements())
@@ -924,13 +911,6 @@ class BadgeInstance(BaseAuditedModel,
             except CachedEmailAddress.DoesNotExist:
                 pass
 
-            if not self.revoked:
-                try:
-                    cache.incr(cache_keys.recipient_count(self.badgeclass_id))
-                except ValueError:
-                    # Cache contains no such key
-                    pass
-
         if self.revoked is False:
             self.revocation_reason = None
 
@@ -972,13 +952,6 @@ class BadgeInstance(BaseAuditedModel,
     def delete(self, *args, **kwargs):
         badgeclass = self.badgeclass
 
-        if not self.revoked:
-            try:
-                cache.decr(cache_keys.recipient_count(self.badgeclass_id))
-            except ValueError:
-                # Cache contains no such key
-                pass
-
         recipient_profile = self.cached_recipient_profile
         super(BadgeInstance, self).delete(*args, **kwargs)
         badgeclass.publish()
@@ -999,13 +972,6 @@ class BadgeInstance(BaseAuditedModel,
         self.revocation_reason = revocation_reason
         self.image.delete()
         self.save()
-
-        try:
-            cache.decr(cache_keys.recipient_count(self.badgeclass_id))
-        except ValueError:
-            # Cache contains no such key
-            pass
-
 
     def notify_earner(self, badgr_app=None, renotify=False):
         """
