@@ -11,6 +11,7 @@ from itertools import chain
 import cachemodel
 import os
 from allauth.account.adapter import get_adapter
+from cachemodel import CACHE_FOREVER_TIMEOUT
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -25,6 +26,7 @@ from json import dumps as json_dumps
 from jsonfield import JSONField
 from openbadges_bakery import bake
 from django.utils import timezone
+from django.core.cache import cache
 
 import badgrlog
 from entity.models import BaseVersionedEntity
@@ -34,6 +36,8 @@ from mainsite.mixins import HashUploadedImage, ResizeUploadedImage, ScrubUploade
 from mainsite.models import BadgrApp, EmailBlacklist
 from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri
+
+from . import cache_keys
 from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_rebaked_filename,
                     generate_sha256_hashstring, get_obi_context, parse_original_datetime, UNVERSIONED_BAKED_VERSION)
 
@@ -559,9 +563,17 @@ class BadgeClass(ResizeUploadedImage,
     def cached_issuer(self):
         return Issuer.cached.get(pk=self.issuer_id)
 
-    @cachemodel.cached_method(auto_publish=True)
+    @property
     def recipient_count(self):
-        return self.badgeinstances.filter(revoked=False).count()
+        # If this value is not in the cache, calculate it using a SQL query.
+        # Once populated, the cached value is incremented and decremented by badge instance operations
+        key = cache_keys.recipient_count(self.pk)
+        data = cache.get(key)
+        if data is None:
+            data = self.badgeinstances.filter(revoked=False).count()
+            cache.set(key, data, CACHE_FOREVER_TIMEOUT)
+
+        return data
 
     def pathway_element_count(self):
         return len(self.cached_pathway_elements())
@@ -912,6 +924,13 @@ class BadgeInstance(BaseAuditedModel,
             except CachedEmailAddress.DoesNotExist:
                 pass
 
+            if not self.revoked:
+                try:
+                    cache.incr(cache_keys.recipient_count(self.badgeclass_id))
+                except ValueError:
+                    # Cache contains no such key
+                    pass
+
         if self.revoked is False:
             self.revocation_reason = None
 
@@ -952,6 +971,14 @@ class BadgeInstance(BaseAuditedModel,
 
     def delete(self, *args, **kwargs):
         badgeclass = self.badgeclass
+
+        if not self.revoked:
+            try:
+                cache.decr(cache_keys.recipient_count(self.badgeclass_id))
+            except ValueError:
+                # Cache contains no such key
+                pass
+
         recipient_profile = self.cached_recipient_profile
         super(BadgeInstance, self).delete(*args, **kwargs)
         badgeclass.publish()
@@ -973,7 +1000,14 @@ class BadgeInstance(BaseAuditedModel,
         self.image.delete()
         self.save()
 
-    def notify_earner(self, badgr_app=None, renotify=False):
+        try:
+            cache.decr(cache_keys.recipient_count(self.badgeclass_id))
+        except ValueError:
+            # Cache contains no such key
+            pass
+
+
+def notify_earner(self, badgr_app=None, renotify=False):
         """
         Sends an email notification to the badge recipient.
         """
