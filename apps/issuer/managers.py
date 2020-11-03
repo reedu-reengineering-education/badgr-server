@@ -14,7 +14,6 @@ from django.urls import resolve, Resolver404
 
 from issuer.utils import sanitize_id
 from mainsite.utils import fetch_remote_file_to_storage, list_of, OriginSetting
-from pathway.tasks import award_badges_for_pathway_completion
 
 
 def resolve_source_url_referencing_local_object(source_url):
@@ -296,7 +295,6 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         evidence=None,
         extensions=None,
         notify=False,
-        check_completions=True,
         allow_uppercase=False,
         badgr_app=None,
         **kwargs
@@ -307,7 +305,6 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         :type badgeclass: BadgeClass
         :type issuer: Issuer
         :type notify: bool
-        :type check_completions: bool
         :type evidence: list of dicts(url=string, narrative=string)
         """
         recipient_identifier = kwargs.pop('recipient_identifier')
@@ -350,9 +347,6 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
                         name=name,
                         original_json=json.dumps(ext)
                     )
-
-        if check_completions:
-            award_badges_for_pathway_completion.delay(badgeinstance_pk=new_instance.pk)
 
         if not notify and getattr(settings, 'GDPR_COMPLIANCE_NOTIFY_ON_FIRST_AWARD'):
             # always notify if this is the first time issuing to a recipient if configured for GDPR compliance

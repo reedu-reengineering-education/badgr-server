@@ -24,6 +24,13 @@ from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 
 logger = badgrlog.BadgrLogger()
 
+def _scrub_boolean(boolean_str, default=None):
+    if boolean_str in _TRUE_VALUES:
+        return True
+    if boolean_str in _FALSE_VALUES:
+        return False
+    return default
+
 class BackpackAssertionList(BaseEntityListView):
     model = BadgeInstance
     v1_serializer_class = LocalBadgeInstanceUploadSerializerV1
@@ -334,7 +341,6 @@ class ShareBackpackAssertion(BaseEntityDetailView):
               type: string
               paramType: query
         """
-        from recipient.api import _scrub_boolean
         redirect = _scrub_boolean(request.query_params.get('redirect', "1"))
 
         provider = request.query_params.get('provider')
@@ -381,7 +387,6 @@ class ShareBackpackCollection(BaseEntityDetailView):
               type: string
               paramType: query
         """
-        from recipient.api import _scrub_boolean
         redirect = _scrub_boolean(request.query_params.get('redirect', "1"))
 
         provider = request.query_params.get('provider')

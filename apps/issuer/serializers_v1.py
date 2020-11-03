@@ -109,9 +109,9 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
             representation['badgeclasses'] = BadgeClassSerializerV1(obj.badgeclasses.all(), many=True, context=self.context).data
 
         representation['badgeClassCount'] = len(obj.cached_badgeclasses())
-        representation['recipientGroupCount'] = len(obj.cached_recipient_groups())
-        representation['recipientCount'] = sum(g.member_count() for g in obj.cached_recipient_groups())
-        representation['pathwayCount'] = len(obj.cached_pathways())
+        representation['recipientGroupCount'] = 0
+        representation['recipientCount'] = 0
+        representation['pathwayCount'] = 0
 
         return representation
 
@@ -164,7 +164,6 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
     criteria_text = MarkdownCharField(required=False, allow_null=True, allow_blank=True)
     criteria_url = StripTagsCharField(required=False, allow_blank=True, allow_null=True, validators=[URLValidator()])
     recipient_count = serializers.IntegerField(required=False, read_only=True, source='v1_api_recipient_count')
-    pathway_element_count = serializers.IntegerField(required=False, read_only=True)
     description = StripTagsCharField(max_length=16384, required=True, convert_null=True)
 
     alignment = AlignmentItemSerializerV1(many=True, source='alignment_items', required=False)

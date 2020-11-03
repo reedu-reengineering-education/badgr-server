@@ -48,8 +48,6 @@ INSTALLED_APPS = [
     'entity',
     'issuer',
     'backpack',
-    'pathway',
-    'recipient',
     'externaltools',
 
     # api docs

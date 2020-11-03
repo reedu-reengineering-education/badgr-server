@@ -19,7 +19,6 @@ from oauth2_provider.urls import base_urlpatterns as oauth2_provider_base_urlpat
 
 from mainsite.views import SitewideActionFormView, LoginAndObtainAuthToken, RedirectToUiLogin, DocsAuthorizeRedirect
 from mainsite.views import info_view, email_unsubscribe, AppleAppSiteAssociation, error404, error500
-from pathway.api import PathwayList
 
 urlpatterns = [
     # Backup URLs in case the server isn't serving these directly
@@ -71,7 +70,6 @@ urlpatterns = [
     url(r'^unsubscribe/(?P<email_encoded>[^/]+)/(?P<expiration>[^/]+)/(?P<signature>[^/]+)', email_unsubscribe, name='unsubscribe'),
 
     url(r'^public/', include('issuer.public_api_urls'), kwargs={'version': 'v2'}),
-    url(r'^public/', include('pathway.public_api_urls'), kwargs={'version': 'v2'}),
 
     # legacy share redirects
     url(r'', include('backpack.share_urls')),
@@ -88,16 +86,6 @@ urlpatterns = [
 
     url(r'^v1/issuer/', include('issuer.v1_api_urls'), kwargs={'version': 'v1'}),
     url(r'^v1/earner/', include('backpack.v1_api_urls'), kwargs={'version': 'v1'}),
-
-
-    # NOTE: pathway and recipient were written and deployed for beta testing at /v2/ before /v2/ was formalized
-    # they do not conform to new /v2/ conventions,  they need to appear before /v2/ to not collide
-    url(r'^v2/issuers/(?P<issuer_slug>[^/]+)/pathways$', PathwayList.as_view(), name='pathway_list'),
-    url(r'^v2/issuers/(?P<issuer_slug>[^/]+)/pathways/', include('pathway.api_urls'), kwargs={'version': 'v1'}),
-
-    # recipient was refactored to /v2/, but for now keep the old "v1" API registered at /v2/issuers/<issuer_slug/recipient-groups
-    url(r'^v2/', include('recipient.v1_api_urls'), kwargs={'version': 'v1'}),
-    # url(r'^v2/', include('recipient.v2_api_urls'), kwargs={'version': 'v2'}),
 
 
     # v2 API endpoints

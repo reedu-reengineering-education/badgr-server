@@ -23,7 +23,6 @@ from issuer.tasks import rebake_all_assertions, update_issuedon_all_assertions
 from mainsite.admin_actions import clear_cache
 from mainsite.models import EmailBlacklist, BadgrApp
 from mainsite.serializers import VerifiedAuthTokenSerializer
-from pathway.tasks import resave_all_elements
 import badgrlog
 
 logger = badgrlog.BadgrLogger()
@@ -129,19 +128,16 @@ class LoginAndObtainAuthToken(ObtainAuthToken):
 
 class SitewideActionForm(forms.Form):
     ACTION_CLEAR_CACHE = 'CLEAR_CACHE'
-    ACTION_RESAVE_ELEMENTS = 'RESAVE_ELEMENTS'
     ACTION_REBAKE_ALL_ASSERTIONS = "REBAKE_ALL_ASSERTIONS"
     ACTION_FIX_ISSUEDON = 'FIX_ISSUEDON'
 
     ACTIONS = {
         ACTION_CLEAR_CACHE: clear_cache,
-        ACTION_RESAVE_ELEMENTS: resave_all_elements,
         ACTION_REBAKE_ALL_ASSERTIONS: rebake_all_assertions,
         ACTION_FIX_ISSUEDON: update_issuedon_all_assertions,
     }
     CHOICES = (
         (ACTION_CLEAR_CACHE, 'Clear Cache',),
-        (ACTION_RESAVE_ELEMENTS, 'Re-save Pathway Elements',),
         (ACTION_REBAKE_ALL_ASSERTIONS, 'Rebake all assertions',),
         (ACTION_FIX_ISSUEDON, 'Re-process issuedOn for backpack assertions',),
     )
