@@ -647,6 +647,12 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
 
         return instance
 
+    def create(self, validated_data):
+        if 'cached_issuer' in validated_data:
+            # included issuer in request
+            validated_data['issuer'] = validated_data.pop('cached_issuer')
+        return super().create(validated_data)
+      
     def validate(self, data):
         request = self.context.get('request', None)
         expected_issuer = self.context.get('kwargs', {}).get('issuer')
