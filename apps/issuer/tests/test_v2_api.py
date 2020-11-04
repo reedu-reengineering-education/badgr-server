@@ -278,7 +278,10 @@ class AssertionFetching(SetupIssuerHelper, BadgrTestCase):
 class AssertionPosting(SetupIssuerHelper, BadgrTestCase):
     def test_can_post_assertion_to_v2_api_badgeclass_assertion_list_with_issuer_specified(self):
         u1 = self.setup_user(authenticate=True, email="hey@example.com")
+        u2 = self.setup_user(authenticate=False, email="secondIssuerUser@example.com")
+        u3 = self.setup_user(authenticate=False, email="reandom3rdUser@example.com")
         i = self.setup_issuer(owner=u1)
+        i2 = self.setup_issuer(owner=u2)
         b = self.setup_badgeclass(issuer=i)
         url = "{url}".format(
             url=reverse('v2_api_badgeclass_assertion_list', kwargs={'entity_id': b.entity_id})
@@ -292,3 +295,31 @@ class AssertionPosting(SetupIssuerHelper, BadgrTestCase):
             }
         }, format="json")
         self.assertEqual(response.status_code, 201)
+
+        # put a bad value in the issuer of the payload and make sure it is ignored
+        response2 = self.client.post(url, data={
+            "issuer": i2.entity_id,
+            "recipient": {
+                "identity": u2.email,
+                "hashed": True,
+                "type": "email"
+            }
+        }, format="json")
+        self.assertEqual(response2.status_code, 201)
+
+        # don't include issuer in request and make sure correct one is used
+        response3 = self.client.post(url, data={
+            "recipient": {
+                "identity": u3.email,
+                "hashed": True,
+                "type": "email"
+            }
+        }, format="json")
+        self.assertEqual(response3.status_code, 201)
+
+        # fetch the assertions
+        response4 = self.client.get(url)
+        self.assertEqual(response4.status_code, 200)
+        self.assertEqual(len(response4.data['result']), 3)
+        for result in response4.data['result']:
+            self.assertEqual(result['issuer'], i.entity_id)

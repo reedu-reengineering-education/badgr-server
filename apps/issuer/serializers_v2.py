@@ -649,8 +649,8 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
 
     def create(self, validated_data):
         if 'cached_issuer' in validated_data:
-            # included issuer in request
-            validated_data['issuer'] = validated_data.pop('cached_issuer')
+            # ignore issuer in request
+            validated_data.pop('cached_issuer')
         return super().create(validated_data)
       
     def validate(self, data):
