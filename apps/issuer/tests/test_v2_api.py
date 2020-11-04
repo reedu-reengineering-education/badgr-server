@@ -275,3 +275,20 @@ class AssertionFetching(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(len(response.data['result']), 1)
 
 
+class AssertionPosting(SetupIssuerHelper, BadgrTestCase):
+    def test_can_post_assertion_to_v2_api_badgeclass_assertion_list_with_issuer_specified(self):
+        u1 = self.setup_user(authenticate=True, email="hey@example.com")
+        i = self.setup_issuer(owner=u1)
+        b = self.setup_badgeclass(issuer=i)
+        url = "{url}".format(
+            url=reverse('v2_api_badgeclass_assertion_list', kwargs={'entity_id': b.entity_id})
+        )
+        response = self.client.post(url, data={
+            "issuer": i.entity_id,
+            "recipient": {
+                "identity": u1.email,
+                "hashed": True,
+                "type": "email"
+            }
+        }, format="json")
+        self.assertEqual(response.status_code, 201)
