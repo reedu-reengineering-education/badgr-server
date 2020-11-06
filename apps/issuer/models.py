@@ -1027,7 +1027,7 @@ class BadgeInstance(BaseAuditedModel,
                 'image_url': self.public_url + '/image',
                 'download_url': self.public_url + "?action=download",
                 'site_name': badgr_app.name,
-                'site_url': badgr_app.ui_login_redirect,
+                'site_url': badgr_app.signup_redirect,
                 'badgr_app': badgr_app
             }
             if badgr_app.cors == 'badgr.io':
@@ -1043,7 +1043,7 @@ class BadgeInstance(BaseAuditedModel,
             from badgeuser.models import CachedEmailAddress
             CachedEmailAddress.objects.get(email=self.recipient_identifier, verified=True)
             template_name = 'issuer/email/notify_account_holder'
-            email_context['site_url'] = badgr_app.email_confirmation_redirect
+            email_context['site_url'] = badgr_app.ui_login_redirect
         except CachedEmailAddress.DoesNotExist:
             pass
 
