@@ -104,6 +104,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         response = self.client.post(url, data=data)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data['success_url'].startswith(registration_data['redirect_uris'][0]))
+        self.assertTrue('scope' in response.data['success_url'])
         url = parse.urlparse(response.data['success_url'])
         code = parse.parse_qs(url.query)['code'][0]
 

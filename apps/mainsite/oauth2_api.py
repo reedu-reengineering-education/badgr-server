@@ -25,7 +25,7 @@ from backpack.badge_connect_api import BADGE_CONNECT_SCOPES
 from mainsite.models import ApplicationInfo
 from mainsite.oauth_validator import BadgrRequestValidator, BadgrOauthServer
 from mainsite.serializers import ApplicationInfoSerializer, AuthorizationSerializer
-from mainsite.utils import client_ip_from_request, throttleable
+from mainsite.utils import client_ip_from_request, throttleable, set_url_query_params
 
 badgrlogger = badgrlog.BadgrLogger()
 
@@ -42,7 +42,7 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
     def get_authorization_redirect_url(self, scopes, credentials, allow=True):
         uri, headers, body, status = self.create_authorization_response(
             request=self.request, scopes=scopes, credentials=credentials, allow=allow)
-        return uri
+        return set_url_query_params(uri, **{'scope': scopes})
 
     def post(self, request, *args, **kwargs):
         if not self.request.user.is_authenticated:
