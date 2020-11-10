@@ -24,6 +24,9 @@ from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
 
 logger = badgrlog.BadgrLogger()
 
+_TRUE_VALUES = ['true', 't', 'on', 'yes', 'y', '1', 1, 1.0, True]
+_FALSE_VALUES = ['false', 'f', 'off', 'no', 'n', '0', 0, 0.0, False]
+
 def _scrub_boolean(boolean_str, default=None):
     if boolean_str in _TRUE_VALUES:
         return True

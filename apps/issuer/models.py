@@ -212,6 +212,9 @@ class Issuer(ResizeUploadedImage,
 
         self._state.fields_cache = fields_cache  # restore the fields cache
 
+    def has_nonrevoked_assertions(self):
+        return self.badgeinstance_set.filter(revoked=False).exists()
+
     def delete(self, *args, **kwargs):
         if self.has_nonrevoked_assertions():
             raise ProtectedError("Issuer can not be deleted because it has previously issued badges.", self)
@@ -918,8 +921,6 @@ class BadgeInstance(BaseAuditedModel,
 
         super(BadgeInstance, self).publish()
         self.badgeclass.publish()
-        if self.cached_recipient_profile:
-            self.cached_recipient_profile.publish()
         if self.recipient_user:
             self.recipient_user.publish()
 
@@ -933,11 +934,8 @@ class BadgeInstance(BaseAuditedModel,
     def delete(self, *args, **kwargs):
         badgeclass = self.badgeclass
 
-        recipient_profile = self.cached_recipient_profile
         super(BadgeInstance, self).delete(*args, **kwargs)
         badgeclass.publish()
-        if recipient_profile:
-            recipient_profile.publish()
         if self.recipient_user:
             self.recipient_user.publish()
         self.publish_delete('entity_id', 'revoked')
