@@ -148,39 +148,70 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
 
 
 class RegistrationSerializer(serializers.Serializer):
-    client_name = serializers.CharField(required=True)
-    client_uri = serializers.URLField(required=True)
-    logo_uri = serializers.URLField(required=True)
-    tos_uri = serializers.URLField(required=True)
-    policy_uri = serializers.URLField(required=True)
-    software_id = serializers.CharField(required=True)
-    software_version = serializers.CharField(required=True)
-    redirect_uris = serializers.ListField(child=serializers.CharField(), required=True)
-    token_endpoint_auth_method = serializers.CharField(required=False)
-    grant_types = serializers.ListField(child=serializers.CharField(), required=False)
-    response_types = serializers.ListField(child=serializers.CharField(), required=False)
-    scope = serializers.CharField(required=False)
+    client_name = serializers.CharField(required=True, source='name')
+    client_uri = serializers.URLField(required=True, source='applicationinfo.website_url')
+    logo_uri = serializers.URLField(required=True, source='applicationinfo.logo_uri')
+    tos_uri = serializers.URLField(required=True, source='applicationinfo.terms_uri')
+    policy_uri = serializers.URLField(required=True, source='applicationinfo.policy_uri')
+    software_id = serializers.CharField(required=True, source='applicationinfo.software_id')
+    software_version = serializers.CharField(required=True, source='applicationinfo.software_version')
+    redirect_uris = serializers.ListField(child=serializers.URLField(), required=True)
+    token_endpoint_auth_method = serializers.CharField(required=False, default='client_secret_basic')
+    grant_types = serializers.ListField(child=serializers.CharField(), required=False, default=['authorization_code'])
+    response_types = serializers.ListField(child=serializers.CharField(), required=False, default=['code'])
+    scope = serializers.CharField(required=False, source='applicationinfo.allowed_scopes')
 
-
-class RegistrationResponseSerializer(serializers.Serializer):
-    client_id = serializers.CharField(source='application.client_id')
-    client_secret = serializers.CharField(source='application.client_secret')
-    client_id_issued_at = serializers.SerializerMethodField()
-    client_secret_expires_at = serializers.IntegerField(default=0)
+    client_id = serializers.CharField(read_only=True)
+    client_secret = serializers.CharField(read_only=True)
+    client_id_issued_at = serializers.SerializerMethodField(read_only=True)
+    client_secret_expires_at = serializers.IntegerField(default=0, read_only=True)
 
     def get_client_id_issued_at(self, obj):
-        return int(obj.application.created.strftime('%s'))
+        try:
+            return int(obj.created.strftime('%s'))
+        except AttributeError:
+            return None
 
+    def validate_grant_types(self, val):
+        if 'authorization_code' not in val:
+            raise serializers.ValidationError(
+                "Missing authorization_code grant type"
+            )
 
-class RegisterApiView(APIView):
-    permission_classes = []
+        for grant_type in val:
+            if grant_type not in ['authorization_code', 'refresh_token']:
+                raise serializers.ValidationError(
+                    "Invalid grant types. Only authorization_code and refresh_token supported"
+                )
+        return val
 
-    def post(self, request):
-        serializer = RegistrationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        app_model = get_application_model()
-        if ApplicationInfo.objects.filter(website_url=serializer.data.get('client_uri')).exists():
-            return Response({"error": "Client already registered"}, status=HTTP_400_BAD_REQUEST)
+    def validate_response_types(self, val):
+        if val != ['code']:
+            raise serializers.ValidationError("Invalid response type")
+        return val
+
+    def validate_scope(self, val):
+        if val:
+            scopes = val.split(' ')
+            for scope in scopes:
+                if scope not in BADGE_CONNECT_SCOPES:
+                    raise serializers.ValidationError(
+                        "Scope {} not valid for automatic application registration. Badge Connect Scopes only".format(
+                            scope
+                        )
+                    )
+            return val
+        else:
+            # If no scopes provided, we assume they want all scopes
+            return ' '.join(BADGE_CONNECT_SCOPES)
+
+    def validate_token_endpoint_auth_method(self, val):
+        if val != 'client_secret_basic':
+            raise serializers.ValidationError("Invalid token authentication method. Only client_secret_basic allowed.")
+        return val
+
+    def validate(self, data):
+        # app_model = get_application_model()
         # All domains in URIs must be HTTPS and match
         uris = set()
         schemes = set()
@@ -189,60 +220,61 @@ class RegisterApiView(APIView):
             parsed = urlparse(uri)
             uris.add(parsed.netloc)
             schemes.add(parsed.scheme)
-        parse_uri(serializer.data.get('client_uri'))
-        parse_uri(serializer.data.get('logo_uri'))
-        parse_uri(serializer.data.get('tos_uri'))
-        parse_uri(serializer.data.get('policy_uri'))
-        for redirect in serializer.data.get('redirect_uris'):
-            if app_model.objects.filter(redirect_uris__contains=redirect):
-                return Response({"error": "Redirect URI already registered"}, status=HTTP_400_BAD_REQUEST)
+
+        parse_uri(data['applicationinfo']['website_url'])
+        parse_uri(data['applicationinfo']['logo_uri'])
+        parse_uri(data['applicationinfo']['terms_uri'])
+        parse_uri(data['applicationinfo']['policy_uri'])
+
+        # if ApplicationInfo.objects.filter(website_url=data.get('client_uri')).exists():
+        #     raise serializers.ValidationError("Client already registered")
+
+        for redirect in data.get('redirect_uris'):
+            # if app_model.objects.filter(redirect_uris__contains=redirect):
+            #     raise serializers.ValidationError("Redirect URI already registered")
             parse_uri(redirect)
         if len(uris) > 1:
-            return Response({"error": "URIs do not match"}, status=HTTP_400_BAD_REQUEST)
+            raise serializers.ValidationError(
+                "client_uri, logo_uri, tos_uri, policy_uri, redirect_uris do not match domain."
+            )
         if len(schemes) > 1 or schemes.pop() != 'https':
-            return Response({"error": "URI schemes must be HTTPS"}, status=HTTP_400_BAD_REQUEST)
+            raise serializers.ValidationError(
+                "client_uri, logo_uri, tos_uri, policy_uri, redirect_uris URI schemes must be https"
+            )
 
-        if serializer.data.get('scopes'):
-            scopes = serializer.data.get('scopes').split(' ')
-            for scope in scopes:
-                if scope not in BADGE_CONNECT_SCOPES:
-                    return Response({"error": "Invalid scope"}, status=HTTP_400_BAD_REQUEST)
-        else:
-            # If no scopes provided, we assume they want all scopes
-            scopes = BADGE_CONNECT_SCOPES
+        return data
 
-        if serializer.data.get('token_endpoint_auth_method') != 'client_secret_basic':
-            return Response({"error": "Invalid token authentication method"}, status=HTTP_400_BAD_REQUEST)
+    def create(self, validated_data):
+        app_model = get_application_model()
+        app = app_model.objects.create(
+            name=validated_data['name'],
+            redirect_uris=' '.join(validated_data['redirect_uris']),
+            authorization_grant_type=app_model.GRANT_AUTHORIZATION_CODE
+        )
+        app_info = ApplicationInfo(
+            application=app,
+            website_url=validated_data['applicationinfo']['website_url'],
+            logo_uri=validated_data['applicationinfo']['logo_uri'],
+            policy_uri=validated_data['applicationinfo']['policy_uri'],
+            software_id=validated_data['applicationinfo']['software_id'],
+            software_version=validated_data['applicationinfo']['software_version'],
+            allowed_scopes=validated_data['applicationinfo']['allowed_scopes'],
+            issue_refresh_token='refresh_token' in validated_data.get('grant_types')
+        )
 
-        if 'authorization_code' not in serializer.data.get('grant_types'):
-            return Response({"error": "Missing authorization_code grant type"}, status=HTTP_400_BAD_REQUEST)
-
-        for grant_type in serializer.data.get('grant_types'):
-            if grant_type not in ['authorization_code', 'refresh_token']:
-                return Response({"error": "Invalid grant types"}, status=HTTP_400_BAD_REQUEST)
-
-        if serializer.data.get('response_types') != ['code']:
-            return Response({"error": "Invalid response type"}, status=HTTP_400_BAD_REQUEST)
-
-        app = app_model.objects.create()
-        app_info = ApplicationInfo(application=app)
-
-        app.name = serializer.data.get('client_name')
-        app.redirect_uris = ' '.join(serializer.data.get('redirect_uris'))
-        app.authorization_grant_type = app.GRANT_AUTHORIZATION_CODE
-        app.save()
-
-        app_info.website_url = serializer.data.get('client_uri')
-        app_info.logo_uri = serializer.data.get('logo_uri')
-        app_info.policy_uri = serializer.data.get('policy_uri')
-        app_info.software_id = serializer.data.get('software_id')
-        app_info.software_version = serializer.data.get('software_version')
-        app_info.allowed_scopes = ' '.join(scopes)
-        app_info.issue_refresh_token = 'refresh_token' in serializer.data.get('grant_types')
         app_info.save()
 
-        response = RegistrationResponseSerializer(instance=app_info)
-        return Response(response.data, status=HTTP_201_CREATED)
+        return app
+
+
+class RegisterApiView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        serializer = RegistrationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=HTTP_201_CREATED)
 
 
 class TokenView(OAuth2ProviderTokenView):

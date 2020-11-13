@@ -83,7 +83,11 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
 
         response = self.client.post('/o/register', registration_data)
         client_id = response.data['client_id']
-        for required_property in ['client_id', 'client_secret', 'client_id_issued_at', 'client_secret_expires_at']:
+        for required_property in [
+            'client_id', 'client_secret', 'client_id_issued_at', 'client_secret_expires_at',
+            'client_name', 'client_uri', 'logo_uri', 'tos_uri', 'policy_uri', 'software_id', 'software_version',
+            'redirect_uris'
+        ]:
             self.assertIn(required_property, response.data)
 
         # At this point the client would trigger the user's agent to make a GET request to the authorize UI endpooint
