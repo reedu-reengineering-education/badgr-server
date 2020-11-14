@@ -266,6 +266,14 @@ class RegistrationSerializer(serializers.Serializer):
 
         return app
 
+    def to_representation(self, instance):
+        rep = super(RegistrationSerializer, self).to_representation(instance)
+        if ' ' in instance.redirect_uris:
+            rep['redirect_uris'] = ' '.split(instance.redirect_uris)
+        else:
+            rep['redirect_uris'] = [instance.redirect_uris]
+        return rep
+
 
 class RegisterApiView(APIView):
     permission_classes = []
