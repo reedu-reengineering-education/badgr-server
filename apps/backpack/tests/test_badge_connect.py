@@ -389,7 +389,6 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         self.assertTrue('refresh_token' not in token_data)
 
 
-
 class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
 
     def test_unauthenticated_requests(self):
@@ -413,6 +412,27 @@ class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
         self.assertEqual(response.status_code, 401)
         self.assertJSONEqual(force_text(response.content), expected_response)
 
+    @responses.activate
+    def test_submit_badges_with_intragraph_references(self):
+        setup_resources([
+            {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png", 'mode': 'rb'},
+        ])
+        self.setup_user(email='test@example.com', authenticate=True)
+
+        assertion = {
+            "@context": 'https://w3id.org/openbadges/v2',
+            "id": 'http://a.com/assertion-embedded1',
+            "type": "Assertion",
+        }
+        post_input = {
+            'assertion': assertion
+        }
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post('/bcv1/assertions', post_input, format='json')
+        self.assertEqual(response.status_code, 201)
 
     def test_assertions_pagination(self):
         self.user = self.setup_user(authenticate=True)
