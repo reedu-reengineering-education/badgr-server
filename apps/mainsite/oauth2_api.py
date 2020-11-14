@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-
+import base64
 import json
 import re
 from urllib.parse import urlparse
@@ -300,13 +300,24 @@ class TokenView(OAuth2ProviderTokenView):
         grant_type = request.POST.get('grant_type', 'password')
         username = request.POST.get('username')
 
+        try:
+            auth_header = request.META['HTTP_AUTHORIZATION']
+            credentials = auth_header.split(' ')
+            if credentials[0] == 'Basic':
+                client_id, client_secret = base64.b64decode(credentials[1].encode('ascii')).decode('ascii').split(':')
+        except (KeyError, IndexError, ValueError, TypeError):
+            client_id = request.POST.get('client_id', None)
+            client_secret = None
+
         # pre-validate scopes requested
-        client_id = request.POST.get('client_id', None)
+
         requested_scopes = [s for s in scope_to_list(request.POST.get('scope', '')) if s]
         oauth_app = None
         if client_id:
             try:
                 oauth_app = Application.objects.get(client_id=client_id)
+                if client_secret and oauth_app.client_secret != client_secret:
+                    return HttpResponse(json.dumps({"error": "invalid client_secret"}), status=HTTP_400_BAD_REQUEST)
             except Application.DoesNotExist:
                 return HttpResponse(json.dumps({"error": "invalid client_id"}), status=HTTP_400_BAD_REQUEST)
 

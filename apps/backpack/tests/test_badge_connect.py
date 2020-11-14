@@ -83,6 +83,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
 
         response = self.client.post('/o/register', registration_data)
         client_id = response.data['client_id']
+        client_secret = response.data['client_secret']
         self.assertEqual(registration_data['redirect_uris'][0], response.data['redirect_uris'][0])
         for required_property in [
             'client_id', 'client_secret', 'client_id_issued_at', 'client_secret_expires_at',
@@ -90,6 +91,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
             'redirect_uris'
         ]:
             self.assertIn(required_property, response.data)
+
 
         # At this point the client would trigger the user's agent to make a GET request to the authorize UI endpooint
         # which would in turn make sure the user is authenticated and then trigger a post to the API to obtain a
@@ -120,11 +122,16 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         data = {
             'grant_type': 'authorization_code',
             'code': code,
-            'client_id': client_id,
             'redirect_uri': registration_data['redirect_uris'][0],
             'scope': ' '.join(requested_scopes),
             'code_verifier': verifier
         }
+        basic_auth_header = 'Basic ' + base64.b64encode(
+            '{}:{}'.format(
+                parse.quote(client_id), parse.quote(client_secret)
+            ).encode('ascii')
+        ).decode('ascii')
+        self.client.credentials(HTTP_AUTHORIZATION=basic_auth_header)
         response = self.client.post('/o/token', data=data)
         if kwargs.get('pkce_fail') is True:
             self.assertEqual(response.status_code, 400)
