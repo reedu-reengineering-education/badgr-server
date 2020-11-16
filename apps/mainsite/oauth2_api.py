@@ -255,6 +255,7 @@ class RegistrationSerializer(serializers.Serializer):
             application=app,
             website_url=validated_data['applicationinfo']['website_url'],
             logo_uri=validated_data['applicationinfo']['logo_uri'],
+            terms_uri=validated_data['applicationinfo']['terms_uri'],
             policy_uri=validated_data['applicationinfo']['policy_uri'],
             software_id=validated_data['applicationinfo']['software_id'],
             software_version=validated_data['applicationinfo']['software_version'],
