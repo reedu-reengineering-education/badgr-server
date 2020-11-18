@@ -40,7 +40,7 @@ class BadgeUserEmailSerializerV2(DetailSerializerV2):
 
 class BadgeUserSerializerV2(DetailSerializerV2):
     firstName = StripTagsCharField(source='first_name', max_length=30, allow_blank=True)
-    lastName = StripTagsCharField(source='last_name', max_length=30, allow_blank=True)
+    lastName = StripTagsCharField(source='last_name', max_length=150, allow_blank=True)
     password = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False, validators=[PasswordValidator()])
     currentPassword = serializers.CharField(style={'input_type': 'password'}, write_only=True, required=False)
     emails = BadgeUserEmailSerializerV2(many=True, source='email_items', required=False)

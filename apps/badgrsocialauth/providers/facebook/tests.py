@@ -18,7 +18,7 @@ class VerifiedFacebookProviderTests(DoesNotSendVerificationEmailMixin, BadgrOAut
            "id": "630595557",
            "name": "Raymond Penners",
            "first_name": "Raymond",
-           "last_name": "Penners",
+           "last_name": "Penners, Ph.D, Extraordinary, Famous, Most Respected",
            "email": "raymond.penners@example.com",
            "link": "https://www.facebook.com/raymond.penners",
            "username": "raymond.penners",
