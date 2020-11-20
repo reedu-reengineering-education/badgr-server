@@ -30,7 +30,9 @@ from badgeuser.authcode import authcode_for_accesstoken, accesstoken_for_authcod
 from badgeuser.models import CachedEmailAddress, BadgeUser
 from badgrsocialauth.models import Saml2Account, Saml2Configuration
 from badgrsocialauth.utils import (set_session_badgr_app, get_session_authcode,
-                                   get_session_verification_email, set_session_authcode,)
+                                   get_session_verification_email, set_session_authcode,
+                                   userdata_from_saml_assertion,
+                                   )
 from django.conf import settings
 from mainsite.models import BadgrApp
 from mainsite.utils import set_url_query_params
@@ -387,15 +389,9 @@ def assertion_consumer_service(request, idp_name):
         ))
 
     authn_response.get_identity()
-    if len(set(settings.SAML_EMAIL_KEYS) & set(authn_response.ava.keys())) == 0:
-        raise ValidationError('Missing email in SAML assertions, received {}'.format(list(authn_response.ava.keys())))
-    if len(set(settings.SAML_FIRST_NAME_KEYS) & set(authn_response.ava.keys())) == 0:
-        raise ValidationError('Missing first_name in SAML assertions, received {}'.format(list(authn_response.ava.keys())))
-    if len(set(settings.SAML_LAST_NAME_KEYS) & set(authn_response.ava.keys())) == 0:
-        raise ValidationError('Missing last_name in SAML assertions, received {}'.format(list(authn_response.ava.keys())))
-    email = [authn_response.ava[key][0] for key in settings.SAML_EMAIL_KEYS if key in authn_response.ava][0]
-    first_name = [authn_response.ava[key][0] for key in settings.SAML_FIRST_NAME_KEYS if key in authn_response.ava][0]
-    last_name = [authn_response.ava[key][0] for key in settings.SAML_LAST_NAME_KEYS if key in authn_response.ava][0]
+    email = userdata_from_saml_assertion(authn_response.ava, 'email', config)
+    first_name = userdata_from_saml_assertion(authn_response.ava, 'first_name', config)
+    last_name = userdata_from_saml_assertion(authn_response.ava, 'last_name', config)
     return auto_provision(request, email, first_name, last_name, config)
 
 

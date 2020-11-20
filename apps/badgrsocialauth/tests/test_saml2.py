@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 
 from contextlib import closing
@@ -13,7 +14,7 @@ from django.test.client import RequestFactory
 
 from badgrsocialauth.models import Saml2Configuration, Saml2Account
 from badgrsocialauth.views import auto_provision, saml2_client_for, create_saml_config_for
-from badgrsocialauth.utils import set_session_authcode, set_session_badgr_app
+from badgrsocialauth.utils import set_session_authcode, set_session_badgr_app, userdata_from_saml_assertion
 
 from badgeuser.models import CachedEmailAddress, BadgeUser
 
@@ -435,6 +436,34 @@ class SAML2Tests(BadgrTestCase):
         self.assertIn(self.badgr_app.ui_login_redirect, resp.url)
         Saml2Account.objects.get(user=t_user)  # There is a Saml account associated with the user.
         CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)  # User has the email.
+
+    def test_can_extract_custom_userdata(self):
+        self.config.custom_settings = json.dumps({
+            'first_name': ['customMyClientFirstName']
+        })
+        self.config.save()
+        reloaded_config = Saml2Configuration.objects.get(pk=self.config.pk)
+        self.assertEqual(reloaded_config.custom_settings_data['email'], [], "default is set to an empty list")
+        self.assertEqual(reloaded_config.custom_settings_data['first_name'], ['customMyClientFirstName'])
+
+        fake_saml_assertion = {
+            'emailaddress': ['moe@example.com'],
+            'LastName': 'McMoe',
+            'customMyClientFirstName': ['Moe']
+        }
+
+        self.assertEqual(
+            userdata_from_saml_assertion(fake_saml_assertion, 'email', config=reloaded_config),
+            fake_saml_assertion['emailaddress'][0]
+        )
+        self.assertEqual(
+            userdata_from_saml_assertion(fake_saml_assertion, 'first_name', config=reloaded_config),
+            fake_saml_assertion['customMyClientFirstName'][0]
+        )
+        self.assertEqual(
+            userdata_from_saml_assertion(fake_saml_assertion, 'last_name', config=reloaded_config),
+            fake_saml_assertion['LastName']
+        )
 
 
 class SamlServer(Server):
