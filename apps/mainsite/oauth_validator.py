@@ -28,7 +28,7 @@ class BadgrRequestValidator(OAuth2Validator):
                         credentials[1].encode('ascii')
                     ).decode('ascii').split(':')
 
-            except (KeyError, IndexError, TypeError, ValueError):
+            except (KeyError, IndexError, TypeError, ValueError, AttributeError,):
                 request.grant_type = 'password'
                 request.client_id = getattr(settings, 'OAUTH2_DEFAULT_CLIENT_ID', 'public')
                 request.client_secret = ''
