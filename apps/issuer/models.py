@@ -11,6 +11,7 @@ from itertools import chain
 import cachemodel
 import os
 from allauth.account.adapter import get_adapter
+from cachemodel import CACHE_FOREVER_TIMEOUT
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -25,6 +26,7 @@ from json import dumps as json_dumps
 from jsonfield import JSONField
 from openbadges_bakery import bake
 from django.utils import timezone
+from django.core.cache import cache
 
 import badgrlog
 from entity.models import BaseVersionedEntity
@@ -34,6 +36,7 @@ from mainsite.mixins import HashUploadedImage, ResizeUploadedImage, ScrubUploade
 from mainsite.models import BadgrApp, EmailBlacklist
 from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri
+
 from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_rebaked_filename,
                     generate_sha256_hashstring, get_obi_context, parse_original_datetime, UNVERSIONED_BAKED_VERSION)
 
@@ -210,7 +213,7 @@ class Issuer(ResizeUploadedImage,
         self._state.fields_cache = fields_cache  # restore the fields cache
 
     def delete(self, *args, **kwargs):
-        if self.recipient_count > 0:
+        if self.has_nonrevoked_assertions():
             raise ProtectedError("Issuer can not be deleted because it has previously issued badges.", self)
 
         # remove any unused badgeclasses owned by issuer
@@ -322,10 +325,6 @@ class Issuer(ResizeUploadedImage,
     @cachemodel.cached_method(auto_publish=True)
     def cached_recipient_groups(self):
         return self.recipientgroup_set.all()
-
-    @property
-    def recipient_count(self):
-        return sum(bc.recipient_count() for bc in self.cached_badgeclasses())
 
     @property
     def image_preview(self):
@@ -500,9 +499,9 @@ class BadgeClass(ResizeUploadedImage,
         self._state.fields_cache = fields_cache  # restore the fields cache
 
     def delete(self, *args, **kwargs):
-        # if there are some assertions and some have not expired
-        if self.recipient_count() > 0 and self.badgeinstances.filter(revoked=False).filter(
-                models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())).count() > 0:
+        # if there are some assertions that have not expired
+        if self.badgeinstances.filter(revoked=False).filter(
+                models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())).exists():
             raise ProtectedError("BadgeClass may only be deleted if all BadgeInstances have been revoked.", self)
 
         if self.pathway_element_count() > 0:
@@ -559,8 +558,14 @@ class BadgeClass(ResizeUploadedImage,
     def cached_issuer(self):
         return Issuer.cached.get(pk=self.issuer_id)
 
-    @cachemodel.cached_method(auto_publish=True)
-    def recipient_count(self):
+    def has_nonrevoked_assertions(self):
+        return self.badgeinstances.filter(revoked=False).exists()
+
+    """
+    Included for legacy purposes. It is inefficient to routinely call this for badge classes with large numbers of assertions.
+    """
+    @property
+    def v1_api_recipient_count(self):
         return self.badgeinstances.filter(revoked=False).count()
 
     def pathway_element_count(self):
@@ -952,6 +957,7 @@ class BadgeInstance(BaseAuditedModel,
 
     def delete(self, *args, **kwargs):
         badgeclass = self.badgeclass
+
         recipient_profile = self.cached_recipient_profile
         super(BadgeInstance, self).delete(*args, **kwargs)
         badgeclass.publish()

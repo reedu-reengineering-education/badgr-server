@@ -1075,7 +1075,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
 
-        original_recipient_count = test_badgeclass.recipient_count()
+        original_recipient_count = test_badgeclass.badgeinstances.filter(revoked=False).count()
 
         new_assertion_props = {
             'email': 'test3@example.com',
@@ -1091,7 +1091,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             badge=test_badgeclass.entity_id,
         ))
         badgeclass_data = response.data
-        self.assertEqual(badgeclass_data.get('recipient_count'), original_recipient_count+1)
+        self.assertEqual(test_badgeclass.badgeinstances.filter(revoked=False).count(), original_recipient_count+1)
 
     def test_batch_assertions_throws_400(self):
         test_user = self.setup_user(authenticate=True)
