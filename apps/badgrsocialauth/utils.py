@@ -1,3 +1,4 @@
+import json
 import urllib
 
 from django.conf import settings
@@ -84,3 +85,25 @@ def userdata_from_saml_assertion(claims, data_field='email', config=None):
         raise ValidationError('Missing {} in SAML assertions, received {}'.format(data_field, list(claims.keys())))
 
     return [list_of(claims[key])[0] for key in configured_keys[data_field] if key in claims][0]
+
+
+DEFAULT_VALID_CUSTOM_SETTINGS_KEYS = ('email', 'first_name', 'last_name',)
+
+
+def custom_settings_filtered_values(input_data, valid_keys=DEFAULT_VALID_CUSTOM_SETTINGS_KEYS):
+    def filter_value(value):
+        if len([v for v in list_of(value) if not isinstance(v, str)]):
+            return list()
+        return list_of(value)
+
+    if input_data:
+        try:
+            data = json.loads(input_data)
+            filtered_data = {
+                'email': filter_value(data.get('email')),
+                'first_name': filter_value(data.get('first_name')),
+                'last_name': filter_value(data.get('last_name'))
+            }
+            return json.dumps(filtered_data, indent=2)
+        except (TypeError, ValueError, AttributeError,):
+            return '{}'

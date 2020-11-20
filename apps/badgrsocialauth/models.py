@@ -5,7 +5,7 @@ from django.db import models
 from django.shortcuts import reverse
 from django.utils import timezone
 from badgeuser.models import BadgeUser
-from mainsite.utils import list_of
+from .utils import custom_settings_filtered_values
 
 
 class Saml2Configuration(models.Model):
@@ -42,17 +42,7 @@ class Saml2Configuration(models.Model):
             return dict()
 
     def save(self, **kwargs):
-        if self.custom_settings:
-            try:
-                data = json.loads(self.custom_settings)
-                filtered_data = {
-                    'email': list_of(data.get('email', [])),
-                    'first_name': list_of(data.get('first_name', [])),
-                    'last_name': list_of(data.get('last_name', []))
-                }
-                self.custom_settings = json.dumps(filtered_data, indent=2)
-            except (TypeError, ValueError,):
-                self.custom_settings = '{}'
+        self.custom_settings = custom_settings_filtered_values(self.custom_settings)
         return super(Saml2Configuration, self).save(**kwargs)
 
 
