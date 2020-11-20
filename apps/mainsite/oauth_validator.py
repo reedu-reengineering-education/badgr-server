@@ -1,3 +1,5 @@
+import base64
+
 from django.conf import settings
 from oauth2_provider.oauth2_validators import OAuth2Validator
 from oauth2_provider.scopes import get_scopes_backend
@@ -18,10 +20,19 @@ class BadgrRequestValidator(OAuth2Validator):
     def authenticate_client(self, request, *args, **kwargs):
         # if a request doesnt include client_id or grant_type assume defaults
         if not (request.client_id and request.grant_type and request.client_secret):
-            request.grant_type = 'password'
-            request.client_id = getattr(settings, 'OAUTH2_DEFAULT_CLIENT_ID', 'public')
-            request.client_secret = ''
-            request.scopes = ['rw:profile', 'rw:issuer', 'rw:backpack']
+            try:
+                auth_header = request.headers.get('HTTP_AUTHORIZATION', None)
+                credentials = auth_header.split(' ')
+                if credentials[0] == 'Basic':
+                    request.client_id, request.client_secret = base64.b64decode(
+                        credentials[1].encode('ascii')
+                    ).decode('ascii').split(':')
+
+            except (KeyError, IndexError, TypeError, ValueError, AttributeError,):
+                request.grant_type = 'password'
+                request.client_id = getattr(settings, 'OAUTH2_DEFAULT_CLIENT_ID', 'public')
+                request.client_secret = ''
+                request.scopes = ['rw:profile', 'rw:issuer', 'rw:backpack']
         return super(BadgrRequestValidator, self).authenticate_client(request, *args, **kwargs)
 
     def validate_scopes(self, client_id, scopes, client, request, *args, **kwargs):

@@ -43,7 +43,7 @@ def badge_connect_api_info(domain):
             ),
         "badgeConnectAPI": [{
             "name": badgr_app.name,
-            "image": "https://placekitten.com/300/300", # TODO
+            "image": '{}/images/logo.png'.format(settings.STATIC_URL),
             "apiBase": '{}{}'.format(settings.HTTP_ORIGIN, '/bcv1'),
             "version": "v1p0",
             "termsOfServiceUrl": "https://badgr.com/terms-of-service.html",

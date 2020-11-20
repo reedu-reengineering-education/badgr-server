@@ -83,8 +83,15 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
 
         response = self.client.post('/o/register', registration_data)
         client_id = response.data['client_id']
-        for required_property in ['client_id', 'client_secret', 'client_id_issued_at', 'client_secret_expires_at']:
+        client_secret = response.data['client_secret']
+        self.assertEqual(registration_data['redirect_uris'][0], response.data['redirect_uris'][0])
+        for required_property in [
+            'client_id', 'client_secret', 'client_id_issued_at', 'client_secret_expires_at',
+            'client_name', 'client_uri', 'logo_uri', 'tos_uri', 'policy_uri', 'software_id', 'software_version',
+            'redirect_uris'
+        ]:
             self.assertIn(required_property, response.data)
+
 
         # At this point the client would trigger the user's agent to make a GET request to the authorize UI endpooint
         # which would in turn make sure the user is authenticated and then trigger a post to the API to obtain a
@@ -104,6 +111,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         response = self.client.post(url, data=data)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data['success_url'].startswith(registration_data['redirect_uris'][0]))
+        self.assertTrue('scope' in response.data['success_url'])
         url = parse.urlparse(response.data['success_url'])
         code = parse.parse_qs(url.query)['code'][0]
 
@@ -114,11 +122,16 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         data = {
             'grant_type': 'authorization_code',
             'code': code,
-            'client_id': client_id,
             'redirect_uri': registration_data['redirect_uris'][0],
             'scope': ' '.join(requested_scopes),
             'code_verifier': verifier
         }
+        basic_auth_header = 'Basic ' + base64.b64encode(
+            '{}:{}'.format(
+                parse.quote(client_id), parse.quote(client_secret)
+            ).encode('ascii')
+        ).decode('ascii')
+        self.client.credentials(HTTP_AUTHORIZATION=basic_auth_header)
         response = self.client.post('/o/token', data=data)
         if kwargs.get('pkce_fail') is True:
             self.assertEqual(response.status_code, 400)
@@ -376,7 +389,6 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         self.assertTrue('refresh_token' not in token_data)
 
 
-
 class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
 
     def test_unauthenticated_requests(self):
@@ -400,6 +412,27 @@ class BadgeConnectAPITests(BadgrTestCase, SetupIssuerHelper):
         self.assertEqual(response.status_code, 401)
         self.assertJSONEqual(force_text(response.content), expected_response)
 
+    @responses.activate
+    def test_submit_badges_with_intragraph_references(self):
+        setup_resources([
+            {'url': 'http://a.com/assertion-embedded1', 'filename': '2_0_assertion_embedded_badgeclass.json'},
+            {'url': OPENBADGES_CONTEXT_V2_URI, 'response_body': json.dumps(OPENBADGES_CONTEXT_V2_DICT)},
+            {'url': 'http://a.com/badgeclass_image', 'filename': "unbaked_image.png", 'mode': 'rb'},
+        ])
+        self.setup_user(email='test@example.com', authenticate=True)
+
+        assertion = {
+            "@context": 'https://w3id.org/openbadges/v2',
+            "id": 'http://a.com/assertion-embedded1',
+            "type": "Assertion",
+        }
+        post_input = {
+            'assertion': assertion
+        }
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
+                        new=lambda a, b: False):
+            response = self.client.post('/bcv1/assertions', post_input, format='json')
+        self.assertEqual(response.status_code, 201)
 
     def test_assertions_pagination(self):
         self.user = self.setup_user(authenticate=True)
