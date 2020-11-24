@@ -6,23 +6,18 @@ from rest_framework import views, exceptions, status
 from rest_framework.response import Response
 
 from backpack.serializers_bcv1 import BadgeConnectErrorSerializer
-from entity.serializers import V2ErrorSerializer
+from entity.serializers import V2ErrorSerializer, Rfc7591ErrorSerializer
 from entity.authentication import CSRFPermissionDenied
 
 
 def exception_handler(exc, context):
-    version = context.get('kwargs', None).get('version', 'v1')
-    if version == 'v1':
-        # Use the default exception-handling logic for v1
-        if isinstance(exc, ProtectedError):
-            description, protected_objects = exc.args
-            return Response(description, status=status.HTTP_400_BAD_REQUEST)
-        return views.exception_handler(exc, context)
-    elif version == 'v2':
+    version = context.get('kwargs', {}).get('version', 'v1')
+
+    if version in ['v2', 'rfc7591']:
         description = 'miscellaneous error'
         field_errors = {}
         validation_errors = []
-        response_code = None
+
         if isinstance(exc, exceptions.ParseError):
             description = 'bad request'
             validation_errors = [exc.detail]
@@ -64,14 +59,17 @@ def exception_handler(exc, context):
         else:
             # Unrecognized exception, return 500 error
             return None
-
-        serializer = V2ErrorSerializer(instance={},
-                                       success=False,
-                                       description=description,
-                                       field_errors=field_errors,
-                                       validation_errors=validation_errors)
-
+        if version == 'v2':
+            serializer = V2ErrorSerializer(
+                instance={}, success=False, description=description,
+                field_errors=field_errors, validation_errors=validation_errors
+            )
+        else:
+            serializer = Rfc7591ErrorSerializer(
+                instance={}, field_errors=field_errors, validation_errors=validation_errors
+            )
         return Response(serializer.data, status=response_code)
+
     elif version == 'bcv1':
         # Badge Connect errors
         error = None
@@ -102,4 +100,10 @@ def exception_handler(exc, context):
                                                  status_text=status_text,
                                                  status_code=status_code)
         return Response(serializer.data, status=status_code)
-                        
+
+    else:
+        # Use the default exception-handling logic for v1
+        if isinstance(exc, ProtectedError):
+            description, protected_objects = exc.args
+            return Response(description, status=status.HTTP_400_BAD_REQUEST)
+        return views.exception_handler(exc, context)
