@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError as RestframeworkValidationError
 
+from mainsite.utils import list_of
+
 
 class EntityRelatedFieldV2(serializers.RelatedField):
     def __init__(self, *args, **kwargs):
@@ -168,7 +170,7 @@ class V2ErrorSerializer(BaseSerializerV2):
 
     def __init__(self, *args, **kwargs):
         self.field_errors = kwargs.pop('field_errors', False)
-        self.validation_errors = kwargs.pop('validation_errors', 'error')
+        self.validation_errors = kwargs.pop('validation_errors', ['error'])
         super(V2ErrorSerializer, self).__init__(*args, **kwargs)
 
     def to_representation(self, instance):
@@ -186,5 +188,13 @@ class V2ErrorSerializer(BaseSerializerV2):
                                                   validation_errors=self.validation_errors)
 
 
-
-
+class Rfc7591ErrorSerializer(V2ErrorSerializer):
+    def to_representation(self, instance):
+        errors_list = self.validation_errors
+        for key in self.field_errors.keys():
+            this_field_errors = self.field_errors.get(key)
+            errors_list.append("{}: {}".format(key, str(list_of(this_field_errors[0])[0])))
+        return {
+            'error': errors_list[0],
+            'error_description': '; '.join(errors_list)
+        }

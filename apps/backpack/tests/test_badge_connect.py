@@ -175,8 +175,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
 
         with mock.patch('mainsite.blacklist.api_query_is_in_blacklist',
                         new=lambda a, b: False):
-            response = self.client.post('/bcv1/assertions', data={
-                'id': REMOTE_BADGE_URI}, format='json')
+            response = self.client.post('/bcv1/assertions', data={'assertion': {'id': REMOTE_BADGE_URI}}, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertJSONEqual(force_text(response.content), {
             "status": expected_status
@@ -214,7 +213,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
     def test_cannot_register_and_auth_badge_connect_app_if_pkce_verification_fails(self):
         self._perform_registration_and_authentication(pkce_fail=True)
 
-    def test_reject_duplicate_redirect_uris(self):
+    def test_supply_default_scope(self):
         registration_data = {
             "client_name": "Badge Issuer",
             "client_uri": "https://issuer.example.com",
@@ -239,11 +238,6 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
 
         response = self.client.post('/o/register', registration_data)
         self.assertTrue('client_id' in response.data)
-
-        registration_data['client_uri'] += '?foo'
-        response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "Redirect URI already registered")
-
 
     def test_reject_different_domains(self):
         registration_data = {
@@ -311,23 +305,23 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         user = self.setup_user(email='test@example.com', authenticate=True)
 
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URI schemes must be HTTPS")
+        self.assertEqual(response.data['error'], "redirect_uris: Must be a valid HTTPS URI")
         registration_data['redirect_uris'][0] = "https://issuer.example.com/o/redirect"
         registration_data['logo_uri'] = "http://issuer.example.com/logo.png"
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URI schemes must be HTTPS")
+        self.assertEqual(response.data['error'], "logo_uri: Must be a valid HTTPS URI")
         registration_data['logo_uri'] = "https://issuer.example.com/logo.png"
         registration_data['tos_uri'] = "http://issuer.example.com/terms-of-service"
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URI schemes must be HTTPS")
+        self.assertEqual(response.data['error'], "tos_uri: Must be a valid HTTPS URI")
         registration_data['tos_uri'] = "https://issuer.example.com/terms-of-service"
         registration_data['policy_uri'] = "http://issuer.example.com/privacy-policy"
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URI schemes must be HTTPS")
+        self.assertEqual(response.data['error'], "policy_uri: Must be a valid HTTPS URI")
         registration_data['policy_uri'] = "https://issuer.example.com/privacy-policy"
         registration_data['client_uri'] = "http://issuer.example.com"
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URI schemes must be HTTPS")
+        self.assertEqual(response.data['error'], "client_uri: Must be a valid HTTPS URI")
 
     def test_no_refresh_token(self):
         requested_scopes = [
