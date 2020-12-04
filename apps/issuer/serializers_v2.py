@@ -199,6 +199,12 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
 
         return super(IssuerSerializerV2, self).update(instance, validated_data)
 
+    def to_representation(self, instance):
+        include_staff = self.context['request'].query_params.get('include_staff', 'true').lower()
+        if self.fields.get('staff') and include_staff == 'false':
+            self.fields.pop('staff')
+        return super(IssuerSerializerV2, self).to_representation(instance)
+
 
 class AlignmentItemSerializerV2(BaseSerializerV2, OriginalJsonSerializerMixin):
     targetName = StripTagsCharField(source='target_name')
