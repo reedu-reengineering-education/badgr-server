@@ -200,8 +200,10 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         return super(IssuerSerializerV2, self).update(instance, validated_data)
 
     def to_representation(self, instance):
-        include_staff = self.context['request'].query_params.get('include_staff', 'true').lower()
-        if self.fields.get('staff') and include_staff == 'false':
+        from recipient.api import _scrub_boolean
+
+        include_staff = _scrub_boolean(self.context['request'].query_params.get('include_staff', True))
+        if self.fields.get('staff') and not include_staff:
             self.fields.pop('staff')
         return super(IssuerSerializerV2, self).to_representation(instance)
 
