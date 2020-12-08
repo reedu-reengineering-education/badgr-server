@@ -343,7 +343,10 @@ class TokenView(OAuth2ProviderTokenView):
 
         if oauth_app and not oauth_app.applicationinfo.issue_refresh_token:
             data = json.loads(response.content)
-            del data['refresh_token']
+            try:
+                del data['refresh_token']
+            except KeyError:
+                pass
             response.content = json.dumps(data)
 
         if grant_type == "password" and response.status_code == 401:
