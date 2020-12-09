@@ -386,6 +386,8 @@ class Issuer(ResizeUploadedImage,
         id = self.badgrapp_id if self.badgrapp_id else None
         return BadgrApp.objects.get_by_id_or_default(badgrapp_id=id)
 
+    def has_nonrevoked_assertions(self):
+        return self.badgeinstance_set.filter(revoked=False).exists()
 
 
 class IssuerStaff(cachemodel.CacheModel):
@@ -427,10 +429,11 @@ class IssuerStaff(cachemodel.CacheModel):
     def cached_issuer(self):
         return Issuer.cached.get(pk=self.issuer_id)
 
+
 def get_user_or_none(recipient_id, recipient_type):
     from badgeuser.models import UserRecipientIdentifier, CachedEmailAddress
     user = None
-    if recipient_type=='email':
+    if recipient_type == 'email':
         verified_email = CachedEmailAddress.objects.filter(verified=True, email=recipient_id).first()
         if verified_email:
             user = verified_email.user

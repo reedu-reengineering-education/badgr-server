@@ -263,23 +263,23 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         user = self.setup_user(email='test@example.com', authenticate=True)
 
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URIs do not match")
+        self.assertIn("do not match", response.data['error'])
         registration_data['redirect_uris'][0] = "https://issuer2.example.com/o/redirect"
         registration_data['logo_uri'] = "https://issuer2.example.com/logo.png"
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URIs do not match")
+        self.assertIn("do not match", response.data['error'])
         registration_data['logo_uri'] = "https://issuer.example.com/logo.png"
         registration_data['tos_uri'] = "https://issuer2.example.com/terms-of-service"
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URIs do not match")
+        self.assertIn("do not match", response.data['error'])
         registration_data['tos_uri'] = "https://issuer.example.com/terms-of-service"
         registration_data['policy_uri'] = "https://issuer2.example.com/privacy-policy"
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URIs do not match")
+        self.assertIn("do not match", response.data['error'])
         registration_data['policy_uri'] = "https://issuer.example.com/privacy-policy"
         registration_data['client_uri'] = "https://issuer2.example.com"
         response = self.client.post('/o/register', registration_data)
-        self.assertEqual(response.data['error'], "URIs do not match")
+        self.assertIn("do not match", response.data['error'])
 
     def test_all_https_uris(self):
         registration_data = {

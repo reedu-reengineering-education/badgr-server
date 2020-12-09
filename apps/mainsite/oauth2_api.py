@@ -302,6 +302,7 @@ class TokenView(OAuth2ProviderTokenView):
 
         grant_type = request.POST.get('grant_type', 'password')
         username = request.POST.get('username')
+        client_id = None
 
         try:
             auth_header = request.META['HTTP_AUTHORIZATION']
