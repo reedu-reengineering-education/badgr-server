@@ -40,7 +40,18 @@ class FailedLoginAttempt(BaseBadgrEvent):
             'username': self.username,
             'endpoint': self.endpoint,
             'ipAddress': client_ip_from_request(self.request)
+        }
 
+
+class DeprecatedApiAuthToken(BaseBadgrEvent):
+    def __init__(self, request, username, **kwargs):
+        self.request = request
+        self.username = username
+
+    def to_representation(self):
+        return {
+            'username': self.username,
+            'ipAddress': client_ip_from_request(self.request)
         }
 
 

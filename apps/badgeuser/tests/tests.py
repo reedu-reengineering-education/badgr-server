@@ -14,6 +14,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from mainsite import TOP_DIR
+from mock import patch
 from rest_framework.authtoken.models import Token
 
 from badgeuser.models import (
@@ -575,6 +576,17 @@ class UserEmailTests(BadgrTestCase):
             'password': new_password,
         })
         self.assertEqual(response.status_code, 200)
+
+    @patch('mainsite.serializers.badgrlogger.event')
+    def test_log_when_api_auth_token_endpoint_is_used(self, mocked_logger):
+        response = self.client.post('/api-auth/token', {
+            'username': self.first_user.username,
+            'password': 'secret',
+        })
+        self.assertEqual(response.status_code, 200)
+        mocked_logger.assert_called_once()
+        self.assertIsNotNone(mocked_logger.call_args[0][0].request.META.get("REMOTE_ADDR", None))
+        self.assertEquals(mocked_logger.call_args[0][0].username, self.first_user.username)
 
     def test_lower_variant_autocreated_on_new_email(self):
         first_email = CachedEmailAddress(

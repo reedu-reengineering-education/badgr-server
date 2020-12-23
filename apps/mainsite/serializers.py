@@ -2,6 +2,7 @@ import json
 from collections import OrderedDict
 import collections
 import pytz
+import badgrlog
 
 import rest_framework
 from django.conf import settings
@@ -18,6 +19,7 @@ from six import string_types
 from entity.serializers import BaseSerializerV2
 from mainsite.pagination import BadgrCursorPagination
 
+badgrlogger = badgrlog.BadgrLogger()
 
 class HumanReadableBooleanField(serializers.BooleanField):
     TRUE_VALUES = serializers.BooleanField.TRUE_VALUES | set(('on', 'On', 'ON'))
@@ -160,6 +162,8 @@ class VerifiedAuthTokenSerializer(AuthTokenSerializer):
     def validate(self, attrs):
         attrs = super(VerifiedAuthTokenSerializer, self).validate(attrs)
         user = attrs.get('user')
+
+        badgrlogger.event(badgrlog.DeprecatedApiAuthToken(self.context['request'], user.username))
         if not user.verified:
             try:
                 email = user.cached_emails()[0]
