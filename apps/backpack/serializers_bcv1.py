@@ -55,6 +55,7 @@ class BadgeConnectManifestSerializer(serializers.Serializer):
         data['@context'] = 'https://w3id.org/openbadges/badgeconnect/v1'
         return data
 
+
 class BadgeConnectStatusSerializer(serializers.Serializer):
     error = serializers.CharField(default=None)
     statusCode = serializers.IntegerField(default=200)

@@ -5,6 +5,7 @@ import json
 import re
 from urllib.parse import urlparse
 
+from django.core.validators import URLValidator
 from django.http import HttpResponse
 from django.utils import timezone
 from oauth2_provider.exceptions import OAuthToolkitError
@@ -147,19 +148,24 @@ class AuthorizationApiView(OAuthLibMixin, APIView):
             }, status=HTTP_400_BAD_REQUEST)
 
 
+httpsUrlValidator = URLValidator(message="Must be a valid HTTPS URI", schemes=['https'])
+
+
 class RegistrationSerializer(serializers.Serializer):
     client_name = serializers.CharField(required=True, source='name')
-    client_uri = serializers.URLField(required=True, source='applicationinfo.website_url')
-    logo_uri = serializers.URLField(required=True, source='applicationinfo.logo_uri')
-    tos_uri = serializers.URLField(required=True, source='applicationinfo.terms_uri')
-    policy_uri = serializers.URLField(required=True, source='applicationinfo.policy_uri')
+    client_uri = serializers.URLField(required=True, source='applicationinfo.website_url', validators=[httpsUrlValidator])
+    logo_uri = serializers.URLField(required=True, source='applicationinfo.logo_uri', validators=[httpsUrlValidator])
+    tos_uri = serializers.URLField(required=True, source='applicationinfo.terms_uri', validators=[httpsUrlValidator])
+    policy_uri = serializers.URLField(required=True, source='applicationinfo.policy_uri', validators=[httpsUrlValidator])
     software_id = serializers.CharField(required=True, source='applicationinfo.software_id')
     software_version = serializers.CharField(required=True, source='applicationinfo.software_version')
-    redirect_uris = serializers.ListField(child=serializers.URLField(), required=True)
+    redirect_uris = serializers.ListField(child=serializers.URLField(validators=[httpsUrlValidator]), required=True)
     token_endpoint_auth_method = serializers.CharField(required=False, default='client_secret_basic')
     grant_types = serializers.ListField(child=serializers.CharField(), required=False, default=['authorization_code'])
     response_types = serializers.ListField(child=serializers.CharField(), required=False, default=['code'])
-    scope = serializers.CharField(required=False, source='applicationinfo.allowed_scopes')
+    scope = serializers.CharField(
+        required=False, source='applicationinfo.allowed_scopes', default=' '.join(BADGE_CONNECT_SCOPES)
+    )
 
     client_id = serializers.CharField(read_only=True)
     client_secret = serializers.CharField(read_only=True)
@@ -237,10 +243,6 @@ class RegistrationSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "client_uri, logo_uri, tos_uri, policy_uri, redirect_uris do not match domain."
             )
-        if len(schemes) > 1 or schemes.pop() != 'https':
-            raise serializers.ValidationError(
-                "client_uri, logo_uri, tos_uri, policy_uri, redirect_uris URI schemes must be https"
-            )
 
         return data
 
@@ -279,7 +281,7 @@ class RegistrationSerializer(serializers.Serializer):
 class RegisterApiView(APIView):
     permission_classes = []
 
-    def post(self, request):
+    def post(self, request, **kwargs):
         serializer = RegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -300,6 +302,7 @@ class TokenView(OAuth2ProviderTokenView):
 
         grant_type = request.POST.get('grant_type', 'password')
         username = request.POST.get('username')
+        client_id = None
 
         try:
             auth_header = request.META['HTTP_AUTHORIZATION']
@@ -341,7 +344,10 @@ class TokenView(OAuth2ProviderTokenView):
 
         if oauth_app and not oauth_app.applicationinfo.issue_refresh_token:
             data = json.loads(response.content)
-            del data['refresh_token']
+            try:
+                del data['refresh_token']
+            except KeyError:
+                pass
             response.content = json.dumps(data)
 
         if grant_type == "password" and response.status_code == 401:
