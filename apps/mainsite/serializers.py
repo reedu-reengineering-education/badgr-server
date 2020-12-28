@@ -4,18 +4,14 @@ import pytz
 
 from django.utils.html import strip_tags
 from rest_framework import serializers
-from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.exceptions import ValidationError
 
-import badgrlog
 from entity.serializers import BaseSerializerV2
 from mainsite.pagination import BadgrCursorPagination
 
 
-badgrlogger = badgrlog.BadgrLogger()
-
-
 class HumanReadableBooleanField(serializers.BooleanField):
+    TRUE_VALUES = serializers.BooleanField.TRUE_VALUES | set(('on', 'On', 'ON'))
     TRUE_VALUES = serializers.BooleanField.TRUE_VALUES | set(('on', 'On', 'ON'))
     FALSE_VALUES = serializers.BooleanField.FALSE_VALUES | set(('off', 'Off', 'OFF'))
 
@@ -151,22 +147,6 @@ class MarkdownCharFieldValidator(object):
 
 class MarkdownCharField(StripTagsCharField):
     default_validators = [MarkdownCharFieldValidator()]
-
-
-class VerifiedAuthTokenSerializer(AuthTokenSerializer):
-    def validate(self, attrs):
-        attrs = super(VerifiedAuthTokenSerializer, self).validate(attrs)
-        user = attrs.get('user')
-
-        badgrlogger.event(badgrlog.DeprecatedApiAuthToken(self.context['request'], user.username))
-        if not user.verified:
-            try:
-                email = user.cached_emails()[0]
-                email.send_confirmation()
-            except IndexError as e:
-                pass
-            raise ValidationError('You must verify your primary email address before you can sign in.')
-        return attrs
 
 
 class OriginalJsonSerializerMixin(serializers.Serializer):
