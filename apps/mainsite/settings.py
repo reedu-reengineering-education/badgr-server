@@ -352,9 +352,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'mainsite.authentication.BadgrOAuth2Authentication',
-        'rest_framework.authentication.TokenAuthentication',
+        'mainsite.authentication.LoggedLegacyTokenAuthentication',
         'entity.authentication.ExplicitCSRFSessionAuthentication',
-        # 'rest_framework.authentication.BasicAuthentication',
     ),
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'DEFAULT_VERSION': 'v1',

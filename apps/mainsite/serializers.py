@@ -1,25 +1,17 @@
-import json
 from collections import OrderedDict
-import collections
+import json
 import pytz
 
-import rest_framework
-from django.conf import settings
-from django.http import Http404
 from django.utils.html import strip_tags
 from rest_framework import serializers
-from rest_framework import status, exceptions
-from rest_framework.authtoken.serializers import AuthTokenSerializer
-from rest_framework.exceptions import ValidationError, PermissionDenied
-from rest_framework.response import Response
-from rest_framework.serializers import ListSerializer
-from six import string_types
+from rest_framework.exceptions import ValidationError
 
 from entity.serializers import BaseSerializerV2
 from mainsite.pagination import BadgrCursorPagination
 
 
 class HumanReadableBooleanField(serializers.BooleanField):
+    TRUE_VALUES = serializers.BooleanField.TRUE_VALUES | set(('on', 'On', 'ON'))
     TRUE_VALUES = serializers.BooleanField.TRUE_VALUES | set(('on', 'On', 'ON'))
     FALSE_VALUES = serializers.BooleanField.FALSE_VALUES | set(('off', 'Off', 'OFF'))
 
@@ -96,6 +88,7 @@ class LinkedDataReferenceField(serializers.Serializer):
                 "manager that implements get_by_id method."
             )
 
+
 class LinkedDataReferenceList(serializers.ListField):
     # child must be declared in implementation.
     def get_value(self, dictionary):
@@ -154,20 +147,6 @@ class MarkdownCharFieldValidator(object):
 
 class MarkdownCharField(StripTagsCharField):
     default_validators = [MarkdownCharFieldValidator()]
-
-
-class VerifiedAuthTokenSerializer(AuthTokenSerializer):
-    def validate(self, attrs):
-        attrs = super(VerifiedAuthTokenSerializer, self).validate(attrs)
-        user = attrs.get('user')
-        if not user.verified:
-            try:
-                email = user.cached_emails()[0]
-                email.send_confirmation()
-            except IndexError as e:
-                pass
-            raise ValidationError('You must verify your primary email address before you can sign in.')
-        return attrs
 
 
 class OriginalJsonSerializerMixin(serializers.Serializer):

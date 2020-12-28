@@ -4,7 +4,12 @@ from django.conf import settings
 from django.utils import timezone
 from oauth2_provider.models import Application
 from oauth2_provider.oauth2_backends import get_oauthlib_core
-from rest_framework.authentication import BaseAuthentication
+from rest_framework.authentication import BaseAuthentication, TokenAuthentication
+
+import badgrlog
+
+
+badgrlogger = badgrlog.BadgrLogger()
 
 
 class BadgrOAuth2Authentication(BaseAuthentication):
@@ -33,3 +38,11 @@ class BadgrOAuth2Authentication(BaseAuthentication):
                 return r.access_token.user, r.access_token
         else:
             return None
+
+
+class LoggedLegacyTokenAuthentication(TokenAuthentication):
+    def authenticate(self, request):
+        authenticated_credentials = super(LoggedLegacyTokenAuthentication, self).authenticate(request)
+        if authenticated_credentials is not None:
+            badgrlogger.event(badgrlog.DeprecatedApiAuthToken(request, authenticated_credentials[0].username))
+        return authenticated_credentials

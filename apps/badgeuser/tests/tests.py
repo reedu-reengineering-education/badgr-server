@@ -14,6 +14,8 @@ from django.test import override_settings
 from django.utils import timezone
 
 from mainsite import TOP_DIR
+from mainsite.models import Application, ApplicationInfo
+from mock import patch
 from rest_framework.authtoken.models import Token
 
 from badgeuser.models import (
@@ -570,11 +572,37 @@ class UserEmailTests(BadgrTestCase):
         backoff_data = cache.get(backoff_key)
         self.assertIsNone(backoff_data)
 
-        response = self.client.post('/api-auth/token', {
-            'username': self.first_user.username,
+        application = Application.objects.create(
+            client_id='public',
+            client_secret='',
+            user=None,
+            authorization_grant_type=Application.GRANT_PASSWORD,
+            name='public'
+        )
+        ApplicationInfo.objects.create(
+            application=application,
+            allowed_scopes='rw:issuer rw:backpack rw:profile'
+        )
+
+        response = self.client.post('/o/token', {
+            'username': self.first_user.email,
             'password': new_password,
         })
         self.assertEqual(response.status_code, 200)
+
+    @patch('mainsite.authentication.badgrlogger.event')
+    def test_log_when_legacy_auth_token_is_used(self, mocked_logger):
+        # logout previous user
+        self.client.logout()
+
+        user_email = 'hundredth.user@newemail.test'
+        user = self.setup_user(email=user_email, authenticate=False)
+        token, created = Token.objects.get_or_create(user=user)
+        response = self.client.get('/v2/users/self', HTTP_AUTHORIZATION='Token {}'.format(token.key))
+
+        mocked_logger.assert_called_once()
+        self.assertIsNotNone(mocked_logger.call_args[0][0].request.META.get("REMOTE_ADDR", None))
+        self.assertEquals(mocked_logger.call_args[0][0].username, user.username)
 
     def test_lower_variant_autocreated_on_new_email(self):
         first_email = CachedEmailAddress(

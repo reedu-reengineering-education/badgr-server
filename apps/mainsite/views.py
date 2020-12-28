@@ -6,14 +6,13 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.urls import reverse_lazy
 from django.db import IntegrityError
-from django.http import (HttpResponse, HttpResponseServerError,
-                         HttpResponseNotFound, HttpResponseRedirect)
+from django.http import HttpResponseServerError, HttpResponseNotFound, HttpResponseRedirect
 from django.shortcuts import redirect
-from django.template import loader, TemplateDoesNotExist
+from django.template import loader
+from django.template.exceptions import TemplateDoesNotExist
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import FormView, RedirectView
-from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import AllowAny
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -22,11 +21,13 @@ from rest_framework.views import APIView
 from issuer.tasks import rebake_all_assertions, update_issuedon_all_assertions
 from mainsite.admin_actions import clear_cache
 from mainsite.models import EmailBlacklist, BadgrApp
-from mainsite.serializers import VerifiedAuthTokenSerializer
 from pathway.tasks import resave_all_elements
 import badgrlog
 
+
 logger = badgrlog.BadgrLogger()
+
+
 ##
 #
 #  Error Handler Views
@@ -121,10 +122,6 @@ class AppleAppSiteAssociation(APIView):
             data['applinks']['details'].append(app_id)
 
         return Response(data=data)
-
-
-class LoginAndObtainAuthToken(ObtainAuthToken):
-    serializer_class = VerifiedAuthTokenSerializer
 
 
 class SitewideActionForm(forms.Form):
