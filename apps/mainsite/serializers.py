@@ -1,25 +1,19 @@
-import json
 from collections import OrderedDict
-import collections
+import json
 import pytz
-import badgrlog
 
-import rest_framework
-from django.conf import settings
-from django.http import Http404
 from django.utils.html import strip_tags
 from rest_framework import serializers
-from rest_framework import status, exceptions
 from rest_framework.authtoken.serializers import AuthTokenSerializer
-from rest_framework.exceptions import ValidationError, PermissionDenied
-from rest_framework.response import Response
-from rest_framework.serializers import ListSerializer
-from six import string_types
+from rest_framework.exceptions import ValidationError
 
+import badgrlog
 from entity.serializers import BaseSerializerV2
 from mainsite.pagination import BadgrCursorPagination
 
+
 badgrlogger = badgrlog.BadgrLogger()
+
 
 class HumanReadableBooleanField(serializers.BooleanField):
     TRUE_VALUES = serializers.BooleanField.TRUE_VALUES | set(('on', 'On', 'ON'))
@@ -97,6 +91,7 @@ class LinkedDataReferenceField(serializers.Serializer):
                 "LinkedDataReferenceField model must be declared and use cache " +
                 "manager that implements get_by_id method."
             )
+
 
 class LinkedDataReferenceList(serializers.ListField):
     # child must be declared in implementation.
