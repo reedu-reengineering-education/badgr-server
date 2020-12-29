@@ -22,6 +22,7 @@ from issuer.models import Issuer, BadgeClass, IssuerStaff
 from mainsite.models import ApplicationInfo, AccessTokenProxy, BadgrApp
 from mainsite.tests import SetupOAuth2ApplicationHelper
 from mainsite.tests.base import BadgrTestCase, SetupIssuerHelper
+from mainsite.utils import set_url_query_params
 
 
 @override_settings(TOKEN_BACKOFF_MAXIMUM_SECONDS=0)  # disable token backoff
@@ -193,6 +194,57 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         self.assertEqual(
             issuer_data['badgrDomain'], response.data['result'][0]['badgrDomain'], "badgrDomain has not been changed"
         )
+
+
+    def test_put_issuer_detail_with_the_option_to_exclude_staff(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user, name='1')
+        issuer_data = {
+            'name': 'Testy MctestAlot',
+            'description': test_issuer.description,
+            'email': test_user.email,
+            'url': 'http://example.com'
+        }
+
+        staff_get_url = '/v1/issuer/issuers/{slug}/staff'.format(slug=test_issuer.entity_id)
+        url_and_include_staff_false = set_url_query_params('/v2/issuers/{}'.format(test_issuer.entity_id), include_staff='false')
+        url_and_include_staff_true = set_url_query_params('/v2/issuers/{}'.format(test_issuer.entity_id), include_staff='true')
+        url_no_query_param = '/v2/issuers/{}'.format(test_issuer.entity_id)
+
+        staff_response = self.client.get(staff_get_url)
+        intial_staff = staff_response.data[0]['user']
+
+        # put
+        response1 = self.client.put(url_and_include_staff_false, data=issuer_data)
+        self.assertEqual(response1.status_code, 200)
+        self.assertFalse(response1.data['result'][0].get('staff'))
+
+        response2 = self.client.put(url_no_query_param, data=issuer_data)
+        self.assertEqual(response2.status_code, 200)
+        self.assertTrue(response2.data['result'][0].get('staff'))
+
+        response3 = self.client.put(url_and_include_staff_true, data=issuer_data)
+        self.assertEqual(response3.status_code, 200)
+        self.assertTrue(response3.data['result'][0].get('staff'))
+
+        # get
+        get_response1 = self.client.get(url_and_include_staff_false)
+        self.assertEqual(get_response1.status_code, 200)
+        self.assertFalse(get_response1.data['result'][0].get('staff'))
+
+        get_response2 = self.client.get(url_no_query_param)
+        self.assertEqual(get_response2.status_code, 200)
+        self.assertTrue(get_response2.data['result'][0].get('staff'))
+
+        get_response3 = self.client.get(url_and_include_staff_true)
+        self.assertEqual(get_response3.status_code, 200)
+        self.assertTrue(get_response3.data['result'][0].get('staff'))
+
+        # test that staff hasn't been modified
+        staff_response2 = self.client.get(staff_get_url)
+        final_staff = staff_response2.data[0]['user']
+        self.assertTrue(intial_staff == final_staff)
+
 
     def test_can_update_issuer_if_authenticated(self):
         test_user = self.setup_user(authenticate=True)
