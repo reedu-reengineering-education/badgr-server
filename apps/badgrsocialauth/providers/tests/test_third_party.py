@@ -91,6 +91,9 @@ class LinkedInOAuth2ProviderTests(DoesNotSendVerificationEmailMixin, BadgrOAuth2
             response = self.login(self.get_mocked_response())
             self.assert_login_redirect(response)  # User can sign in again properly
 
+            email_again = CachedEmailAddress.objects.last()
+            self.assertTrue(email_again.verified)
+
 
 class AzureProviderTests(DoesNotSendVerificationEmailMixin, BadgrOAuth2TestsMixin, BadgrSocialAuthTestCase):
     provider_id = AzureProvider.id
