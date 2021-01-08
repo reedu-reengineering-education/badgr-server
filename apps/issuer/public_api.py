@@ -26,7 +26,7 @@ from . import utils
 from backpack.models import BackpackCollection
 from entity.api import VersionedObjectMixin
 from mainsite.models import BadgrApp
-from mainsite.utils import OriginSetting, set_url_query_params, first_node_match
+from mainsite.utils import OriginSetting, set_url_query_params, first_node_match, fit_image_to_height
 from .models import Issuer, BadgeClass, BadgeInstance
 logger = badgrlog.BadgrLogger()
 
@@ -210,18 +210,6 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
         )
         storage = DefaultStorage()
 
-        def _fit_dimension(new_size, desired_height):
-            return int(math.floor((new_size - desired_height)/2))
-
-        def _fit_to_height(img, ar, height=400):
-            img.thumbnail((height, height))
-            new_size = (int(ar[0]*height), int(ar[1]*height))
-            resized_dimension = new_size[1]
-            resized_img = img.resize((resized_dimension, resized_dimension), Image.BICUBIC)
-            new_img = Image.new("RGBA", new_size, 0)
-            new_img.paste(resized_img, (_fit_dimension(new_size[0], height), _fit_dimension(new_size[1], height)))
-            return new_img
-
         if image_type == 'original' and image_fmt == 'square':
             image_url = image_prop.url
         elif ext == '.svg':
@@ -235,7 +223,7 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
                         return redirect(storage.url(image_prop.name))  # If conversion fails, return existing file.
                     img = Image.open(svg_buf)
 
-                    img = _fit_to_height(img, supported_fmts[image_fmt])
+                    img = fit_image_to_height(img, supported_fmts[image_fmt])
 
                     img.save(out_buf, format='png')
                     storage.save(new_name, out_buf)
@@ -246,7 +234,7 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
                     out_buf = io.BytesIO()
                     # height and width set to the Height and Width of the original badge
                     img = Image.open(input_png)
-                    img = _fit_to_height(img, supported_fmts[image_fmt])
+                    img = fit_image_to_height(img, supported_fmts[image_fmt])
 
                     img.save(out_buf, format='png')
                     storage.save(new_name, out_buf)

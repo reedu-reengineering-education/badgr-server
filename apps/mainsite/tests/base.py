@@ -125,6 +125,9 @@ class SetupIssuerHelper(object):
     def get_test_image_path(self):
         return os.path.join(self.get_testfiles_path(), 'guinea_pig_testing_badge.png')
 
+    def get_test_image_800x800(self):
+        return os.path.join(self.get_testfiles_path(), '800x800.png')
+
     def get_test_png_image_path(self):
         return self.get_test_image_path()
 
