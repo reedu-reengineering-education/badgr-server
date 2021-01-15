@@ -564,13 +564,6 @@ class BadgeClass(ResizeUploadedImage,
     def has_nonrevoked_assertions(self):
         return self.badgeinstances.filter(revoked=False).exists()
 
-    """
-    Included for legacy purposes. It is inefficient to routinely call this for badge classes with large numbers of assertions.
-    """
-    @property
-    def v1_api_recipient_count(self):
-        return self.badgeinstances.filter(revoked=False).count()
-
     def pathway_element_count(self):
         return len(self.cached_pathway_elements())
 

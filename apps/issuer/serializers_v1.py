@@ -163,7 +163,6 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
     criteria = MarkdownCharField(allow_blank=True, required=False, write_only=True)
     criteria_text = MarkdownCharField(required=False, allow_null=True, allow_blank=True)
     criteria_url = StripTagsCharField(required=False, allow_blank=True, allow_null=True, validators=[URLValidator()])
-    recipient_count = serializers.IntegerField(required=False, read_only=True, source='v1_api_recipient_count')
     pathway_element_count = serializers.IntegerField(required=False, read_only=True)
     description = StripTagsCharField(max_length=16384, required=True, convert_null=True)
 
