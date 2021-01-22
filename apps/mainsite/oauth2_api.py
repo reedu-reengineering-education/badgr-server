@@ -5,6 +5,8 @@ import json
 import re
 from urllib.parse import urlparse
 
+from django.core.files.storage import default_storage
+from django.conf import settings
 from django.core.validators import URLValidator
 from django.http import HttpResponse
 from django.utils import timezone
@@ -26,7 +28,7 @@ from backpack.badge_connect_api import BADGE_CONNECT_SCOPES
 from mainsite.models import ApplicationInfo
 from mainsite.oauth_validator import BadgrRequestValidator, BadgrOauthServer
 from mainsite.serializers import ApplicationInfoSerializer, AuthorizationSerializer
-from mainsite.utils import client_ip_from_request, throttleable, set_url_query_params
+from mainsite.utils import fetch_remote_file_to_storage, throttleable, set_url_query_params
 
 badgrlogger = badgrlog.BadgrLogger()
 
@@ -246,6 +248,11 @@ class RegistrationSerializer(serializers.Serializer):
 
         return data
 
+    def fetch_and_process_logo_uri(self, logo_uri):
+        return fetch_remote_file_to_storage(logo_uri, upload_to='remote/application',
+                                            allowed_mime_types=['image/png', 'image/svg+xml'],
+                                            resize_to_height=512)
+
     def create(self, validated_data):
         app_model = get_application_model()
         app = app_model.objects.create(
@@ -253,10 +260,19 @@ class RegistrationSerializer(serializers.Serializer):
             redirect_uris=' '.join(validated_data['redirect_uris']),
             authorization_grant_type=app_model.GRANT_AUTHORIZATION_CODE
         )
+
+        saved_logo_uri = ""
+        if validated_data['applicationinfo']['logo_uri'] is not None:
+            logo_uri = validated_data['applicationinfo']['logo_uri']
+            status_code, image = self.fetch_and_process_logo_uri(logo_uri)
+
+        if status_code == 200:
+            saved_logo_uri = getattr(settings, 'HTTP_ORIGIN') + default_storage.url(image)
+
         app_info = ApplicationInfo(
             application=app,
             website_url=validated_data['applicationinfo']['website_url'],
-            logo_uri=validated_data['applicationinfo']['logo_uri'],
+            logo_uri=saved_logo_uri,
             terms_uri=validated_data['applicationinfo']['terms_uri'],
             policy_uri=validated_data['applicationinfo']['policy_uri'],
             software_id=validated_data['applicationinfo']['software_id'],

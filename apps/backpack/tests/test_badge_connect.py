@@ -2,20 +2,25 @@
 import base64
 import hashlib
 import json
+import os
 import random
 import string
+import shutil
 from urllib import parse
 
 from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V2_URI, OPENBADGES_CONTEXT_V2_DICT
 import responses
 import mock
 
+from django.conf import settings
+from django.core.files.storage import default_storage
 from django.utils.encoding import force_text
 from rest_framework.fields import DateTimeField
 
 from backpack.tests.utils import setup_resources
 from mainsite.models import BadgrApp
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper
+from mainsite.utils import fetch_remote_file_to_storage
 
 
 class ManifestFileTests(BadgrTestCase):
@@ -51,6 +56,47 @@ class ManifestFileTests(BadgrTestCase):
 
 
 class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
+    test_uploaded_path = os.path.join('testfiles/application')
+
+    def setUp(self):
+        from mainsite.oauth2_api import RegistrationSerializer
+
+        upload_to_path = self.test_uploaded_path
+        """" 
+        swizzling function so upload_to argument points to the testfiles directory.
+        This guaranties any uploaded files can be clean up after testing
+        """
+        def swizzled_fetch_and_process_logo_uri(self, logo_uri):
+            return fetch_remote_file_to_storage(logo_uri,
+                                                upload_to=upload_to_path,
+                                                allowed_mime_types=['image/png', 'image/svg+xml'],
+                                                resize_to_height=512)
+
+        RegistrationSerializer.fetch_and_process_logo_uri = swizzled_fetch_and_process_logo_uri
+
+    def tearDown(self):
+        dir = os.path.join('{base_url}/{upload_to}/'.format(
+            base_url=default_storage.location,
+            upload_to=self.test_uploaded_path
+        ))
+
+        try:
+            shutil.rmtree(dir)
+        except OSError as e:
+            print(("%s does not exist and was not deleted" % e))
+
+
+    def _register_mock_GET_response_for_logo_uri(self, logo_uri, test_image_path):
+        """
+        Returns a local test image when RegistrationSerializer#create tries to fetch the logo at logo_uri
+        """
+        responses.add(
+            responses.GET,
+            logo_uri,
+            body=open(test_image_path, 'rb').read(),
+            status=200
+        )
+
     def _perform_registration_and_authentication(self, **kwargs):
         requested_scopes = [
             "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly",
@@ -80,6 +126,8 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         }
 
         user = self.setup_user(email='test@example.com', authenticate=True)
+
+        self._register_mock_GET_response_for_logo_uri(registration_data['logo_uri'], self.get_test_image_path())
 
         response = self.client.post('/o/register', registration_data)
         client_id = response.data['client_id']
@@ -213,6 +261,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
     def test_cannot_register_and_auth_badge_connect_app_if_pkce_verification_fails(self):
         self._perform_registration_and_authentication(pkce_fail=True)
 
+    @responses.activate
     def test_supply_default_scope(self):
         registration_data = {
             "client_name": "Badge Issuer",
@@ -236,8 +285,61 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         }
         user = self.setup_user(email='test@example.com', authenticate=True)
 
+        self._register_mock_GET_response_for_logo_uri(registration_data['logo_uri'], self.get_test_image_path())
         response = self.client.post('/o/register', registration_data)
         self.assertTrue('client_id' in response.data)
+
+    @responses.activate
+    def register_and_process_logo_uri(self, test_image_path):
+        requested_scopes = [
+            "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly",
+            "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.create",
+            "https://purl.imsglobal.org/spec/ob/v2p1/scope/profile.readonly",
+        ]
+        registration_data = {
+            "client_name": "Badge Issuer",
+            "client_uri": "https://issuer.example.com",
+            "logo_uri": "https://issuer.example.com/logo.png",
+            "tos_uri": "https://issuer.example.com/terms-of-service",
+            "policy_uri": "https://issuer.example.com/privacy-policy",
+            "software_id": "13dcdc83-fc0d-4c8d-9159-6461da297388",
+            "software_version": "54dfc83-fc0d-4c8d-9159-6461da297388",
+            "redirect_uris": [
+                "https://issuer.example.com/o/redirect"
+            ],
+            "token_endpoint_auth_method": "client_secret_basic",
+            "grant_types": [
+                "authorization_code",
+                "refresh_token"
+            ],
+            "response_types": [
+                "code"
+            ],
+            "scope": ' '.join(requested_scopes)
+        }
+
+        self._register_mock_GET_response_for_logo_uri(registration_data['logo_uri'], test_image_path)
+
+        return self.client.post('/o/register', registration_data)
+
+    def assert_logo_url_was_handled(self, response):
+        logo_url_storage_name = response.data['logo_uri'].split(getattr(settings, 'HTTP_ORIGIN')+"/media/")
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(default_storage.size(logo_url_storage_name[1]) > 0)
+
+    def test_registration_when_logo_uri_is_png(self):
+        self.assert_logo_url_was_handled(self.register_and_process_logo_uri(self.get_test_png_image_path()))
+
+    def test_registration_when_logo_uri_svg(self):
+        self.assert_logo_url_was_handled(self.register_and_process_logo_uri(self.get_test_svg_image_path()))
+
+    def test_registration_when_logo_uri_is_svg_hacked(self):
+        self.assert_logo_url_was_handled(self.register_and_process_logo_uri(self.get_hacked_svg_image_path()))
+
+    def test_registration_when_logo_uri_is_not_svg_or_png(self):
+        response = self.register_and_process_logo_uri(self.get_test_jpeg_image_path())
+        self.assertEqual(response.status_code, 400)
+
 
     def test_reject_different_domains(self):
         registration_data = {
@@ -323,6 +425,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         response = self.client.post('/o/register', registration_data)
         self.assertEqual(response.data['error'], "client_uri: Must be a valid HTTPS URI")
 
+    @responses.activate
     def test_no_refresh_token(self):
         requested_scopes = [
             "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly",
@@ -351,6 +454,8 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         }
 
         user = self.setup_user(email='test@example.com', authenticate=True)
+
+        self._register_mock_GET_response_for_logo_uri(registration_data['logo_uri'], self.get_test_image_path())
 
         response = self.client.post('/o/register', registration_data)
         client_id = response.data['client_id']

@@ -2,19 +2,18 @@
 Utility functions and constants that might be used across the project.
 """
 
-
 import io
 import base64
 import datetime
 import hashlib
 import json
-import re
 import puremagic
+import math
+import re
 import requests
 import urllib.request, urllib.parse, urllib.error
 import urllib.parse
 import uuid
-from xml.etree import cElementTree as ET
 
 from django.apps import apps
 from django.conf import settings
@@ -24,7 +23,12 @@ from django.core.files.storage import DefaultStorage
 from django.urls import get_callable
 from django.http import HttpResponse
 from django.utils import timezone
+
+from PIL import Image
+
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
+
+from xml.etree import cElementTree as ET
 
 
 class ObjectView(object):
@@ -147,12 +151,40 @@ def scrubSvgElementTree(svg_elem):
     return svg_elem
 
 
-def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()):
+def fit_image_to_height(img, aspect_ratio, height=400):
     """
-    Fetches a remote url, and stores it in DefaultStorage
+    Resize an image with the option to change the image ratio.
+    :param img: An :py:class:`~PIL.Image.Image` object.
+    :param aspect_ratio: A tuple that describes an aspect ratio. E.G: (1.91, 1)
+    :param height: Maximum image height, defaults to 400.
+    :return: An :py:class:`~PIL.Image.Image` object.
+    """
+
+    def _fit_dimension(size, desired_height):
+        return int(math.floor((size - desired_height)/2))
+
+    img.thumbnail((height, height))
+    new_size = (int(aspect_ratio[0] * height), int(aspect_ratio[1] * height))
+    resized_dimension = new_size[1]
+    resized_img = img.resize((resized_dimension, resized_dimension), Image.BICUBIC)
+    new_img = Image.new("RGBA", new_size, 0)
+    new_img.paste(resized_img, (_fit_dimension(new_size[0], height), _fit_dimension(new_size[1], height)))
+
+    return new_img
+
+
+def fetch_remote_file_to_storage(remote_url,
+                                 upload_to='',
+                                 allowed_mime_types=(),
+                                 resize_to_height=None,
+                                 aspect_ratio=(1, 1)):
+    """
+    Fetches a remote url, and stores it in DefaultStorage. Can optionally resize and change the
+    aspect ratio of an image when saving to DefaultStorage. Currently only PNG are supported for resizing and reframing
     :return: (status_code, new_storage_name)
     """
     SVG_MIME_TYPE = 'image/svg+xml'
+    RESIZABLE_MIME_TYPES = ['image/png']
 
     if not allowed_mime_types:
         raise SuspiciousFileOperation("allowed mime types must be passed in")
@@ -212,8 +244,15 @@ def fetch_remote_file_to_storage(remote_url, upload_to='', allowed_mime_types=()
             ext=derived_ext)
 
         if not store.exists(storage_name):
-            buf = io.BytesIO(string_to_write_to_file)
-            store.save(storage_name, buf)
+            out_buf = io.BytesIO()
+            if resize_to_height and derived_mime_type in RESIZABLE_MIME_TYPES:
+                img = Image.open(io.BytesIO(string_to_write_to_file))
+                img = fit_image_to_height(img, aspect_ratio, resize_to_height)
+                img.save(out_buf, format=derived_ext.split('.')[1])
+            else:
+                out_buf = io.BytesIO(string_to_write_to_file)
+
+            store.save(storage_name, out_buf)
         return status_code, storage_name
     return status_code, None
 
