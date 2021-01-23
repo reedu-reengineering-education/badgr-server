@@ -4,6 +4,7 @@ import io
 import json
 import urllib.request, urllib.parse, urllib.error
 import mock
+import os
 from PIL import Image
 import responses
 
@@ -14,12 +15,12 @@ from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V1_URI, OP
 from openbadges_bakery import unbake
 
 from backpack.models import BackpackCollection, BackpackCollectionBadgeInstance
-from backpack.tests.utils import setup_resources, setup_basic_1_0
+from backpack.tests.utils import setup_resources, setup_basic_1_0, CURRENT_DIRECTORY
 from badgeuser.models import CachedEmailAddress
-from issuer.models import Issuer, BadgeInstance
-from issuer.utils import CURRENT_OBI_VERSION, OBI_VERSION_CONTEXT_IRIS, UNVERSIONED_BAKED_VERSION
+from issuer.models import BadgeClass, BadgeInstance, Issuer
+from issuer.utils import OBI_VERSION_CONTEXT_IRIS, UNVERSIONED_BAKED_VERSION
 from mainsite.models import BadgrApp
-from mainsite.tests import BadgrTestCase, SetupIssuerHelper
+from mainsite.tests import BadgrTestCase, Ob2Generators, SetupIssuerHelper
 from mainsite.utils import OriginSetting
 
 
@@ -406,6 +407,57 @@ class OEmbedTests(SetupIssuerHelper, BadgrTestCase):
         self.assertContains(response, 'oembed')
 
 
-class PublicReverificationTests(BadgrTestCase):
-    def test_can_reverify_basic(self):
-        pass
+class PublicReverificationTests(SetupIssuerHelper, BadgrTestCase, Ob2Generators):
+
+    @responses.activate
+    @mock.patch('issuer.public_api.openbadges.verify')
+    def test_can_reverify_basic(self, mock_verify):
+        issuer_ob2 = self.generate_issuer_obo2()
+        badgeclass_ob2 = self.generate_badgeclass_ob2()
+        assertion_ob2 = self.generate_assertion_ob2(source_url='https://example.com/assertion/1')
+
+        responses.add(responses.GET,
+                      badgeclass_ob2['image'],
+                      body=open(os.path.join(CURRENT_DIRECTORY, 'testfiles/unbaked_image.png'), 'rb').read(),
+                      status=200, content_type='image/png')
+
+        issuer_image = Issuer.objects.image_from_ob2(issuer_ob2)
+        badgeclass_image = BadgeClass.objects.image_from_ob2(badgeclass_ob2)
+        badgeinstance_image = BadgeInstance.objects.image_from_ob2(badgeclass_image, assertion_ob2)
+
+        issuer, _ = Issuer.objects.get_or_create_from_ob2(issuer_ob2, image=issuer_image)
+        badgeclass, _ = BadgeClass.objects.get_or_create_from_ob2(issuer, badgeclass_ob2, image=badgeclass_image)
+
+        revocation_reason = "Manually revoked by Issuer"
+
+        with mock.patch('mainsite.blacklist.api_query_is_in_blacklist', new=lambda a, b: False):
+            assertion, _ = BadgeInstance.objects.get_or_create_from_ob2(
+                badgeclass,
+                assertion_ob2,
+                recipient_identifier='test@example.com',
+                image=badgeinstance_image
+            )
+
+            mock_verify.return_value = {
+                'report': self.generate_ob2_report(validationSubject=assertion_ob2['id']),
+                'graph': [assertion_ob2, badgeclass_ob2, issuer_ob2],
+                'input': self.generate_ob2_input(input_type='url', value=assertion_ob2['id'])
+            }
+
+            # openbadges.verify response (Not Revoked)
+            verify_response = self.client.post('/public/verify', data={'entity_id': assertion.entity_id})
+            self.assertFalse('revoked' in verify_response.data['result'][0])
+            self.assertFalse('revocationReason' in verify_response.data['result'][0])
+
+            # openbadges.verify response (Revoked)
+            mock_verify.return_value = {
+                'graph': [
+                    {**assertion_ob2, "revocationReason": revocation_reason, "revoked": True}, badgeclass_ob2, issuer_ob2
+                ]
+            }
+
+            # call badge check with this assertion (revoked)
+            revoked_response = self.client.post('/public/verify', data={'entity_id': assertion.entity_id})
+            # response contains revocation flag and revocation reason
+            self.assertTrue(revoked_response.data['result'][0]['revoked'])
+            self.assertEqual(revoked_response.data['result'][0]['revocationReason'], revocation_reason)

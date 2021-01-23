@@ -18,6 +18,8 @@ from issuer.models import Issuer, BadgeClass
 from mainsite import TOP_DIR
 from mainsite.models import BadgrApp, ApplicationInfo, AccessTokenProxy
 
+from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V2_URI
+
 
 class SetupOAuth2ApplicationHelper(object):
     def setup_oauth2_application(self,
@@ -214,3 +216,71 @@ class BadgrTestCase(SetupUserHelper, APITransactionTestCase, CachingTestCase):
                 name='test cors',
                 cors='localhost:8000'
             )
+
+
+class Ob2Generators(object):
+    def generate_issuer_obo2(self, **kwargs):
+        data = {
+            '@context': OPENBADGES_CONTEXT_V2_URI,
+            'id': 'https://example.com/issuer/1',
+            'type': 'Issuer',
+            'name': 'Basic Issuer',
+            'url': 'http://a.com/issuer/website'
+        }
+        data.update(kwargs)
+        return data
+
+    def generate_badgeclass_ob2(self, **kwargs):
+        data = {
+            '@context': OPENBADGES_CONTEXT_V2_URI,
+            'id': 'https://example.com/badgeclass/1',
+            'type': 'BadgeClass',
+            'name': 'Embedded badgeclass',
+            'criteria': {
+                'narrative': 'do it'
+            },
+            'image': 'http://example.com/badgeclass/1/image',
+            'description': 'a beautiful bespoke badgeclass',
+            'issuer': 'https://example.com/issuer/1'
+        }
+        data.update(kwargs)
+        return data
+
+    def generate_assertion_ob2(self, **kwargs):
+        data = {
+            '@context': OPENBADGES_CONTEXT_V2_URI,
+            'id': 'https://example.com/assertion/1',
+            'type': 'Assertion',
+            'issuedOn': '2017-06-29T21:50:14+00:00',
+            'recipient': {
+                'type': 'email',
+                'hashed': False,
+                'identity': 'test@example.com'
+            },
+            'verification': {
+                'type': 'HostedBadge'
+            },
+            'badge': 'https://example.com/badgeclass/1',
+        }
+        data.update(kwargs)
+        return data
+
+    def generate_ob2_report(self, **kwargs):
+        data = {
+            'messages': [],
+            "warningCount": 0,
+            "valid": True,
+            "openBadgesVersion": "2.0",
+            "validationSubject": "https://example.com/badgeclass/1",
+            "errorCount": 0
+        }
+        data.update(kwargs)
+        return data
+
+    def generate_ob2_input(self, **kwargs):
+        data = {
+            "input_type": "url",
+            "value": "https://example.com/badgeclass/1"
+        }
+        data.update(kwargs)
+        return data
