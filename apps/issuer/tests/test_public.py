@@ -448,6 +448,8 @@ class PublicReverificationTests(SetupIssuerHelper, BadgrTestCase, Ob2Generators)
             verify_response = self.client.post('/public/verify', data={'entity_id': assertion.entity_id})
             self.assertFalse('revoked' in verify_response.data['result'][0])
             self.assertFalse('revocationReason' in verify_response.data['result'][0])
+            # badge instance is not revoked
+            self.assertFalse(BadgeInstance.objects.last().revoked)
 
             # openbadges.verify response (Revoked)
             mock_verify.return_value = {
@@ -461,3 +463,28 @@ class PublicReverificationTests(SetupIssuerHelper, BadgrTestCase, Ob2Generators)
             # response contains revocation flag and revocation reason
             self.assertTrue(revoked_response.data['result'][0]['revoked'])
             self.assertEqual(revoked_response.data['result'][0]['revocationReason'], revocation_reason)
+            # badge instance is revoked, revocation_reason has not changed
+            self.assertTrue(BadgeInstance.objects.last().revoked)
+            self.assertEqual(BadgeInstance.objects.last().revocation_reason, revocation_reason)
+
+            # attempt to revalidate a revoked badge.
+            second_revoked_response = self.client.post('/public/verify', data={'entity_id': assertion.entity_id})
+            # still revoked
+            self.assertTrue(second_revoked_response.data['result'][0]['revoked'])
+            # returns original revoked response
+            self.assertEqual(second_revoked_response.data['result'][0]['revocationReason'], revocation_reason)
+            # badge instance is revoked, revocation_reason has not changed
+            self.assertTrue(BadgeInstance.objects.last().revoked)
+            self.assertEqual(BadgeInstance.objects.last().revocation_reason, revocation_reason)
+
+            # attempting to revalidate a revoked badge with a new revocation reason does not update the original reason.
+            mock_verify.return_value["graph"][0].update({'revocationReason': 'New reason should not replace original reason'})
+            third_revoked_response = self.client.post('/public/verify', data={'entity_id': assertion.entity_id})
+            # still revoked
+            self.assertTrue(third_revoked_response.data['result'][0]['revoked'])
+            # returns original revoked response, revocation_reason has not changed
+            self.assertEqual(third_revoked_response.data['result'][0]['revocationReason'], revocation_reason)
+            # badge instance is revoked, revocation_reason has not changed
+            self.assertTrue(BadgeInstance.objects.last().revoked)
+            self.assertEqual(BadgeInstance.objects.last().revocation_reason, revocation_reason)
+
