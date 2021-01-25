@@ -296,79 +296,91 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         """
         return self.set_email_items(value)
 
-    def set_email_items(self, value, send_confirmations=True, allow_verify=False):
-        if len(value) < 1:
-            raise ValidationError("Must have at least 1 email")
-
-        new_email_idx = {d['email']: d for d in value}
-
-        primary_count = sum(1 if d.get('primary', False) else 0 for d in value)
-        if primary_count != 1:
-            raise ValidationError("Must have exactly 1 primary email")
-        requested_primary = [d for d in value if d.get('primary', False)][0]
-
-        with transaction.atomic():
-            # add or update existing items
-            for email_data in value:
-                primary = email_data.get('primary', False)
-                verified = email_data.get('verified', False)
-                emailaddress, created = CachedEmailAddress.cached.get_or_create(
-                    email=email_data['email'],
-                    defaults={
-                        'user': self,
-                        'primary': primary
-                    })
-                if not created:
-                    dirty = False
-
-                    if emailaddress.user_id == self.id:
-                        # existing email address owned by user
-                        emailaddress.primary = primary
-                        dirty = True
-                    elif not emailaddress.verified:
-                        # existing unverified email address, handover to this user
-                        emailaddress.user = self
-                        emailaddress.primary = primary
-                        emailaddress.save()  # in this case, don't mark as dirty
-                        emailaddress.send_confirmation()
-                    else:
-                        # existing email address used by someone else
-                        raise ValidationError("Email '{}' may already be in use".format(email_data.get('email')))
-
-                    if allow_verify and verified != emailaddress.verified:
-                        emailaddress.verified = verified
-                        dirty = True
-
-                    if dirty:
-                        emailaddress.save()
-                else:
-                    # email is new
-                    if allow_verify and email_data.get('verified') is True:
-                        emailaddress.verified = True
-                        emailaddress.save()
-                    if emailaddress.verified is False and created is True and send_confirmations is True:
-                        # new email address send a confirmation
-                        emailaddress.send_confirmation()
-
-                if not emailaddress.verified:
-                    continue  # only verified email addresses may have variants. Don't bother trying otherwise.
-
-                requested_variants = email_data.get('cached_variant_emails', [])
-                existing_variant_emails = emailaddress.cached_variant_emails()
-                for requested_variant in requested_variants:
-                    if requested_variant not in existing_variant_emails:
-                        EmailAddressVariant.objects.create(
-                            canonical_email=emailaddress, email=requested_variant
-                        )
-
-            # remove old items
-            for emailaddress in self.email_items:
-                if emailaddress.email.lower() not in (lower_case_idx.lower() for lower_case_idx in new_email_idx):
-                    emailaddress.delete()
-
-        if self.email != requested_primary:
-            self.email = requested_primary['email']
+    def set_email_items(self, value, send_confirmations=True, allow_verify=False, is_privileged_user=False):
+        """
+            If value is empty and the user is privileged, assume they meant to remove the users email and allow it.
+            E.g. They are preforming some sort of ELT use case
+        """
+        if is_privileged_user and len(value) == 0:
+            for email_address in self.email_items:
+                email_address.delete()
+            self.email = ''
             self.save()
+
+        else:
+            if len(value) < 1:
+                raise ValidationError("Must have at least 1 email")
+
+            new_email_idx = {d['email']: d for d in value}
+
+            primary_count = sum(1 if d.get('primary', False) else 0 for d in value)
+
+            if primary_count != 1:
+                raise ValidationError("Must have exactly 1 primary email")
+            requested_primary = [d for d in value if d.get('primary', False)][0]
+
+            with transaction.atomic():
+                # add or update existing items
+                for email_data in value:
+                    primary = email_data.get('primary', False)
+                    verified = email_data.get('verified', False)
+                    emailaddress, created = CachedEmailAddress.cached.get_or_create(
+                        email=email_data['email'],
+                        defaults={
+                            'user': self,
+                            'primary': primary
+                        })
+                    if not created:
+                        dirty = False
+
+                        if emailaddress.user_id == self.id:
+                            # existing email address owned by user
+                            emailaddress.primary = primary
+                            dirty = True
+                        elif not emailaddress.verified:
+                            # existing unverified email address, handover to this user
+                            emailaddress.user = self
+                            emailaddress.primary = primary
+                            emailaddress.save()  # in this case, don't mark as dirty
+                            emailaddress.send_confirmation()
+                        else:
+                            # existing email address used by someone else
+                            raise ValidationError("Email '{}' may already be in use".format(email_data.get('email')))
+
+                        if allow_verify and verified != emailaddress.verified:
+                            emailaddress.verified = verified
+                            dirty = True
+
+                        if dirty:
+                            emailaddress.save()
+                    else:
+                        # email is new
+                        if allow_verify and email_data.get('verified') is True:
+                            emailaddress.verified = True
+                            emailaddress.save()
+                        if emailaddress.verified is False and created is True and send_confirmations is True:
+                            # new email address send a confirmation
+                            emailaddress.send_confirmation()
+
+                    if not emailaddress.verified:
+                        continue  # only verified email addresses may have variants. Don't bother trying otherwise.
+
+                    requested_variants = email_data.get('cached_variant_emails', [])
+                    existing_variant_emails = emailaddress.cached_variant_emails()
+                    for requested_variant in requested_variants:
+                        if requested_variant not in existing_variant_emails:
+                            EmailAddressVariant.objects.create(
+                                canonical_email=emailaddress, email=requested_variant
+                            )
+
+                # remove old items
+                for emailaddress in self.email_items:
+                    if emailaddress.email.lower() not in (lower_case_idx.lower() for lower_case_idx in new_email_idx):
+                        emailaddress.delete()
+
+            if self.email != requested_primary:
+                self.email = requested_primary['email']
+                self.save()
 
 
     def cached_email_variants(self):
