@@ -56,35 +56,42 @@ class ManifestFileTests(BadgrTestCase):
 
 
 class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
-    test_uploaded_path = os.path.join('testfiles/application')
+    def get_test_upload_path(self, *args):
+        return 'testfiles'
 
     def setUp(self):
+        super(BadgeConnectOAuthTests, self).setUp()
+
         from mainsite.oauth2_api import RegistrationSerializer
 
-        upload_to_path = self.test_uploaded_path
+        upload_to_path = self.get_test_upload_path()
         """" 
-        swizzling function so upload_to argument points to the testfiles directory.
+        patching function so upload_to argument points to the testfiles directory.
         This guaranties any uploaded files can be clean up after testing
         """
-        def swizzled_fetch_and_process_logo_uri(self, logo_uri):
+        def patched_fetch_and_process_logo_uri(self, logo_uri):
             return fetch_remote_file_to_storage(logo_uri,
                                                 upload_to=upload_to_path,
                                                 allowed_mime_types=['image/png', 'image/svg+xml'],
                                                 resize_to_height=512)
-
-        RegistrationSerializer.fetch_and_process_logo_uri = swizzled_fetch_and_process_logo_uri
+        self.patcher = mock.patch.object(RegistrationSerializer, "fetch_and_process_logo_uri",
+                                         patched_fetch_and_process_logo_uri)
+        self.patcher.start()
 
     def tearDown(self):
-        dir = os.path.join('{base_url}/{upload_to}/'.format(
+        super(BadgeConnectOAuthTests, self).tearDown()
+
+        testfile_path = os.path.join('{base_url}/{upload_to}/'.format(
             base_url=default_storage.location,
-            upload_to=self.test_uploaded_path
+            upload_to=self.get_test_upload_path(),
         ))
+        if os.path.exists(testfile_path):
+            try:
+                shutil.rmtree(testfile_path)
+            except Exception as e:
+                print("testfiles were not deleted, %s" % e)
 
-        try:
-            shutil.rmtree(dir)
-        except OSError as e:
-            print(("%s does not exist and was not deleted" % e))
-
+        self.patcher.stop()
 
     def _register_mock_GET_response_for_logo_uri(self, logo_uri, test_image_path):
         """
