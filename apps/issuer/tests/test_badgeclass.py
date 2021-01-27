@@ -64,7 +64,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             BadgeClass.cached.get(entity_id=new_badgeclass_slug)
 
             # assert that the BadgeClass was published to and fetched from the cache
-            with self.assertNumQueries(1):
+            with self.assertNumQueries(0):
                 response = self.client.get('/v1/issuer/issuers/{issuer}/badges/{badgeclass}'.format(
                     issuer=test_issuer.entity_id,
                     badgeclass=new_badgeclass_slug))
