@@ -495,3 +495,7 @@ AUTHCODE_EXPIRES_SECONDS = 600  # needs to be long enough to fetch information f
 SAML_EMAIL_KEYS = ['Email', 'email', 'mail', 'emailaddress', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress']
 SAML_FIRST_NAME_KEYS = ['FirstName', 'givenName', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname']
 SAML_LAST_NAME_KEYS = ['LastName', 'sn', 'surname', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname']
+
+# Serverless SVG to PNG settings
+SVG_SERVERLESS_CONVERSION_ENABLED = False
+SVG_SERVERLESS_CONVERSION_ENDPOINT = '' # ex. http://example.com/convert-to-png
