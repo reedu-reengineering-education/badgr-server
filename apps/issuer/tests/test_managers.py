@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-
-from openbadges.verifier.openbadges_context import OPENBADGES_CONTEXT_V2_URI
 import os
 import responses
 import mock
@@ -9,56 +7,7 @@ import mock
 from backpack.tests.utils import CURRENT_DIRECTORY as BACKPACK_TESTS_DIRECTORY
 from issuer.models import Issuer, BadgeClass, BadgeInstance, BadgeInstanceEvidence
 
-from mainsite.tests import BadgrTestCase, SetupIssuerHelper
-
-
-def _generate_issuer_obo(**kwargs):
-    data = {
-        '@context': OPENBADGES_CONTEXT_V2_URI,
-        'id': 'https://example.com/issuer/1',
-        'type': 'Issuer',
-        'name': 'Basic Issuer',
-        'url': 'http://a.com/issuer/website'
-    }
-    data.update(kwargs)
-    return data
-
-
-def _generate_badgeclass_ob2(**kwargs):
-    data = {
-        '@context': OPENBADGES_CONTEXT_V2_URI,
-        'id': 'https://example.com/badgeclass/1',
-        'type': 'BadgeClass',
-        'name': 'Embedded badgeclass',
-        'criteria': {
-            'narrative': 'do it'
-        },
-        'image': 'http://example.com/badgeclass/1/image',
-        'description': 'a beautiful bespoke badgeclass',
-        'issuer': 'https://example.com/issuer/1'
-    }
-    data.update(kwargs)
-    return data
-
-
-def _generate_assertion_ob2(**kwargs):
-    data = {
-        '@context': OPENBADGES_CONTEXT_V2_URI,
-        'id': 'https://example.com/assertion/1',
-        'type': 'Assertion',
-        'issuedOn': '2017-06-29T21:50:14+00:00',
-        'recipient': {
-            'type': 'email',
-            'hashed': False,
-            'identity': 'test@example.com'
-        },
-        'verification': {
-            'type': 'HostedBadge'
-        },
-        'badge': 'https://example.com/badgeclass/1',
-    }
-    data.update(kwargs)
-    return data
+from mainsite.tests import BadgrTestCase, Ob2Generators, SetupIssuerHelper
 
 
 def _register_image_mock(url):
@@ -69,7 +18,7 @@ def _register_image_mock(url):
     )
 
 
-class BadgeInstanceAndEvidenceManagerTests(SetupIssuerHelper, BadgrTestCase):
+class BadgeInstanceAndEvidenceManagerTests(SetupIssuerHelper, BadgrTestCase, Ob2Generators):
     def setUp(self):
         super(BadgeInstanceAndEvidenceManagerTests, self).setUp()
         self.local_owner_user = self.setup_user(authenticate=False)
@@ -80,9 +29,9 @@ class BadgeInstanceAndEvidenceManagerTests(SetupIssuerHelper, BadgrTestCase):
     def test_update_from_ob2_basic(self):
         recipient = self.setup_user(email='recipient1@example.org')
 
-        issuer_ob2 = _generate_issuer_obo()
-        badgeclass_ob2 = _generate_badgeclass_ob2()
-        assertion_ob2 = _generate_assertion_ob2()
+        issuer_ob2 = self.generate_issuer_obo2()
+        badgeclass_ob2 = self.generate_badgeclass_ob2()
+        assertion_ob2 = self.generate_assertion_ob2()
         _register_image_mock(badgeclass_ob2['image'])
 
         issuer_image = Issuer.objects.image_from_ob2(issuer_ob2)
