@@ -596,7 +596,8 @@ class VerifyBadgeAPIEndpoint(JSONComponentView):
 
             if bool(revoked_obo):
                 instance = BadgeInstance.objects.get(source_url=revoked_obo['id'])
-                instance.revoke(revoked_obo.get('revocationReason', 'Badge is revoked'))
+                if not instance.revoked:
+                    instance.revoke(revoked_obo.get('revocationReason', 'Badge is revoked'))
 
             else:
                 report = response.get('report', {})
