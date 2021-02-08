@@ -12,6 +12,7 @@ import urllib.request, urllib.parse, urllib.error
 import urllib.parse
 import warnings
 
+from django.conf import settings
 from django.core import mail
 from django.core.cache import cache, CacheKeyWarning
 from django.core.exceptions import ValidationError
@@ -333,7 +334,7 @@ class TestBlacklist(BadgrTestCase):
 class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
     mime_types = ['image/png', 'image/svg+xml', 'image/jpeg']
     test_uploaded_path = os.path.join('testfiles')
-    path_to_mediafiles = os.path.join(TOP_DIR, 'mediafiles/')
+    path_to_mediafiles = getattr(settings, 'MEDIA_ROOT')
     test_url = 'http://example.com/123abc'
 
     def tearDown(self):
@@ -491,7 +492,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
             resize_to_height=512
         )
 
-        image = Image.open(self.path_to_mediafiles + storage_name)
+        image = Image.open(os.path.join(self.path_to_mediafiles, storage_name))
         self.assertEqual(image.width, 512)
         self.assertEqual(image.height, 512)
         self.assertTrue(storage_name.endswith(expected_extension))
@@ -516,7 +517,7 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
             aspect_ratio=(1.77, 1)
         )
 
-        image = Image.open(self.path_to_mediafiles + storage_name)
+        image = Image.open(os.path.join(self.path_to_mediafiles, storage_name))
 
         self.assertEqual(image.height, 512)
         self.assertEqual(image.width, 906)
