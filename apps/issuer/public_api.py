@@ -215,17 +215,18 @@ class ImagePropertyDetailView(APIView, SlugToEntityIdRedirectMixin):
             image_url = image_prop.url
         elif ext == '.svg':
             if not storage.exists(new_name):
+                svg_buf = None
                 with storage.open(image_prop.name, 'rb') as input_svg:
                     if settings.SVG_SERVERLESS_CONVERSION_ENABLED:
                         max_square = getattr(settings, 'IMAGE_FIELD_MAX_PX', 400)
                         svg_buf = convert_svg_to_png(input_svg.read(), max_square, max_square)
                         # If serverless conversion fails, try falling back to python solution
-                        if not svg_buf:
-                            svg_buf = io.BytesIO()
-                            try:
-                                cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
-                            except IOError:
-                                return redirect(storage.url(image_prop.name))  # If conversion fails, return existing file.
+                    if not svg_buf:
+                        svg_buf = io.BytesIO()
+                        try:
+                            cairosvg.svg2png(file_obj=input_svg, write_to=svg_buf)
+                        except IOError:
+                            return redirect(storage.url(image_prop.name))  # If conversion fails, return existing file.
                     img = Image.open(svg_buf)
 
                     img = fit_image_to_height(img, supported_fmts[image_fmt])
