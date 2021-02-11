@@ -382,6 +382,9 @@ def generate_png_preview_image(self, entity_id, entity_type):
 
 
 def handle_png_preview_post_save(sender, instance, **kwargs):
+    if not getattr(settings, 'SVG_SERVERLESS_CONVERSION_ENABLED', False):
+        return
+
     # If instance doesn't have an image preview and its image is an SVG, generate PNG image_preview copy.
     if not instance.image_preview and instance.image and verify_svg(instance.image):
         generate_png_preview_image.delay(entity_id=instance.id, entity_type=type(instance).__name__)
