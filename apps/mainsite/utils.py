@@ -418,9 +418,16 @@ def convert_svg_to_png(svg_string, height, width):
     :param svg_string: An SVG
     :param height: PNG height
     :param width: PNG width
-    :return: BytesIO of PNG bytes
+    :return: BytesIO of PNG bytes or False
     """
-    response = requests.post(settings.SVG_SERVERLESS_CONVERSION_ENDPOINT, json=dict(
+    if getattr(settings, 'SVG_HTTP_CONVERSION_ENABLED', False) is False:
+        return False
+
+    endpoint = getattr(settings, 'SVG_HTTP_CONVERSION_ENDPOINT')
+    if not endpoint:
+        return False
+
+    response = requests.post(endpoint, json=dict(
         svgString=svg_string,
         height=height,
         width=width

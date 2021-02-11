@@ -200,6 +200,7 @@ class CachingTestCase(TransactionTestCase):
     def setUp(self):
         # scramble the cache key each time
         cache.key_prefix = "test{}".format(str(time.time()))
+        super(CachingTestCase, self).setUp()
 
 
 @override_settings(

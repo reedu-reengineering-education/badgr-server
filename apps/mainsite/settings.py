@@ -496,6 +496,7 @@ SAML_EMAIL_KEYS = ['Email', 'email', 'mail', 'emailaddress', 'http://schemas.xml
 SAML_FIRST_NAME_KEYS = ['FirstName', 'givenName', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname']
 SAML_LAST_NAME_KEYS = ['LastName', 'sn', 'surname', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname']
 
-# Serverless SVG to PNG settings
-SVG_SERVERLESS_CONVERSION_ENABLED = False
-SVG_SERVERLESS_CONVERSION_ENDPOINT = '' # ex. http://example.com/convert-to-png
+# SVG to PNG Image Preview Generation Settings
+# You may use an HTTP service to convert SVG images to PNG for higher reliability than the built-in Python option.
+SVG_HTTP_CONVERSION_ENABLED = False
+SVG_HTTP_CONVERSION_ENDPOINT = ''  # Include scheme, e.g. 'http://example.com/convert-to-png'

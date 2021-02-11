@@ -405,7 +405,9 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertIn('slug', response.data)
         assertion_slug = response.data.get('slug')
-
+        # warm the cache
+        _ = test_user.verified
+        _ = test_issuer.cached_issuerstaff()
         # assert that the BadgeInstance was published to and fetched from cache
         query_count = 0
         with self.assertNumQueries(query_count):
