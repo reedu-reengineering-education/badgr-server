@@ -68,7 +68,7 @@ python-json-logger==0.1.2
 
 # SSL Support
 cffi==1.11.5
-cryptography==3.2.1
+cryptography==3.3.2
 idna==2.8
 ipaddress==1.0.14
 pyasn1==0.1.9
