@@ -13,6 +13,7 @@ from django.template.exceptions import TemplateDoesNotExist
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import FormView, RedirectView
+from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import AllowAny
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -21,6 +22,7 @@ from rest_framework.views import APIView
 from issuer.tasks import rebake_all_assertions, update_issuedon_all_assertions
 from mainsite.admin_actions import clear_cache
 from mainsite.models import EmailBlacklist, BadgrApp
+from mainsite.serializers import LegacyVerifiedAuthTokenSerializer
 from pathway.tasks import resave_all_elements
 import badgrlog
 
@@ -122,6 +124,16 @@ class AppleAppSiteAssociation(APIView):
             data['applinks']['details'].append(app_id)
 
         return Response(data=data)
+
+
+class LegacyLoginAndObtainAuthToken(ObtainAuthToken):
+    serializer_class = LegacyVerifiedAuthTokenSerializer
+
+    def post(self, request, *args, **kwargs):
+        response = super(LegacyLoginAndObtainAuthToken, self).post(request, *args, **kwargs)
+        response.data['warning'] = 'This method of obtaining a token is deprecated and will be removed. ' \
+                                   'This request has been logged.'
+        return response
 
 
 class SitewideActionForm(forms.Form):
