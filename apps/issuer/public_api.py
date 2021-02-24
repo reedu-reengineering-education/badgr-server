@@ -77,7 +77,11 @@ class JSONComponentView(VersionedObjectMixin, APIView, SlugToEntityIdRedirectMix
         pass
 
     def get_json(self, request, **kwargs):
-        json = self.current_object.get_json(obi_version=self._get_request_obi_version(request), **kwargs)
+        try:
+            json = self.current_object.get_json(obi_version=self._get_request_obi_version(request), **kwargs)
+        except BadgeClass.DoesNotExist:
+            raise Http404
+
         return json
 
     def get(self, request, **kwargs):
