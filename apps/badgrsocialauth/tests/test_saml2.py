@@ -135,12 +135,12 @@ class SAML2Tests(BadgrTestCase):
             last_name=last_name,
         )
         # Auto verify emails
-        email = CachedEmailAddress.objects.get(email=email)
-        email.verified = True
-        email.save()
+        cached_email = CachedEmailAddress.objects.get(email=email)
+        cached_email.verified = True
+        cached_email.save()
         Saml2Account.objects.create(config=self.config, user=new_user, uuid=email)
         badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com", cors='example.com')
-        resp = auto_provision(None, email, first_name, last_name, self.config)
+        resp = auto_provision(None, [email], first_name, last_name, self.config)
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
@@ -151,7 +151,7 @@ class SAML2Tests(BadgrTestCase):
         first_name = "firsty"
         last_name = "lastington"
         badgr_app = self.badgr_app
-        resp = auto_provision(None, email, first_name, last_name, self.config)
+        resp = auto_provision(None, [email], first_name, last_name, self.config)
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
@@ -169,7 +169,7 @@ class SAML2Tests(BadgrTestCase):
 
         # email does not exist
         resp = auto_provision(
-            None, "different425@example.com", first_name, last_name, self.config
+            None, ["different425@example.com"], first_name, last_name, self.config
         )
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
@@ -189,7 +189,7 @@ class SAML2Tests(BadgrTestCase):
             last_name=last_name,
             send_confirmation=False
         )
-        resp = auto_provision(None, email, first_name, last_name, self.config)
+        resp = auto_provision(None, [email], first_name, last_name, self.config)
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
@@ -199,7 +199,7 @@ class SAML2Tests(BadgrTestCase):
         self.assertTrue(email_address.primary)
 
         # Can auto provision again
-        resp = auto_provision(None, email, first_name, last_name, self.config)
+        resp = auto_provision(None, [email], first_name, last_name, self.config)
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
@@ -218,7 +218,7 @@ class SAML2Tests(BadgrTestCase):
         saml_account_count = Saml2Account.objects.count()
 
         self._initiate_login(idp_name, badgr_app)
-        resp = auto_provision(None, email2, first_name, last_name, self.config)
+        resp = auto_provision(None, [email2], first_name, last_name, self.config)
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
@@ -264,7 +264,7 @@ class SAML2Tests(BadgrTestCase):
         set_session_authcode(fake_request, authcode)
 
         resp = auto_provision(
-            fake_request, email, test_user.first_name, test_user.last_name, self.config
+            fake_request, [email], test_user.first_name, test_user.last_name, self.config
         )
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
@@ -336,24 +336,7 @@ class SAML2Tests(BadgrTestCase):
             ],
         }
 
-    def test_acs_with_authn_response_includes_subjectLocality(self):
-        self._skip_if_xmlsec_binary_missing()
-        self.config.use_signed_authn_request = True
-        self.config.save()
-
-        with override_settings(SAML_KEY_FILE=self.ipd_key_path, SAML_CERT_FILE=self.ipd_cert_path):
-            saml2config = self.config
-            sp_config = config.SPConfig()
-            sp_config.load(create_saml_config_for(saml2config))
-            sp_metadata = create_metadata_string('', config=sp_config, sign=True)
-
-        idp_config = self.get_idp_config(sp_metadata)
-
-        identity = {"eduPersonAffiliation": ["staff", "member"],
-                    "surName": ["Jeter"], "givenName": ["Derek"],
-                    "mail": ["foo@gmail.com"],
-                    "title": ["shortstop"]}
-
+    def get_authn_response(self, idp_config, identity):
         with closing(SamlServer(idp_config)) as server:
             name_id = server.ident.transient_nameid(
                 "urn:mace:example.com:saml:roland:idp", "id12")
@@ -371,7 +354,7 @@ class SAML2Tests(BadgrTestCase):
                 session_index="id12"
             )
 
-            authn_response = server.create_authn_response(
+            return server.create_authn_response(
                 identity,
                 "id12",  # in_response_to
                 self.sp_acs_location,  # consumer_url. config.sp.endpoints.assertion_consumer_service:["acs_endpoint"]
@@ -382,13 +365,161 @@ class SAML2Tests(BadgrTestCase):
                 authn_statement=authn_statement
             )
 
+    def test_saml2_create_account(self):
+        self._skip_if_xmlsec_binary_missing()
+        self.config.use_signed_authn_request = True
+        self.config.save()
+
+        with override_settings(SAML_KEY_FILE=self.ipd_key_path, SAML_CERT_FILE=self.ipd_cert_path):
+            saml2config = self.config
+            sp_config = config.SPConfig()
+            sp_config.load(create_saml_config_for(saml2config))
+            sp_metadata = create_metadata_string('', config=sp_config, sign=True)
+
+        idp_config = self.get_idp_config(sp_metadata)
+
+        identity = {"eduPersonAffiliation": ["staff", "member"],
+                    "surName": ["Jeter"], "givenName": ["Derek"],
+                    "mail": ["foo@gmail.com"],
+                    "title": ["shortstop"]}
+
+        authn_response = self.get_authn_response(idp_config, identity)
+
         base64_encoded_response_metadata = base64.b64encode(authn_response.encode('utf-8'))
         base_64_utf8_response_metadata = base64_encoded_response_metadata.decode('utf-8')
 
-        request = self.client.post(
+        response = self.client.post(
             reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
             {'SAMLResponse': base_64_utf8_response_metadata}
         )
+
+        self.assertEqual(response.status_code, 302)
+
+        location = response._headers['location'][1]
+        response = self.client.get(location)
+
+        self.assertEqual(Saml2Account.objects.count(), 1)
+        self.assertEqual(CachedEmailAddress.objects.count(), 1)
+        self.assertEqual(BadgeUser.objects.count(), 1)
+
+    def test_saml2_create_account_multiple_emails(self):
+        self._skip_if_xmlsec_binary_missing()
+        self.config.use_signed_authn_request = True
+        self.config.save()
+
+        with override_settings(SAML_KEY_FILE=self.ipd_key_path, SAML_CERT_FILE=self.ipd_cert_path):
+            saml2config = self.config
+            sp_config = config.SPConfig()
+            sp_config.load(create_saml_config_for(saml2config))
+            sp_metadata = create_metadata_string('', config=sp_config, sign=True)
+
+        idp_config = self.get_idp_config(sp_metadata)
+
+        identity = {"eduPersonAffiliation": ["staff", "member"],
+                    "surName": ["Jeter"], "givenName": ["Derek"],
+                    "mail": ["foo@gmail.com", "foo2@gmail.com"],
+                    "title": ["shortstop"]}
+
+        authn_response = self.get_authn_response(idp_config, identity)
+
+        base64_encoded_response_metadata = base64.b64encode(authn_response.encode('utf-8'))
+        base_64_utf8_response_metadata = base64_encoded_response_metadata.decode('utf-8')
+
+        response = self.client.post(
+            reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
+            {'SAMLResponse': base_64_utf8_response_metadata}
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        location = response._headers['location'][1]
+        response = self.client.get(location)
+
+        self.assertEqual(Saml2Account.objects.count(), 1)
+        self.assertEqual(CachedEmailAddress.objects.count(), 2)
+        self.assertEqual(BadgeUser.objects.count(), 1)
+
+    def test_saml2_create_account_multiple_email_assertions(self):
+        self._skip_if_xmlsec_binary_missing()
+        self.config.use_signed_authn_request = True
+        self.config.save()
+
+        with override_settings(SAML_KEY_FILE=self.ipd_key_path, SAML_CERT_FILE=self.ipd_cert_path):
+            saml2config = self.config
+            sp_config = config.SPConfig()
+            sp_config.load(create_saml_config_for(saml2config))
+            sp_metadata = create_metadata_string('', config=sp_config, sign=True)
+
+        idp_config = self.get_idp_config(sp_metadata)
+
+        identity = {"eduPersonAffiliation": ["staff", "member"],
+                    "surName": ["Jeter"], "givenName": ["Derek"],
+                    "mail": ["foo@gmail.com", "foo2@gmail.com"],
+                    "email": ["foo3@gmail.com"],
+                    "title": ["shortstop"]}
+
+        authn_response = self.get_authn_response(idp_config, identity)
+
+        base64_encoded_response_metadata = base64.b64encode(authn_response.encode('utf-8'))
+        base_64_utf8_response_metadata = base64_encoded_response_metadata.decode('utf-8')
+
+        response = self.client.post(
+            reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
+            {'SAMLResponse': base_64_utf8_response_metadata}
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        location = response._headers['location'][1]
+        response = self.client.get(location)
+
+        self.assertEqual(Saml2Account.objects.count(), 1)
+        self.assertEqual(CachedEmailAddress.objects.count(), 3)
+        self.assertEqual(BadgeUser.objects.count(), 1)
+
+    def test_saml2_create_account_multiple_email_already_taken(self):
+        self._skip_if_xmlsec_binary_missing()
+        self.config.use_signed_authn_request = True
+        self.config.save()
+
+        email = 'exampleuser@example.com'
+        t_user = self.setup_user(
+            email=email,
+            token_scope='rw:profile rw:issuer rw:backpack'
+        )
+
+        with override_settings(SAML_KEY_FILE=self.ipd_key_path, SAML_CERT_FILE=self.ipd_cert_path):
+            saml2config = self.config
+            sp_config = config.SPConfig()
+            sp_config.load(create_saml_config_for(saml2config))
+            sp_metadata = create_metadata_string('', config=sp_config, sign=True)
+
+        idp_config = self.get_idp_config(sp_metadata)
+
+        identity = {"eduPersonAffiliation": ["staff", "member"],
+                    "surName": ["Jeter"], "givenName": ["Derek"],
+                    "mail": ["foo@gmail.com", "foo2@gmail.com"],
+                    "email": ["exampleuser@example.com"],
+                    "title": ["shortstop"]}
+
+        authn_response = self.get_authn_response(idp_config, identity)
+
+        base64_encoded_response_metadata = base64.b64encode(authn_response.encode('utf-8'))
+        base_64_utf8_response_metadata = base64_encoded_response_metadata.decode('utf-8')
+
+        response = self.client.post(
+            reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
+            {'SAMLResponse': base_64_utf8_response_metadata}
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        location = response._headers['location'][1]
+        response = self.client.get(location)
+
+        self.assertEqual(Saml2Account.objects.count(), 0)
+        self.assertEqual(CachedEmailAddress.objects.count(), 1)
+        self.assertEqual(BadgeUser.objects.count(), 1)
 
     def test_add_samlaccount_to_existing_user_with_varying_email(self):
         email = 'exampleuser@example.com'
@@ -422,7 +553,7 @@ class SAML2Tests(BadgrTestCase):
 
 
         email2 = 'exampleuser_alt@example.com'
-        resp = auto_provision(fake_request, email2, t_user.first_name, t_user.last_name, self.config)
+        resp = auto_provision(fake_request, [email2], t_user.first_name, t_user.last_name, self.config)
         self.assertEqual(resp.status_code, 302)
 
         fake_request.session = dict()

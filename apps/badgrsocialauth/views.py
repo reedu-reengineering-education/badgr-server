@@ -287,27 +287,25 @@ class SamlProvisionRedirect(RedirectView):
         try:
             data = json.loads(decrypt_authcode(self.request.GET['request_id']))
             client, config = saml2_client_for(data['idp_name'])
-            email = data['email']
+            emails = data['emails']
             first_name = data['first_name']
             last_name = data['last_name']
 
         except (TypeError, ValueError, AttributeError, KeyError, Saml2Configuration.DoesNotExist,) as e:
             return saml2_fail(authError="Could not process Saml2 Response.")
 
-        try:
-            existing_email = CachedEmailAddress.cached.get(email=email)
-        except CachedEmailAddress.DoesNotExist:
-            if accesstoken is not None and not accesstoken.is_expired():
-                saml2_account = Saml2Account.objects.create(config=config, user=accesstoken.user, uuid=email)
-                new_mail = CachedEmailAddress.objects.create(email=email, user=accesstoken.user, verified=True,
-                                                             primary=False)
-                return redirect_to_login_with_token(self.request, accesstoken)
-
-            # Email does not exist, nor does existing account. auto-provision new account and log in
-            return redirect_user_to_login(saml2_new_account(email, config, first_name, last_name, self.request))
-
-        else:
+        if CachedEmailAddress.cached.filter(email__in=emails).count() > 0:
             return saml2_fail(authError="Saml2 Response Processing interrupted. Email exists.")
+
+        if accesstoken is not None and not accesstoken.is_expired():
+            account_uuid = emails[0]
+            Saml2Account.objects.create(config=config, user=accesstoken.user, uuid=account_uuid)
+            for e in emails:
+                CachedEmailAddress.objects.create(email=e, user=accesstoken.user, verified=True, primary=False)
+            return redirect_to_login_with_token(self.request, accesstoken)
+
+        # Email does not exist, nor does existing account. auto-provision new account and log in
+        return redirect_user_to_login(saml2_new_account(emails, config, first_name, last_name, self.request))
 
 
 class SamlFailureRedirect(RedirectView):
@@ -389,38 +387,56 @@ def assertion_consumer_service(request, idp_name):
         ))
 
     authn_response.get_identity()
-    email = userdata_from_saml_assertion(authn_response.ava, 'email', config)
+    emails = userdata_from_saml_assertion(authn_response.ava, 'email', config, many=True)
     first_name = userdata_from_saml_assertion(authn_response.ava, 'first_name', config)
     last_name = userdata_from_saml_assertion(authn_response.ava, 'last_name', config)
-    return auto_provision(request, email, first_name, last_name, config)
+    return auto_provision(request, emails, first_name, last_name, config)
 
 
-def auto_provision(request, email, first_name, last_name, config):
+def auto_provision(request, emails, first_name, last_name, config):
     # Get/Create account and redirect with token or with error message
-    saml2_account = Saml2Account.objects.filter(uuid=email, config=config).first()
+    try:
+        saml2_account = Saml2Account.objects.filter(uuid__in=emails, config=config).first()
+    except Saml2Account.MultipleObjectsReturned:
+        return redirect(reverse(
+            'saml2_failure',
+            kwargs=dict(authError="Multiple SAML accounts found.")
+        ))
+
     if saml2_account:
+        if CachedEmailAddress.objects.exclude(user=saml2_account.user).filter(email__in=emails).count() > 0:
+            return redirect(reverse(
+                'saml2_failure',
+                kwargs=dict(authError="Multiple accounts using provided emails.")
+            ))
+        existing_emails = CachedEmailAddress.objects.filter(user=saml2_account.user).values_list('email', flat=True)
+        unused = [e for e in emails if e not in existing_emails]
+        for e in unused:
+            CachedEmailAddress.objects.create(email=e, user=saml2_account.user)
         return redirect(redirect_user_to_login(saml2_account.user))
 
-    try:
-        existing_email = CachedEmailAddress.cached.get(email=email)
-        if not existing_email.verified:
-            # Email exists but is not verified, auto-provision account and log in
-            new_account = saml2_new_account(email, config, first_name, last_name, request)
-            return redirect(redirect_user_to_login(new_account))
-        elif existing_email.verified:
-            # Email exists and is already verified
-            return redirect(
-                set_url_query_params(
-                    reverse('saml2_emailexists'),
-                    email=base64.urlsafe_b64encode(email.encode('utf-8')).decode('utf-8')
-                )
+    # Check if any/all of the claimed emails already exist as verified
+    claimed_emails = CachedEmailAddress.cached.filter(email__in=emails, verified=True)
+    if claimed_emails.count() > 0:
+        # If at least one is already verified, grab the first one and redirect with error
+        email = claimed_emails.first().email
+        return redirect(
+            set_url_query_params(
+                reverse('saml2_emailexists'),
+                email=base64.urlsafe_b64encode(email.encode('utf-8')).decode('utf-8')
             )
+        )
 
-    except CachedEmailAddress.DoesNotExist:
+    existing_email = CachedEmailAddress.cached.filter(email__in=emails).first()
+    if existing_email:
+        # An email exists but is not verified, auto-provision account and log in
+        new_account = saml2_new_account(emails, config, first_name, last_name, request)
+        return redirect(redirect_user_to_login(new_account))
+    else:
         provision_data = json.dumps({
             'first_name': first_name,
             'last_name': last_name,
-            'email': email,
+            'emails': emails,
             'idp_name': config.slug  # TODO: actual property
         })
         return redirect(
@@ -431,19 +447,22 @@ def auto_provision(request, email, first_name, last_name, config):
         )
 
 
-def saml2_new_account(requested_email, config, first_name='', last_name='', request=None):
+def saml2_new_account(requested_emails, config, first_name='', last_name='', request=None):
+    first_email = requested_emails[0]
     new_user = BadgeUser.objects.create(
-        email=requested_email,
+        email=first_email,
         first_name=first_name,
         last_name=last_name,
         request=request,
         send_confirmation=False
     )
-    # Auto verify emails
-    cached_email = CachedEmailAddress.objects.get(email=requested_email)
+    for email in requested_emails[1:]:
+        CachedEmailAddress.objects.create(email=email, user=new_user, verified=True)
+    # Auto verify email
+    cached_email = CachedEmailAddress.objects.get(email=first_email)
     cached_email.verified = True
     cached_email.save()
-    Saml2Account.objects.create(config=config, user=new_user, uuid=requested_email)
+    Saml2Account.objects.create(config=config, user=new_user, uuid=first_email)
     return new_user
 
 

@@ -65,7 +65,7 @@ def generate_provider_identifier(sociallogin=None, socialaccount=None):
         return 'https://twitter.com/{}'.format(socialaccount.extra_data['screen_name'].lower())
 
 
-def userdata_from_saml_assertion(claims, data_field='email', config=None):
+def userdata_from_saml_assertion(claims, data_field='email', config=None, many=False):
     """
     From a set of SAML claims processed into a dict, extract a claim for the desired property based
     on system settings and the specific Saml2Config, if that claim exists. Raise ValidationError if missing
@@ -84,7 +84,9 @@ def userdata_from_saml_assertion(claims, data_field='email', config=None):
     if len(configured_keys[data_field] & set(claims.keys())) == 0:
         raise ValidationError('Missing {} in SAML assertions, received {}'.format(data_field, list(claims.keys())))
 
-    return [list_of(claims[key])[0] for key in configured_keys[data_field] if key in claims][0]
+    found = [list_of(claims.get(key)) for key in configured_keys[data_field] if key in claims]
+    found = [claim for sublist in found for claim in sublist]
+    return found if many else found[0]
 
 
 DEFAULT_VALID_CUSTOM_SETTINGS_KEYS = ('email', 'first_name', 'last_name',)
