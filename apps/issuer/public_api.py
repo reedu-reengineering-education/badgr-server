@@ -9,6 +9,7 @@ import cairosvg
 import openbadges
 from PIL import Image
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.storage import DefaultStorage
 from django.urls import resolve, reverse, Resolver404, NoReverseMatch
 from django.http import Http404, HttpResponseRedirect
@@ -79,7 +80,7 @@ class JSONComponentView(VersionedObjectMixin, APIView, SlugToEntityIdRedirectMix
     def get_json(self, request, **kwargs):
         try:
             json = self.current_object.get_json(obi_version=self._get_request_obi_version(request), **kwargs)
-        except BadgeClass.DoesNotExist:
+        except ObjectDoesNotExist:
             raise Http404
 
         return json
