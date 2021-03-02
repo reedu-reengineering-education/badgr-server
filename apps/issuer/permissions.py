@@ -170,22 +170,6 @@ class ApprovedIssuersOnly(permissions.BasePermission):
         return _is_server_admin(request) or self.has_object_permission(request, view, None)
 
 
-class IsIssuerEditor(IsEditor):
-    """
-    Used as a proxy permission for objects that have a .cached_issuer property and want to delegate permissions to issuer
-    """
-    def has_object_permission(self, request, view, recipient_group):
-        return _is_server_admin(request) or super(IsIssuerEditor, self).has_object_permission(request, view, recipient_group.cached_issuer)
-
-
-class IsIssuerStaff(IsStaff):
-    """
-    Used as a proxy permission for objects that have a .cached_issuer property and want to delegate permissions to issuer
-    """
-    def has_object_permission(self, request, view, recipient_group):
-        return _is_server_admin(request) or super(IsIssuerStaff, self).has_object_permission(request, view, recipient_group.cached_issuer)
-
-
 class AuditedModelOwner(permissions.BasePermission):
     """
     Request user matches .created_by

@@ -4,7 +4,7 @@ import pytz
 import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.validators import URLValidator, EmailValidator, RegexValidator
+from django.core.validators import URLValidator, EmailValidator
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
@@ -200,7 +200,7 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         return super(IssuerSerializerV2, self).update(instance, validated_data)
 
     def to_representation(self, instance):
-        from recipient.api import _scrub_boolean
+        from backpack.api import _scrub_boolean
 
         include_staff = _scrub_boolean(self.context['request'].query_params.get('include_staff', True))
         if self.fields.get('staff') and not include_staff:

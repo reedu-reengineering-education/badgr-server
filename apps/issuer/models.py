@@ -215,6 +215,9 @@ class Issuer(ResizeUploadedImage,
 
         self._state.fields_cache = fields_cache  # restore the fields cache
 
+    def has_nonrevoked_assertions(self):
+        return self.badgeinstance_set.filter(revoked=False).exists()
+
     def delete(self, *args, **kwargs):
         if self.has_nonrevoked_assertions():
             raise ProtectedError("Issuer can not be deleted because it has previously issued badges.", self)
@@ -321,16 +324,9 @@ class Issuer(ResizeUploadedImage,
     def cached_badgeclasses(self):
         return self.badgeclasses.all().order_by("created_at")
 
-    @cachemodel.cached_method(auto_publish=True)
-    def cached_pathways(self):
-        return self.pathway_set.filter(is_active=True)
-
-    @cachemodel.cached_method(auto_publish=True)
-    def cached_recipient_groups(self):
-        return self.recipientgroup_set.all()
-
-    def recipient_count(self):
-        return sum(bc.recipient_count() for bc in self.cached_badgeclasses())
+    @property
+    def image_preview(self):
+        return self.image
 
     def get_json(self, obi_version=CURRENT_OBI_VERSION, include_extra=True, use_canonical_id=False):
         obi_version, context_iri = get_obi_context(obi_version)
@@ -510,12 +506,6 @@ class BadgeClass(ResizeUploadedImage,
                 models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())).exists():
             raise ProtectedError("BadgeClass may only be deleted if all BadgeInstances have been revoked.", self)
 
-        if self.pathway_element_count() > 0:
-            raise ProtectedError("BadgeClass may only be deleted if all PathwayElementBadge have been removed.", self)
-
-        if len(self.cached_completion_elements()) > 0:
-            raise ProtectedError("Badge could not be deleted. It is being used as a pathway completion badge.", self)
-
         issuer = self.issuer
         super(BadgeClass, self).delete(*args, **kwargs)
         issuer.publish(publish_staff=False)
@@ -567,8 +557,12 @@ class BadgeClass(ResizeUploadedImage,
     def has_nonrevoked_assertions(self):
         return self.badgeinstances.filter(revoked=False).exists()
 
-    def pathway_element_count(self):
-        return len(self.cached_pathway_elements())
+    """
+    Included for legacy purposes. It is inefficient to routinely call this for badge classes with large numbers of assertions.
+    """
+    @property
+    def v1_api_recipient_count(self):
+        return self.badgeinstances.filter(revoked=False).count()
 
     @cachemodel.cached_method(auto_publish=True)
     def cached_alignments(self):
@@ -641,14 +635,6 @@ class BadgeClass(ResizeUploadedImage,
 
     def get_extensions_manager(self):
         return self.badgeclassextension_set
-
-    @cachemodel.cached_method(auto_publish=True)
-    def cached_pathway_elements(self):
-        return [peb.element for peb in self.pathwayelementbadge_set.all()]
-
-    @cachemodel.cached_method(auto_publish=True)
-    def cached_completion_elements(self):
-        return [pce for pce in self.completion_elements.all()]
 
     def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, recipient_type=RECIPIENT_TYPE_EMAIL, **kwargs):
         return BadgeInstance.objects.create(
@@ -942,8 +928,6 @@ class BadgeInstance(BaseAuditedModel,
 
         super(BadgeInstance, self).publish()
         self.badgeclass.publish()
-        if self.cached_recipient_profile:
-            self.cached_recipient_profile.publish()
         if self.recipient_user:
             self.recipient_user.publish()
 
@@ -957,11 +941,8 @@ class BadgeInstance(BaseAuditedModel,
     def delete(self, *args, **kwargs):
         badgeclass = self.badgeclass
 
-        recipient_profile = self.cached_recipient_profile
         super(BadgeInstance, self).delete(*args, **kwargs)
         badgeclass.publish()
-        if recipient_profile:
-            recipient_profile.publish()
         if self.recipient_user:
             self.recipient_user.publish()
         self.publish_delete('entity_id', 'revoked')
@@ -1044,16 +1025,6 @@ class BadgeInstance(BaseAuditedModel,
 
     def get_extensions_manager(self):
         return self.badgeinstanceextension_set
-
-    @property
-    def cached_recipient_profile(self):
-        from recipient.models import RecipientProfile
-        try:
-            return RecipientProfile.cached.get(recipient_identifier=self.recipient_identifier)
-        except RecipientProfile.MultipleObjectsReturned:
-            return RecipientProfile.objects.filter(recipient_identifier=self.recipient_identifier).first()
-        except RecipientProfile.DoesNotExist:
-            return None
 
     @property
     def recipient_user(self):
