@@ -188,7 +188,7 @@ class Issuer(ResizeUploadedImage,
     staff = models.ManyToManyField(AUTH_USER_MODEL, through='IssuerStaff')
 
     # slug has been deprecated for now, but preserve existing values
-    slug = models.CharField(max_length=255, blank=True, null=True, default=None)
+    slug = models.CharField(max_length=255, db_index=True, blank=True, null=True, default=None)
     #slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
 
     badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None, on_delete=models.SET_NULL)
@@ -472,7 +472,7 @@ class BadgeClass(ResizeUploadedImage,
     issuer = models.ForeignKey(Issuer, blank=False, null=False, on_delete=models.CASCADE, related_name="badgeclasses")
 
     # slug has been deprecated for now, but preserve existing values
-    slug = models.CharField(max_length=255, blank=True, null=True, default=None)
+    slug = models.CharField(max_length=255, db_index=True, blank=True, null=True, default=None)
     #slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
 
     name = models.CharField(max_length=255)
@@ -771,7 +771,7 @@ class BadgeInstance(BaseAuditedModel,
     image = models.FileField(upload_to='uploads/badges', blank=True)
 
     # slug has been deprecated for now, but preserve existing values
-    slug = models.CharField(max_length=255, blank=True, null=True, default=None)
+    slug = models.CharField(max_length=255, db_index=True, blank=True, null=True, default=None)
     #slug = AutoSlugField(max_length=255, populate_from='get_new_slug', unique=True, blank=False, editable=False)
 
     revoked = models.BooleanField(default=False, db_index=True)
