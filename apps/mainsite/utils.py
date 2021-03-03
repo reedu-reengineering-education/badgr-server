@@ -436,9 +436,9 @@ def convert_svg_to_png(svg_string, height, width):
         return False
     try:
         result = response.json()
-        if 'data' not in result or result['statusCode'] != 200:
+        if 'body' not in result or result['statusCode'] != 200:
             return False
-        b64png = result['data'].replace('data:image/png;base64,', '')
+        b64png = result['body'].replace('data:image/png;base64,', '')
         return io.BytesIO(base64.b64decode(b64png))
     except ValueError:
         # Issuing decoding response JSON
