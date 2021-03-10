@@ -159,6 +159,22 @@ class SAML2Tests(BadgrTestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
 
+    def test_login_with_email_variant(self):
+        email = "testemail@example.com"
+        first_name = "firsty"
+        last_name = "lastington"
+        resp = auto_provision(None, [email], first_name, last_name, self.config)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
+        self.assertEqual(resp.status_code, 302)
+        resp = self.client.get(resp.url)
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("authToken", resp.url)
+
+        email = "testEMAIL@example.com"
+        resp = auto_provision(None, [email], first_name, last_name, self.config)
+        self.assertIn("authcode", resp.url)
+
     def test_saml2_login_with_conflicts(self):
         email = "test8679@example.com"
         email2 = "test234425@example.com"
@@ -550,7 +566,6 @@ class SAML2Tests(BadgrTestCase):
             reverse('assertion_consumer_service', kwargs={'idp_name': self.config.slug}),
             {'saml_assertion': 'very fake'}
         )
-
 
         email2 = 'exampleuser_alt@example.com'
         resp = auto_provision(fake_request, [email2], t_user.first_name, t_user.last_name, self.config)

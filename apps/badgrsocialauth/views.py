@@ -410,7 +410,8 @@ def auto_provision(request, emails, first_name, last_name, config):
                 kwargs=dict(authError="Multiple accounts using provided emails.")
             ))
         existing_emails = CachedEmailAddress.objects.filter(user=saml2_account.user).values_list('email', flat=True)
-        unused = [e for e in emails if e not in existing_emails]
+        processed_emails = [ee.lower() for ee in existing_emails]
+        unused = [e for e in emails if e.lower() not in processed_emails]
         for e in unused:
             CachedEmailAddress.objects.create(email=e, user=saml2_account.user)
         return redirect(redirect_user_to_login(saml2_account.user))
