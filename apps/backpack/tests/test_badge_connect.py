@@ -65,7 +65,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         from mainsite.oauth2_api import RegistrationSerializer
 
         upload_to_path = self.get_test_upload_path()
-        """" 
+        """"
         patching function so upload_to argument points to the testfiles directory.
         This guaranties any uploaded files can be clean up after testing
         """
@@ -105,11 +105,12 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         )
 
     def _perform_registration_and_authentication(self, **kwargs):
-        requested_scopes = [
+        default_requested_scopes = [
             "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly",
             "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.create",
             "https://purl.imsglobal.org/spec/ob/v2p1/scope/profile.readonly",
         ]
+        requested_scopes = kwargs.get('requested_scopes', default_requested_scopes)
         registration_data = {
             "client_name": "Badge Issuer",
             "client_uri": "https://issuer.example.com",
@@ -139,6 +140,11 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
         response = self.client.post('/o/register', registration_data)
         client_id = response.data['client_id']
         client_secret = response.data['client_secret']
+
+        # Make sure registration didn't sneak any scopes in and that they were attenuated properly
+        registered_scopes = response.data['scope'].split(' ')
+        self.assertEqual(set(requested_scopes) - set(default_requested_scopes), set(requested_scopes) - set(registered_scopes))
+
         self.assertEqual(registration_data['redirect_uris'][0], response.data['redirect_uris'][0])
         for required_property in [
             'client_id', 'client_secret', 'client_id_issued_at', 'client_secret_expires_at',
@@ -146,7 +152,6 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
             'redirect_uris'
         ]:
             self.assertIn(required_property, response.data)
-
 
         # At this point the client would trigger the user's agent to make a GET request to the authorize UI endpooint
         # which would in turn make sure the user is authenticated and then trigger a post to the API to obtain a
@@ -158,7 +163,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
             "response_type": "code",
             "client_id": response.data['client_id'],
             "redirect_uri": registration_data['redirect_uris'][0],
-            "scopes": requested_scopes,
+            "scopes": registered_scopes,
             "state": "",
             "code_challenge": base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('='),
             "code_challenge_method": 'S256'
@@ -178,7 +183,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
             'grant_type': 'authorization_code',
             'code': code,
             'redirect_uri': registration_data['redirect_uris'][0],
-            'scope': ' '.join(requested_scopes),
+            'scope': ' '.join(registered_scopes),
             'code_verifier': verifier
         }
         basic_auth_header = 'Basic ' + base64.b64encode(
@@ -267,6 +272,20 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
     @responses.activate
     def test_cannot_register_and_auth_badge_connect_app_if_pkce_verification_fails(self):
         self._perform_registration_and_authentication(pkce_fail=True)
+
+    @responses.activate
+    def test_scope_attenuation(self):
+        """
+        If a Badge Connect Relying Party asks for a scope we don't support, we don't need to reject that request.
+        We can just attenuate the scopes and return what we do support.
+        """
+        all_spec_scopes = [
+            "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.readonly",
+            "https://purl.imsglobal.org/spec/ob/v2p1/scope/assertion.create",
+            "https://purl.imsglobal.org/spec/ob/v2p1/scope/profile.readonly",
+            "https://purl.imsglobal.org/spec/ob/v2p1/scope/profile.update"
+        ]
+        self._perform_registration_and_authentication(requested_scopes=all_spec_scopes)
 
     @responses.activate
     def test_supply_default_scope(self):
