@@ -121,6 +121,28 @@ class PublicAPITests(SetupIssuerHelper, BadgrTestCase):
 
             self.assertEqual(content['type'], 'Assertion')
 
+    def test_get_for_revoked_assertion_and_deleted_badge_class_returns_404(self):
+        test_user = self.setup_user(authenticate=False)
+        test_issuer = self.setup_issuer(owner=test_user)
+        test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
+        assertion = test_badgeclass.issue(recipient_id='new.recipient@email.test')
+
+        response = self.client.get('/public/assertions/{}?action=download'.format(assertion.entity_id))
+        self.assertEqual(response.status_code, 200)
+
+        assertion.revoked = True
+        assertion.revocation_reason = 'For testing'
+        assertion.save()
+
+        response2 = self.client.get('/public/assertions/{}?action=download'.format(assertion.entity_id))
+        self.assertEqual(response2.status_code, 200)
+
+        test_badgeclass.delete()
+        response3 = self.client.get('/public/assertions/{}?action=download'.format(assertion.entity_id))
+        self.assertEqual(response3.status_code, 404)
+
+
+
     def test_scrapers_get_html_stub(self):
         test_user_email = 'test.user@email.test'
 
