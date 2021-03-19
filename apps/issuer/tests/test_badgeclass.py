@@ -727,6 +727,29 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(image_width, 400)
             self.assertEqual(image_height, 400)
 
+    def test_badgeclass_image_url_is_canonical(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.issuer = test_issuer
+
+        with open(self.get_test_image_path(), 'rb') as badge_image:
+            example_badgeclass_props = {
+                'name': 'Badge of Awesome',
+                'description': "An awesome badge only awarded to awesome people or non-existent test entities",
+                'image': self._base64_data_uri_encode(badge_image, "image/png"),
+                'criteriaNarrative': 'http://wikipedia.org/Awesome',
+                'issuer': self.issuer.entity_id
+            }
+
+        response = self.client.post('/v2/badgeclasses', data=example_badgeclass_props, format="json")
+        self.assertEqual(response.status_code, 201)
+        bc = response.data['result'][0]
+        self.assertIn('{}/image'.format(bc['entityId']), bc['image'])
+
+        response = self.client.get('/v2/issuers/{}/badgeclasses'.format(test_issuer.entity_id))
+        self.assertEqual(response.status_code, 200)
+        bc_get = response.data['result'][0]
+        self.assertIn('{}/image'.format(bc_get['entityId']), bc_get['image'])
 
     def test_badgeclass_put_image_data_uri(self):
         test_user = self.setup_user(authenticate=True)

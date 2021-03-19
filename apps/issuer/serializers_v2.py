@@ -71,7 +71,7 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     createdAt = DateTimeWithUtcZAtEndField(source='created_at', read_only=True)
     createdBy = EntityRelatedFieldV2(source='cached_creator', queryset=BadgeUser.cached, required=False)
     name = StripTagsCharField(max_length=1024)
-    image = ValidImageField(required=False)
+    image = ValidImageField(required=False, use_public=True, source='*')
     email = serializers.EmailField(max_length=255, required=True)
     description = StripTagsCharField(max_length=16384, required=False)
     url = serializers.URLField(max_length=1024, required=True)
@@ -241,7 +241,7 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     issuerOpenBadgeId = serializers.URLField(source='issuer_jsonld_id', read_only=True)
 
     name = StripTagsCharField(max_length=1024)
-    image = ValidImageField(required=False)
+    image = ValidImageField(required=False, use_public=True, source='*')
     description = StripTagsCharField(max_length=16384, required=True, convert_null=True)
 
     criteriaUrl = StripTagsCharField(source='criteria_url', required=False, allow_null=True, validators=[URLValidator()])
@@ -501,7 +501,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
     issuer = EntityRelatedFieldV2(source='cached_issuer', required=False, queryset=Issuer.cached)
     issuerOpenBadgeId = serializers.URLField(source='issuer_jsonld_id', read_only=True)
 
-    image = serializers.FileField(read_only=True)
+    image = ValidImageField(read_only=True, use_public=True, source='*')
     recipient = BadgeRecipientSerializerV2(source='*', required=False)
 
     issuedOn = DateTimeWithUtcZAtEndField(source='issued_on', required=False, default_timezone=pytz.utc)
@@ -660,7 +660,7 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
             # ignore issuer in request
             validated_data.pop('cached_issuer')
         return super().create(validated_data)
-      
+
     def validate(self, data):
         request = self.context.get('request', None)
         expected_issuer = self.context.get('kwargs', {}).get('issuer')

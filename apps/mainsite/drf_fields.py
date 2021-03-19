@@ -44,10 +44,11 @@ class ValidImageField(Base64FileField):
 
     def __init__(self, skip_http=True, allow_empty_file=False, use_url=True, allow_null=True, **kwargs):
         self.skip_http = skip_http
-        super(ValidImageField, self).__init__(allow_empty_file=allow_empty_file,
-                                              use_url=use_url,
-                                              allow_null=allow_null,
-                                              **kwargs)
+        self.use_public = kwargs.pop('use_public', False)
+
+        super(ValidImageField, self).__init__(
+            allow_empty_file=allow_empty_file, use_url=use_url, allow_null=allow_null, **kwargs
+        )
 
     def to_internal_value(self, data):
         # Skip http/https urls to avoid overwriting valid data when, for example, a client GETs and subsequently PUTs an
@@ -55,7 +56,18 @@ class ValidImageField(Base64FileField):
         if self.skip_http and not isinstance(data, UploadedFile) and urllib.parse.urlparse(data).scheme in ('http', 'https'):
             raise SkipField()
 
+        self.source_attrs = ['image']  # Kind of a dirty hack, because this is failing to stick if set on init.
         return super(ValidImageField, self).to_internal_value(data)
 
-
-
+    def to_representation(self, value):
+        if self.use_public:
+            try:
+                if getattr(value, 'instance', None):
+                    return value.instance.image_url(public=True)  # sometimes value is a FileField despite source="*"
+                return value.image_url(public=True)
+            except AttributeError:
+                pass
+        try:
+            return super(ValidImageField, self).to_representation(value.image)
+        except AttributeError:
+            return super(ValidImageField, self).to_representation(value)

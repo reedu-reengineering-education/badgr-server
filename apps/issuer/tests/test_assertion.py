@@ -196,6 +196,11 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             self.assertNotEqual(updated_image_hash_v2, original_image_hash_v2)
             self.assertGreater(updated_assertion_v2.updated_at, test_assertion_v2.updated_at)
             self.assertEqual(updated_assertion_v2.image.name.split(".").pop(), 'svg')
+            response = self.client.get('/v2/assertions/{}'.format(updated_assertion_v2.entity_id))
+            self.assertEqual(response.status_code, 200)
+            result = response.data['result'][0]
+            self.assertIn('{}/image'.format(updated_assertion_v2.entity_id), result['image'])  # canonical image url
+
             # test batching works in task
             updated_assertion_v2_2 = BadgeInstance.objects.get(entity_id=test_assertion_v2_2.entity_id)
             updated_image_hash_v2_2 = hash_for_image(updated_assertion_v2_2.image)
@@ -1279,6 +1284,8 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
             issuer=test_issuer.entity_id
         ), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 201)
+        result = response.data['result'][0]
+        self.assertIn('{}/image'.format(result['entityId']), result['image'])  # canonical image url
 
     def test_v2_issue_uppercase_email(self):
         test_user = self.setup_user(authenticate=True)
@@ -1324,6 +1331,7 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
             issuer=test_issuer.entity_id
         ), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 201)
+
         assertion_data = response.data['result'][0]
         recipient_id = assertion_data['recipient']['plaintextIdentity']
         self.assertEqual(
