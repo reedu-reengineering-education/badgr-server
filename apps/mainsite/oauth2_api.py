@@ -201,14 +201,17 @@ class RegistrationSerializer(serializers.Serializer):
     def validate_scope(self, val):
         if val:
             scopes = val.split(' ')
+            included = []
             for scope in scopes:
-                if scope not in BADGE_CONNECT_SCOPES:
-                    raise serializers.ValidationError(
-                        "Scope {} not valid for automatic application registration. Badge Connect Scopes only".format(
-                            scope
-                        )
-                    )
-            return val
+                if scope in BADGE_CONNECT_SCOPES:
+                    included.append(scope)
+
+            if len(included):
+                return ' '.join(set(included))
+            raise serializers.ValidationError(
+                "No supported Badge Connect scopes requested. See manifest for supported scopes."
+            )
+
         else:
             # If no scopes provided, we assume they want all scopes
             return ' '.join(BADGE_CONNECT_SCOPES)
