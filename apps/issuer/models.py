@@ -262,6 +262,14 @@ class Issuer(ResizeUploadedImage,
     def public_url(self):
         return OriginSetting.HTTP+self.get_absolute_url()
 
+    def image_url(self, public=False):
+        if public:
+            return OriginSetting.HTTP + reverse('issuer_image', kwargs={'entity_id': self.entity_id})
+        if getattr(settings, 'MEDIA_URL').startswith('http'):
+            return default_storage.url(self.image.name)
+        else:
+            return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
+
     @property
     def jsonld_id(self):
         if self.source_url:
@@ -340,7 +348,7 @@ class Issuer(ResizeUploadedImage,
             email=self.email,
             description=self.description))
         if self.image:
-            image_url = OriginSetting.HTTP + reverse('issuer_image', kwargs={'entity_id': self.entity_id})
+            image_url = self.image_url(public=True)
             json['image'] = image_url
             if self.original_json:
                 image_info = self.get_original_json().get('image', None)
@@ -646,6 +654,17 @@ class BadgeClass(ResizeUploadedImage,
             **kwargs
         )
 
+    def image_url(self, public=False):
+        if public:
+            return OriginSetting.HTTP + reverse('badgeclass_image', kwargs={'entity_id': self.entity_id})
+
+        if getattr(settings, 'MEDIA_URL').startswith('http'):
+            return default_storage.url(self.image.name)
+        else:
+            return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
+
+
+
     def get_json(self, obi_version=CURRENT_OBI_VERSION, include_extra=True, use_canonical_id=False):
         obi_version, context_iri = get_obi_context(obi_version)
         json = OrderedDict({'@context': context_iri})
@@ -659,7 +678,7 @@ class BadgeClass(ResizeUploadedImage,
 
         # image
         if self.image:
-            image_url = OriginSetting.HTTP + reverse('badgeclass_image', kwargs={'entity_id': self.entity_id})
+            image_url = self.image_url(public=True)
             json['image'] = image_url
             if self.original_json:
                 original_json = self.get_original_json()
@@ -798,7 +817,9 @@ class BadgeInstance(BaseAuditedModel,
 
         return extended_json
 
-    def image_url(self):
+    def image_url(self, public=False):
+        if public:
+            return OriginSetting.HTTP + reverse('badgeinstance_image', kwargs={'entity_id': self.entity_id})
         if getattr(settings, 'MEDIA_URL').startswith('http'):
             return default_storage.url(self.image.name)
         else:
@@ -1053,7 +1074,7 @@ class BadgeInstance(BaseAuditedModel,
             ('badge', add_obi_version_ifneeded(self.cached_badgeclass.jsonld_id, obi_version)),
         ])
 
-        image_url = OriginSetting.HTTP + reverse('badgeinstance_image', kwargs={'entity_id': self.entity_id})
+        image_url = self.image_url(public=True)
         json['image'] = image_url
         if self.original_json:
             image_info = self.get_original_json().get('image', None)

@@ -177,6 +177,7 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         issuer.save()
 
         issuer_data = self.client.get('/v2/issuers/{}'.format(issuer.entity_id)).data['result'][0]
+        self.assertIn('{}/image'.format(issuer_data['entityId']), issuer_data['image'])  # canonical image url
         put_data = {
             'name': 'Test Issuer Updated',
             'url': issuer_data['url'],
@@ -706,6 +707,8 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
 
         response = self.client.post('/v2/issuers', new_issuer_props)
         self.assertEqual(response.status_code, 201)
+        result = response.data['result'][0]
+        self.assertIn('{}/image'.format(result['entityId']), result['image'])  # canonical image url
 
         response = self.client.post('/v1/issuer/issuers', new_issuer_props)
         self.assertEqual(response.status_code, 201)
