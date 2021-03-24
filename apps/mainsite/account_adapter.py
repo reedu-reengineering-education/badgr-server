@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import resolve, Resolver404, reverse
+from django.utils.safestring import mark_safe
 
 from badgeuser.authcode import authcode_for_accesstoken
 from badgeuser.models import CachedEmailAddress
@@ -149,7 +150,7 @@ class BadgrAccountAdapter(DefaultAccountAdapter):
         ctx = {
             "user": emailconfirmation.email_address.user,
             "email": emailconfirmation.email_address,
-            "activate_url": activate_url,
+            "activate_url": mark_safe(activate_url),
             "current_site": current_site,
             "key": emailconfirmation.key,
             "badgr_app": badgr_app,
