@@ -583,6 +583,11 @@ class SAML2Tests(BadgrTestCase):
         Saml2Account.objects.get(user=t_user)  # There is a Saml account associated with the user.
         CachedEmailAddress.objects.get(email=email2, user=t_user, verified=True, primary=False)  # User has the email.
 
+        email3 = 'exampleuser_moredifferent@example.com'
+        resp = auto_provision(fake_request, [email2, email3], t_user.first_name, t_user.last_name, self.config)
+
+        CachedEmailAddress.objects.get(email=email3, user=t_user, verified=True, primary=False)  # User has new email.
+
     def test_can_extract_custom_userdata(self):
         self.config.custom_settings = json.dumps({
             'first_name': ['customMyClientFirstName']

@@ -413,7 +413,7 @@ def auto_provision(request, emails, first_name, last_name, config):
         processed_emails = [ee.lower() for ee in existing_emails]
         unused = [e for e in emails if e.lower() not in processed_emails]
         for e in unused:
-            CachedEmailAddress.objects.create(email=e, user=saml2_account.user)
+            CachedEmailAddress.objects.create(email=e, user=saml2_account.user, verified=True)
         return redirect(redirect_user_to_login(saml2_account.user))
 
     # Check if any/all of the claimed emails already exist as verified
