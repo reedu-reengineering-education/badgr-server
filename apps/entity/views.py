@@ -3,6 +3,7 @@ from django import http
 import six
 from django.db.models import ProtectedError
 from rest_framework import views, exceptions, status
+from rest_framework.exceptions import UnsupportedMediaType
 from rest_framework.response import Response
 
 from backpack.serializers_bcv1 import BadgeConnectErrorSerializer
@@ -51,6 +52,10 @@ def exception_handler(exc, context):
         elif isinstance(exc, ProtectedError):
             description, protected_objects = exc.args
             response_code = status.HTTP_400_BAD_REQUEST
+
+        elif isinstance(exc, UnsupportedMediaType):
+            description = exc.detail
+            response_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
 
         elif isinstance(exc, exceptions.APIException):
             field_errors = exc.detail
