@@ -22,6 +22,7 @@ from django.test import override_settings, TransactionTestCase
 from django.utils import timezone
 
 from rest_framework import serializers
+from rest_framework.exceptions import UnsupportedMediaType
 from oauth2_provider.models import AccessToken, Application
 
 from badgeuser.models import BadgeUser, CachedEmailAddress
@@ -565,3 +566,20 @@ class TestRemoteFileToStorage(SetupIssuerHelper, BadgrTestCase):
 
         self.assertTrue(storage_name.endswith(expected_extension))
         self.assertTrue(default_storage.size(storage_name) > 0)
+
+
+    @responses.activate
+    def test_fetch_remote_file_to_storage_with_an_unsupported_mimetype_throws_UnsupportedMediaType(self):
+        responses.add(
+            responses.GET,
+            self.test_url,
+            body=open(self.get_test_jpeg_image_path(), 'rb').read(),
+            status=200
+        )
+
+        with self.assertRaises(UnsupportedMediaType):
+            status_code, storage_name = fetch_remote_file_to_storage(
+                self.test_url,
+                upload_to=self.test_uploaded_path,
+                allowed_mime_types= ['image/png', 'image/svg+xml']
+            )
