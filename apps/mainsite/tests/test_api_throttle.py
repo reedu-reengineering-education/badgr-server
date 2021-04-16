@@ -64,10 +64,7 @@ class BackoffTests(BadgrTestCase):
         backoff = iterate_backoff_count(None, ip1)
         backoff = iterate_backoff_count(backoff, ip2)
         backoff = iterate_backoff_count(backoff, ip2)
-        backoff[ip2]['until'] = timezone.now() - timedelta(minutes=1)
+        backoff[ip2]['until'] = timezone.now() - timedelta(hours=2)
 
         backoff = iterate_backoff_count(backoff, ip1)
         self.assertIsNone(backoff.get(ip2))  # The expired "until" has been expunged
-
-
-

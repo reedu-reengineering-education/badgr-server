@@ -278,7 +278,8 @@ def _expunge_stale_backoffs(backoff):
     backoff_keys = list(backoff.keys())
     for key in backoff_keys:
         try:
-            if backoff[key]['until'] < timezone.now():
+            an_hour_ago = timezone.now() - timezone.timedelta(hours=1)
+            if backoff[key]['until'] < an_hour_ago:
                 raise ValueError('This client_ip backoff is expired and can be removed')
         except (ValueError, TypeError, KeyError,) as e:
             del backoff[key]
