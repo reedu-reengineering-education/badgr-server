@@ -245,7 +245,7 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         cache.clear()
         password = 'secret'
         user = self.setup_user(authenticate=False, password=password, email='testemail233@example.test')
-        backoff_key = backoff_cache_key(user.email, '127.0.0.1')
+        backoff_key = backoff_cache_key(user.email)
         application = Application.objects.create(
             client_id='public',
             client_secret='',
@@ -270,19 +270,19 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         post_data['password'] = 'bad_and_incorrect'
         response = self.client.post('/o/token', data=post_data)
         self.assertEqual(response.status_code, 400)
-        backoff_data = cache.get(backoff_key)
+        backoff_data = cache.get(backoff_key)['127.0.0.1']
         self.assertEqual(backoff_data['count'], 1)
         backoff_time = backoff_data['until']
 
         post_data['password'] = password  # Now try the correct password
         response = self.client.post('/o/token', data=post_data)
         self.assertEqual(response.status_code, 429)
-        backoff_data = cache.get(backoff_key)
+        backoff_data = cache.get(backoff_key)['127.0.0.1']
         self.assertEqual(backoff_data['count'], 1, "Count does not increase if correct password sent too soon")
         self.assertGreaterEqual(backoff_data['until'], backoff_time, "backoff time should not increase.")
 
         backoff_data['until'] = backoff_time - timezone.timedelta(seconds=3)  # reset to a time in the past
-        cache.set(backoff_key, backoff_data)
+        cache.set(backoff_key, {'127.0.0.1': backoff_data})
 
         response = self.client.post('/o/token', data=post_data)
         self.assertEqual(response.status_code, 200)

@@ -282,6 +282,9 @@ def _expunge_stale_backoffs(backoff):
                 raise ValueError('This client_ip backoff is expired and can be removed')
         except (ValueError, TypeError, KeyError,) as e:
             del backoff[key]
+
+    if not len(backoff):
+        return
     return backoff
 
 
@@ -316,7 +319,7 @@ def throttleable(f):
         client_ip = client_ip_from_request(request)
         backoff = cache.get(backoff_cache_key(username))
 
-        if backoff is not None:
+        if backoff is not None and len(backoff):
             backoff_for_ip = backoff.get(client_ip, dict())
 
             if max_backoff != 0 and not _request_authenticated_with_admin_scope(request):

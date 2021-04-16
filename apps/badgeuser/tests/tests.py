@@ -549,8 +549,8 @@ class UserEmailTests(BadgrTestCase):
             'email': self.first_user_email
         })
 
-        backoff_key = backoff_cache_key(self.first_user_email, None)
-        backoff_data = {'count': 6, 'until': timezone.now() + timezone.timedelta(seconds=60)}
+        backoff_key = backoff_cache_key(self.first_user_email)
+        backoff_data = {'127.0.0.1': {'count': 6, 'until': timezone.now() + timezone.timedelta(seconds=60)}}
         cache.set(backoff_key, backoff_data)
         self.assertEqual(cache.get(backoff_key), backoff_data)
 
@@ -828,7 +828,7 @@ class UserRecipientIdentifierTests(SetupIssuerHelper, BadgrTestCase):
         user = self.setup_user(create_email_address=False)
         v2serialized = BadgeUserSerializerV2(user).data['result'][0]
         self.assertEqual(None, v2serialized['recipient'])
-        
+
         url = 'http://example.com'
         phone = '+15413428456'
         user.userrecipientidentifier_set.create(
