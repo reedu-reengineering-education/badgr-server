@@ -1,7 +1,10 @@
 from django.test import override_settings
+from django.utils import timezone
+from django.utils.timezone import timedelta
 
 from mainsite.tests.base import BadgrTestCase
-from mainsite.utils import clamped_backoff_in_seconds, iterate_backoff_count
+from mainsite.utils import (_expunge_stale_backoffs, clamped_backoff_in_seconds, clear_backoff_count_for_ip,
+                            iterate_backoff_count,)
 
 SETTINGS_OVERRIDE = {
     'TOKEN_BACKOFF_MAXIMUM_SECONDS': 3600,
@@ -34,9 +37,37 @@ class BackoffTests(BadgrTestCase):
 
     @override_settings(**SETTINGS_OVERRIDE)
     def test_iterate_backoff_count(self):
-        backoff = {
-            'count': 1
-        }
+        ip1 = '1.2.3.4'
+        backoff = iterate_backoff_count(None, ip1)
 
-        new_backoff = iterate_backoff_count(backoff)
-        self.assertEqual(new_backoff['count'], 2)
+        new_backoff = iterate_backoff_count(backoff, ip1)
+        self.assertEqual(new_backoff[ip1]['count'], 2)
+
+    def test_backoff_manipulation_for_client_ip(self):
+        ip1 = '1.2.3.4'
+        ip2 = '4.5.6.7'
+        backoff = iterate_backoff_count(None, ip1)
+        self.assertEqual(backoff[ip1]['count'], 1)
+
+        backoff = iterate_backoff_count(backoff, ip1)
+        backoff = iterate_backoff_count(backoff, ip2)
+        self.assertEqual(backoff[ip1]['count'], 2)
+        self.assertEqual(backoff[ip2]['count'], 1)
+
+        backoff = clear_backoff_count_for_ip(backoff, ip1)
+        self.assertIsNone(backoff.get(ip1))
+        self.assertEqual(backoff[ip2]['count'], 1)
+
+    def test_backoff_expunging_past_entries(self):
+        ip1 = '1.2.3.4'
+        ip2 = '4.5.6.7'
+        backoff = iterate_backoff_count(None, ip1)
+        backoff = iterate_backoff_count(backoff, ip2)
+        backoff = iterate_backoff_count(backoff, ip2)
+        backoff[ip2]['until'] = timezone.now() - timedelta(minutes=1)
+
+        backoff = iterate_backoff_count(backoff, ip1)
+        self.assertIsNone(backoff.get(ip2))  # The expired "until" has been expunged
+
+
+

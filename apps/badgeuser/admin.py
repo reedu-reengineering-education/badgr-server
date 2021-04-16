@@ -1,6 +1,7 @@
 from django.contrib.admin import ModelAdmin, TabularInline
 from django.core.cache import cache
 from django.utils import timezone
+from django.utils.html import format_html
 from django_object_actions import DjangoObjectActions
 
 from externaltools.models import ExternalToolUserActivation
@@ -65,24 +66,25 @@ class BadgeUserAdmin(DjangoObjectActions, ModelAdmin):
 
     def clear_login_backoff(self, request, obj):
         for email in obj.all_verified_recipient_identifiers:
-            cache_key = backoff_cache_key(username=email)
+            cache_key = backoff_cache_key(email)
             cache.delete(cache_key)
     clear_login_backoff.label = "Clear login backoffs"
     clear_login_backoff.short_description = "Remove blocks created by failed login attempts"
 
     def login_backoff(self, obj):
-        out = []
+        blocks = []
         for email in obj.all_verified_recipient_identifiers:
-            cache_key = backoff_cache_key(username=email)
+            cache_key = backoff_cache_key(email)
             backoff = cache.get(cache_key)
             if backoff is not None:
-                out.append("<div><strong>{email}</strong>: <span>{until}</span> <span>({count} attempts)</span></div>".format(
-                    email=email,
-                    until=backoff.get('until').astimezone(timezone.get_current_timezone()).strftime("%Y-%m-%d %H:%M:%S"),
-                    count=backoff.get('count')
-                ))
-        if len(out):
-            return "".join(out)
+                blocks += ["{email} - {ip}: {until} ({count} attempts)".format(
+                        email=email, ip=key,
+                        until=backoff[key].get('until').astimezone(timezone.get_current_timezone()).strftime("%Y-%m-%d %H:%M:%S"),
+                        count=backoff[key].get('count')
+                    ) for key in backoff.keys()]
+        if len(blocks):
+            return format_html("<ul><li>{}</li></ul>".format("</li><li>".join(blocks)))
+        return "None"
     login_backoff.allow_tags = True
 
 badgr_admin.register(BadgeUser, BadgeUserAdmin)
