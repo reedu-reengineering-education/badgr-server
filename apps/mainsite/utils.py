@@ -50,6 +50,7 @@ slugify_function_path = \
 
 slugify = get_callable(slugify_function_path)
 
+
 def installed_apps_list():
     installed_apps = []
     for app in ('issuer', 'composition', 'badgebook'):
@@ -70,9 +71,8 @@ def client_ip_from_request(request):
     return ip
 
 
-def backoff_cache_key(username=None, client_ip=None):
-    client_descriptor = username if username else client_ip
-    return "failed_token_backoff_{}".format(client_descriptor)
+def backoff_cache_key(client_descriptor=""):
+    return "failed_auth_backoff_{}".format(client_descriptor)
 
 
 class OriginSettingsObject(object):
@@ -274,12 +274,41 @@ def clamped_backoff_in_seconds(backoff_count):
     )
 
 
-def iterate_backoff_count(backoff):
-    if backoff is None:
-        backoff = {'count': 0}
-    backoff['count'] += 1
-    backoff['until'] = timezone.now() + datetime.timedelta(seconds=clamped_backoff_in_seconds(backoff['count']))
+def _expunge_stale_backoffs(backoff):
+    backoff_keys = list(backoff.keys())
+    for key in backoff_keys:
+        try:
+            an_hour_ago = timezone.now() - timezone.timedelta(hours=1)
+            if backoff[key]['until'] < an_hour_ago:
+                raise ValueError('This client_ip backoff is expired and can be removed')
+        except (ValueError, TypeError, KeyError,) as e:
+            del backoff[key]
+
+    if not len(backoff):
+        return
     return backoff
+
+
+def iterate_backoff_count(backoff, client_ip):
+    if backoff is None:
+        backoff = dict()
+    if backoff.get(client_ip) is None:
+        backoff[client_ip] = {'count': 0}
+    backoff[client_ip]['count'] += 1
+    backoff[client_ip]['until'] = timezone.now() + datetime.timedelta(
+        seconds=clamped_backoff_in_seconds(backoff[client_ip]['count'])
+    )
+
+    return _expunge_stale_backoffs(backoff)
+
+
+def clear_backoff_count_for_ip(backoff, client_ip):
+    if backoff is None:
+        return
+
+    if backoff.get(client_ip) is not None:
+        del backoff[client_ip]
+    return _expunge_stale_backoffs(backoff)
 
 
 def throttleable(f):
@@ -287,38 +316,41 @@ def throttleable(f):
     def wrapper(*args, **kw):
         max_backoff = getattr(settings, 'TOKEN_BACKOFF_MAXIMUM_SECONDS', 3600)  # max is 1 hour. Set to 0 to disable.
         request = args[0].request
-        username = request.POST.get('username')
+        username = request.POST.get('username', request.POST.get('client_id', None))
         client_ip = client_ip_from_request(request)
-        backoff = cache.get(backoff_cache_key(username, client_ip))
+        backoff = cache.get(backoff_cache_key(username))
 
-        if backoff is not None and max_backoff != 0 and not _request_authenticated_with_admin_scope(request):
-            backoff_until = backoff.get('until', None)
-            if backoff_until > timezone.now():
-                # Don't increase the backoff count, just return 429.
-                return HttpResponse(json.dumps({
-                    "error_description": "Too many login attempts. Please wait and try again.",
-                    "error": "login attempts throttled",
-                    "expires": clamped_backoff_in_seconds(backoff.get('count')),
-                }), status=HTTP_429_TOO_MANY_REQUESTS)
+        if backoff is not None and len(backoff):
+            backoff_for_ip = backoff.get(client_ip, dict())
+
+            if max_backoff != 0 and not _request_authenticated_with_admin_scope(request):
+                backoff_until = backoff_for_ip.get('until', None)
+                if backoff_until and backoff_until > timezone.now():
+                    # Don't increase the backoff count, just return 429.
+                    return HttpResponse(json.dumps({
+                        "error_description": "Too many login attempts. Please wait and try again.",
+                        "error": "login attempts throttled",
+                        "expires": clamped_backoff_in_seconds(backoff_for_ip.get('count')),
+                    }), status=HTTP_429_TOO_MANY_REQUESTS)
 
         try:
             result = f(*args, **kw)  # execute the decorated function
 
             if 200 <= result.status_code < 300:
                 cache.set(
-                    backoff_cache_key(username, client_ip),
-                    None
+                    backoff_cache_key(username),
+                    clear_backoff_count_for_ip(backoff, client_ip)
                 )  # clear any existing backoff
             else:
                 cache.set(
-                    backoff_cache_key(username, client_ip),
-                    iterate_backoff_count(backoff),
+                    backoff_cache_key(username),
+                    iterate_backoff_count(backoff, client_ip),
                     timeout=max_backoff
                 )
         except Exception as e:
             cache.set(
-                backoff_cache_key(username, client_ip),
-                iterate_backoff_count(backoff),
+                backoff_cache_key(username),
+                iterate_backoff_count(backoff, client_ip),
                 timeout=max_backoff
             )
             raise e

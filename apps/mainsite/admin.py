@@ -2,8 +2,10 @@ import requests
 from allauth.socialaccount.models import SocialToken, SocialAccount
 from django.contrib import messages
 from django.contrib.admin import AdminSite, ModelAdmin, StackedInline, TabularInline
+from django.core.cache import cache
 from django.http import HttpResponseRedirect
-from django.shortcuts import reverse
+from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.module_loading import autodiscover_modules
 from django.utils.translation import ugettext_lazy
 from django_object_actions import DjangoObjectActions
@@ -13,7 +15,7 @@ from oauth2_provider.models import get_application_model, get_grant_model, get_a
 import badgrlog
 from badgeuser.models import CachedEmailAddress, ProxyEmailConfirmation
 from mainsite.models import BadgrApp, EmailBlacklist, ApplicationInfo, AccessTokenProxy, LegacyTokenProxy
-from mainsite.utils import set_url_query_params
+from mainsite.utils import backoff_cache_key, set_url_query_params
 
 badgrlogger = badgrlog.BadgrLogger()
 
@@ -114,16 +116,25 @@ RefreshToken = get_refresh_token_model()
 class ApplicationInfoInline(StackedInline):
     model = ApplicationInfo
     extra = 1
-    fields = ('name', 'icon', 'website_url', 'terms_uri', 'policy_uri', 'software_id', 'software_version',
-              'allowed_scopes', 'trust_email_verification', 'default_launch_url', 'issue_refresh_token',)
+    fieldsets = (
+        ('Service Info', {'fields': ('name', 'icon', 'website_url', 'terms_uri', 'policy_uri', 'software_id',
+                                     'software_version', 'default_launch_url')}),
+        ('Configuration', {'fields': ('allowed_scopes', 'trust_email_verification', 'issue_refresh_token')}),
+    )
     readonly_fields = ('default_launch_url',)
 
 
 class ApplicationInfoAdmin(DjangoObjectActions, ApplicationAdmin):
+    fieldsets = (
+        (None, {'fields': ('name', 'client_id', 'client_secret', 'client_type', 'authorization_grant_type', 'user',
+                           'redirect_uris',)}),
+        ('Permissions', {'fields': ('skip_authorization', 'login_backoff',)}),
+    )
+    readonly_fields = ('login_backoff',)
     inlines = [
         ApplicationInfoInline
     ]
-    change_actions = ['launch', ]
+    change_actions = ['launch', 'clear_login_backoff']
 
     def launch(self, request, obj):
         if obj.authorization_grant_type != Application.GRANT_AUTHORIZATION_CODE:
@@ -135,6 +146,25 @@ class ApplicationInfoAdmin(DjangoObjectActions, ApplicationAdmin):
             scope=obj.applicationinfo.allowed_scopes
         )
         return HttpResponseRedirect(launch_url)
+
+    def clear_login_backoff(self, request, obj):
+        cache_key = backoff_cache_key(obj.client_id)
+        cache.delete(cache_key)
+    clear_login_backoff.label = "Clear login backoffs"
+    clear_login_backoff.short_description = "Remove blocks created by failed login attempts"
+
+    def login_backoff(self, obj):
+        cache_key = backoff_cache_key(obj.client_id)
+        backoff = cache.get(cache_key)
+        if backoff is not None:
+            backoff_data = "</li><li>".join(["{ip}: {until} ({count} attempts)".format(
+                ip=key,
+                until=backoff[key].get('until').astimezone(timezone.get_current_timezone()).strftime("%Y-%m-%d %H:%M:%S"),
+                count=backoff[key].get('count')
+            ) for key in backoff.keys()])
+            return format_html("<ul><li>{}</li></ul>".format(backoff_data))
+        return "None"
+    login_backoff.allow_tags = True
 
 badgr_admin.register(Application, ApplicationInfoAdmin)
 # badgr_admin.register(Grant, GrantAdmin)
