@@ -18,8 +18,8 @@ import uuid
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
-from django.core.exceptions import SuspiciousFileOperation
 from django.core.files.storage import DefaultStorage
+from rest_framework.exceptions import UnsupportedMediaType
 from django.urls import get_callable
 from django.http import HttpResponse
 from django.utils import timezone
@@ -189,7 +189,7 @@ def fetch_remote_file_to_storage(remote_url,
     RESIZABLE_MIME_TYPES = ['image/png']
 
     if not allowed_mime_types:
-        raise SuspiciousFileOperation("allowed mime types must be passed in")
+        raise UnsupportedMediaType("Allowed mime types must be passed in.")
 
     magic_strings = None
     content = None
@@ -233,10 +233,14 @@ def fetch_remote_file_to_storage(remote_url,
             stripped_svg_string = ET.tostring(stripped_svg_element)
 
         if derived_mime_type not in allowed_mime_types:
-            raise SuspiciousFileOperation("{} is not an allowed mime type for upload".format(derived_mime_type))
+            magic_string_info = max(magic_strings, key=lambda ms: ms.confidence and ms.extension and ms.mime_type)
+            raise UnsupportedMediaType(media_type="{} {}".format(
+                getattr(magic_string_info, 'mime_type', 'Unknown'),
+                getattr(magic_string_info, 'extension', 'Unknown')
+            ))
 
         if not derived_ext:
-            raise SuspiciousFileOperation("could not determine a file extension")
+            raise UnsupportedMediaType(media_type="Unknown file extension.")
 
         string_to_write_to_file = stripped_svg_string or content
 
