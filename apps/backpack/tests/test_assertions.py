@@ -808,7 +808,7 @@ class TestBadgeUploads(BadgrTestCase):
                 '/v1/earner/badges', post_input
             )
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 415)
 
         get_response = self.client.get('/v1/earner/badges')
         self.assertEqual(get_response.status_code, 200)

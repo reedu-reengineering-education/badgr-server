@@ -364,7 +364,7 @@ class BadgeConnectOAuthTests(BadgrTestCase, SetupIssuerHelper):
 
     def test_registration_when_logo_uri_is_not_svg_or_png(self):
         response = self.register_and_process_logo_uri(self.get_test_jpeg_image_path())
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 415)
 
 
     def test_reject_different_domains(self):

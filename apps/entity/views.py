@@ -55,6 +55,7 @@ def exception_handler(exc, context):
 
         elif isinstance(exc, UnsupportedMediaType):
             description = exc.detail
+            validation_errors = [exc.detail]
             response_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
 
         elif isinstance(exc, exceptions.APIException):
