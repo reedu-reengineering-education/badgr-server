@@ -383,6 +383,8 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         else:
             # issuer is required on create
             raise serializers.ValidationError({"issuer": "This field is required"})
+        if 'criteria_url' not in validated_data  and 'criteria_text' not in validated_data:
+            raise serializers.ValidationError("A criteria_url or criteria_test is required.")
 
         if not IsEditor().has_object_permission(self.context.get('request'), None, validated_data['issuer']):
             raise serializers.ValidationError({"issuer": "You do not have permission to edit badges on this issuer."})
