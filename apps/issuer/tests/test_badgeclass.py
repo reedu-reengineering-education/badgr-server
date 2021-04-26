@@ -129,7 +129,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             'name': 'Test Badge',
             'description': "A testing badge",
             'image': self.get_test_image_base64(),
-            'criteria': 'http://wikipedia.org/Awesome',
+            'criteriaUrl': 'http://wikipedia.org/Awesome',
             'issuer': test_issuer.entity_id,
         }
 
@@ -263,7 +263,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             'name': 'Expiring Badge',
             'description': "A testing badge that expires",
             'image': self.get_test_image_base64(),
-            'criteria': 'http://wikipedia.org/Awesome',
+            'criteriaUrl': 'http://wikipedia.org/Awesome',
             'issuer': test_issuer.entity_id,
         }
 
@@ -671,7 +671,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             badgeclass_props = {
                 'name': 'Badge of Awesome',
                 'description': 'An awesome badge only awarded to awesome people or non-existent test entities',
-                'criteriaText': 'http://wikipedia.org/Awesome',
+                'criteriaNarrative': 'http://wikipedia.org/Awesome',
             }
 
             response = self.client.post(
@@ -962,7 +962,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
                 'name': 'Badge of Awesome',
                 'description': "An awesome badge only awarded to awesome people or non-existent test entities",
                 'image': self._base64_data_uri_encode(badge_image, "image/png"),
-                'criteria': 'http://wikipedia.org/Awesome',
+                'criteriaUrl': 'http://wikipedia.org/Awesome',
                 'alignments': alignments,
                 'issuer': self.issuer.entity_id
             }
@@ -1038,9 +1038,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
                 'name': 'Badge of Awesome',
                 'description': "An awesome badge only awarded to awesome people or non-existent test entities",
                 'image': self._base64_data_uri_encode(badge_image, "image/png"),
-                'criteria': {
-                    'url': 'http://wikipedia.org/Awesome',
-                },
+                'criteriaUrl': 'http://wikipedia.org/Awesome',
                 'issuer': self.issuer.entity_id,
                 'tags': tags,
             }
@@ -1208,6 +1206,42 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['result'][0]['name'], badgeclass_data['name'])
 
+    def test_create_badgeclass_without_criteria_v2_bad_request(self):
+        image_path = self.get_test_image_path()
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.issuer = test_issuer
+        with open(image_path, 'rb') as badge_image:
+            badgeclass_props = {
+                'name': 'Badge of Slugs',
+                'description': "Recognizes slimy learners with a penchant for lettuce",
+                'image': self._base64_data_uri_encode(badge_image, 'image/png')
+            }
+        response = self.client.post(
+            '/v2/issuers/{}/badgeclasses'.format(test_issuer.entity_id),
+            badgeclass_props, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["validationErrors"][0], "A criteria_url or criteria_test is required.")
+
+    def test_create_badgeclass_without_criteria_v1_bad_request(self):
+        image_path = self.get_test_image_path()
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.issuer = test_issuer
+        with open(image_path, 'rb') as badge_image:
+            example_badgeclass_props = {
+                'name': 'Badge of Awesome',
+                'description': "An awesome badge only awarded to awesome people or non-existent test entities",
+                'image': self._base64_data_uri_encode(badge_image, 'image/png')
+            }
+        response = self.client.post(
+            '/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
+            data=example_badgeclass_props,
+            format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["validationErrors"][0], "One or both of the criteria_text and criteria_url fields must be provided")
 
 class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_badgeclasses(self):
