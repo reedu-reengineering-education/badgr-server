@@ -241,7 +241,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
         if 'criteria' in data:
             if 'criteria_url' in data or 'criteria_text' in data:
                 raise serializers.ValidationError(
-                    "The criteria field is mutually-exclusive with the criteria_url and criteria_text fields------"
+                    "The criteria field is mutually-exclusive with the criteria_url and criteria_text fields"
                 )
 
             if utils.is_probable_url(data.get('criteria')):
