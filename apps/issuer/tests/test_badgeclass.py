@@ -1184,7 +1184,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.get('/public/assertions/{}.json?expand=badge&expand=badge.issuer'.format(assertion_slug))
         self.assertEqual(response.data['badge']['issuer']['name'], 'Issuer 1 updated')
 
-    def can_create_badgeclass_with_serverAdmin_token(self):
+    def test_can_create_badgeclass_with_serverAdmin_token(self):
         issuer_owner = self.setup_user(authenticate=False)
         admin_user = self.setup_user(authenticate=True, verified=True, token_scope='rw:serverAdmin')
         test_issuer = self.setup_issuer(owner=issuer_owner)
@@ -1193,7 +1193,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             'name': 'Test Badge',
             'description': "A testing badge",
             'image': self.get_test_image_base64(),
-            'criteria': 'http://wikipedia.org/Awesome',
+            'criteriaUrl': 'http://wikipedia.org/Awesome',
             'issuer': test_issuer.entity_id,
         }
 
