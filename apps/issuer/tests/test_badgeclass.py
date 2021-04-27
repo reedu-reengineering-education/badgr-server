@@ -1241,7 +1241,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             format="json"
         )
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["validationErrors"][0], "One or both of the criteria_text and criteria_url fields must be provided")
+        self.assertEqual(response.data["non_field_errors"][0], "One or both of the criteria_text and criteria_url fields must be provided")
 
 class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_badgeclasses(self):
