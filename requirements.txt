@@ -57,7 +57,7 @@ django-markdownify==0.1.0
 bleach==3.3.0
 
 # Open Badges related utilities
-badgecheck==1.1.6
+badgecheck==1.1.7
 # TODO replace badgecheck with openbadges after openbadges next release resolving dependency conflicts
 # openbadges==1.1.1
 openbadges-bakery==1.2.4
