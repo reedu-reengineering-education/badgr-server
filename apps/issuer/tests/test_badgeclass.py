@@ -55,9 +55,9 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             test_issuer = self.setup_issuer(owner=test_user)
             self.issuer = test_issuer
             response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
-                                        data=example_badgeclass_props,
-                                        format="json"
-                                        )
+                data=example_badgeclass_props,
+                format="json"
+            )
             self.assertEqual(response.status_code, 201)
             self.assertIn('slug', response.data)
             new_badgeclass_slug = response.data.get('slug')
@@ -115,9 +115,9 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             IssuerStaff.objects.create(issuer=test_issuer, user=test_user, role=IssuerStaff.ROLE_STAFF)
             self.issuer = test_issuer
             response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
-                                        data=example_badgeclass_props,
-                                        format="json"
-                                        )
+                data=example_badgeclass_props,
+                format="json"
+            )
             self.assertEqual(response.status_code, 404)
 
     def test_v2_post_put_badgeclasses_permissions(self):
@@ -416,8 +416,8 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             test_user = self.setup_user(authenticate=True)
             test_issuer = self.setup_issuer(owner=test_user)
             response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
-                                        badgeclass_props
-                                        )
+                badgeclass_props
+            )
             self.assertEqual(response.status_code, 400)
 
     def test_cannot_create_badgeclass_if_unauthenticated(self):
@@ -521,8 +521,8 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             # should not create badge that has images in markdown
             badgeclass_props['criteria'] = 'This is invalid ![foo](image-url) markdown'
             response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
-                                        badgeclass_props
-                                        )
+                badgeclass_props
+            )
             self.assertEqual(response.status_code, 400)
 
     def test_can_create_badgeclass_with_valid_markdown(self):
@@ -540,8 +540,8 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             # valid markdown should be saved but html tags stripped
             badgeclass_props['criteria'] = 'This is *valid* markdown <p>mixed with raw</p> <script>document.write("and abusive html")</script>'
             response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
-                                        badgeclass_props
-                                        )
+                badgeclass_props
+            )
             self.assertEqual(response.status_code, 201)
             self.assertIsNotNone(response.data)
             new_badgeclass = response.data
@@ -651,8 +651,8 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             }
 
             response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
-                                        example_badgeclass_props
-                                        )
+                example_badgeclass_props
+            )
             self.assertEqual(response.status_code, 201)
 
         new_badgelist = self.client.get('/v1/issuer/all-badges')
@@ -763,8 +763,8 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             }
 
             response = self.client.post('/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
-                                        dict(badgeclass_props, image=badge_image),
-                                        )
+                dict(badgeclass_props, image=badge_image),
+            )
             self.assertEqual(response.status_code, 201)
             self.assertIn('slug', response.data)
             badgeclass_slug = response.data.get('slug')
@@ -795,14 +795,14 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
         with open(self.get_testfiles_path('300x300.png'), 'rb') as badge_image:
             post_response = self.client.post('/v1/issuer/issuers/{issuer}/badges'.format(issuer=test_issuer.entity_id),
-                                             dict(badgeclass_props, image=badge_image),
-                                             )
+                dict(badgeclass_props, image=badge_image),
+            )
             self.assertEqual(post_response.status_code, 201)
             slug = post_response.data.get('slug')
 
         put_response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(issuer=test_issuer.entity_id, badge=slug),
             dict(badgeclass_props, image='http://example.com/example.png')
-            )
+        )
         self.assertEqual(put_response.status_code, 200)
 
         new_badgeclass = BadgeClass.objects.get(entity_id=slug)
@@ -824,8 +824,8 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
 
         with open(self.get_testfiles_path('300x300.png'), 'rb') as badge_image:
             post_response = self.client.post('/v1/issuer/issuers/{issuer}/badges'.format(issuer=test_issuer.entity_id),
-                                             dict(badgeclass_props, image=badge_image),
-                                             )
+                dict(badgeclass_props, image=badge_image),
+            )
             self.assertEqual(post_response.status_code, 201)
             slug = post_response.data.get('slug')
 
@@ -833,7 +833,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             put_response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(issuer=test_issuer.entity_id, badge=slug),
                 dict(badgeclass_props, image=new_badge_image),
                 format='multipart'
-                )
+            )
             self.assertEqual(put_response.status_code, 200)
 
             new_badgeclass = BadgeClass.objects.get(entity_id=slug)
@@ -856,9 +856,9 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             }
 
             post_response = self.client.post('/v1/issuer/issuers/{issuer}/badges'.format(issuer=test_issuer.entity_id),
-                                             example_badgeclass_props,
-                                             format='multipart'
-                                             )
+                example_badgeclass_props,
+                format='multipart'
+            )
         self.assertEqual(post_response.status_code, 201)
 
         self.assertIn('slug', post_response.data)
@@ -867,7 +867,7 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(get_response.status_code, 200)
 
         put_response = self.client.put('/v1/issuer/issuers/{issuer}/badges/{badge}'.format(issuer=test_issuer.entity_id, badge=slug),
-            get_response.data, format='json')
+                                       get_response.data, format='json')
         self.assertEqual(put_response.status_code, 200)
 
         self.assertEqual(get_response.data, put_response.data)
