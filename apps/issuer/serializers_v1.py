@@ -229,8 +229,6 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
                 raise serializers.ValidationError(
                     'Changes cannot be made that would leave both criteria_url and criteria_text blank.'
                 )
-
-
             else:
                 instance.criteria_text = end_criteria_text
                 instance.criteria_url = end_criteria_url
