@@ -365,6 +365,18 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         if 'image' in validated_data:
             self.context['save_kwargs'] = dict(force_resize=True)
 
+        # Verify that criteria won't be empty
+        if 'criteria_url' in validated_data or 'criteria_text' in validated_data:
+            end_criteria_url = validated_data['criteria_url'] if 'criteria_url' in validated_data \
+                else instance.criteria_url
+            end_criteria_text = validated_data['criteria_text'] if 'criteria_text' in validated_data \
+                else instance.criteria_text
+
+            if ((end_criteria_url is None or not end_criteria_url.strip())
+                    and (end_criteria_text is None or not end_criteria_text.strip())):
+                raise serializers.ValidationError('Changes cannot be made that would leave both criteria_url and '
+                                                  'criteria_text blank.')
+
         if not IsEditor().has_object_permission(self.context.get('request'), None, instance.issuer):
             raise serializers.ValidationError(
                 {"issuer": "You do not have permission to edit badges on this issuer."})

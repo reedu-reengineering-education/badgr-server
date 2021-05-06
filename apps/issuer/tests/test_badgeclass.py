@@ -1241,7 +1241,143 @@ class BadgeClassTests(SetupIssuerHelper, BadgrTestCase):
             format="json"
         )
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["non_field_errors"][0], "One or both of the criteria_text and criteria_url fields must be provided")
+        self.assertEqual(response.data[0],
+                         "One or both of the criteria_text and criteria_url fields must be provided")
+
+    def test_update_badgeclass_with_null_criteria_v2_bad_request(self):
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.issuer = test_issuer
+
+        badgeclass_data = {
+            'name': 'Test Badge',
+            'description': "A testing badge",
+            'image': self.get_test_image_base64(),
+            'criteriaUrl': 'http://wikipedia.org/Awesome',
+            'issuer': test_issuer.entity_id,
+        }
+
+        # Create Badge without narrative
+        response = self.client.post('/v2/badgeclasses', data=badgeclass_data, format="json")
+        modifyData = response.data['result'][0]
+        modifyData["criteriaUrl"] = None
+
+        # Try to remove url
+        response1 = self.client.put("/v2/badgeclasses/{badge}".format(badge=modifyData.get('entityId')),
+                                    data=modifyData,
+                                    format="json")
+        self.assertEqual(response1.status_code, 400)
+        self.assertEqual(response1.data['validationErrors'][0],
+                         'Changes cannot be made that would leave both criteria_url and criteria_text blank.')
+
+        # Verify that setting one will allow removing the other.
+        modifyData['criteriaNarrative'] = 'Description'
+        response2 = self.client.put("/v2/badgeclasses/{badge}".format(badge=modifyData.get('entityId')),
+                                    data=modifyData,
+                                    format="json")
+        self.assertEqual(response2.status_code, 200)
+
+        # Try to remove narrative
+        modifyData['criteriaNarrative'] = ''
+        response3 = self.client.put("/v2/badgeclasses/{badge}".format(badge=modifyData.get('entityId')),
+                                    data=modifyData,
+                                    format="json")
+        self.assertEqual(response3.status_code, 400)
+        self.assertEqual(response3.data["fieldErrors"]['criteriaNarrative'][0], 'This field may not be blank.')
+
+        # Verify that not sending either won't prevent the changes sent
+        del modifyData["criteriaNarrative"]
+        del modifyData["criteriaUrl"]
+
+        response4 = self.client.put("/v2/badgeclasses/{badge}".format(badge=modifyData.get('entityId')),
+                                    data=modifyData,
+                                    format="json")
+
+        self.assertEqual(response4.status_code, 200)
+        returnedBadge4 = response4.data["result"][0]
+        self.assertEqual(returnedBadge4.get("criteriaNarrative", None), 'Description')
+        self.assertEqual(returnedBadge4.get("criteriaUrl", None), None)
+
+    def test_update_badgeclass_with_null_criteria_v1_bad_request(self):
+        image_path = self.get_test_image_path()
+        test_user = self.setup_user(authenticate=True)
+        test_issuer = self.setup_issuer(owner=test_user)
+        self.issuer = test_issuer
+        with open(image_path, 'rb') as badge_image:
+            example_badgeclass_props = {
+                'name': 'Badge of Awesome',
+                'description': "An awesome badge only awarded to awesome people or non-existent test entities",
+                'image': self._base64_data_uri_encode(badge_image, 'image/png'),
+                'criteria': 'http://wikipedia.org/Awesome',
+            }
+
+        # Create Badge without narrative
+        response = self.client.post(
+            '/v1/issuer/issuers/{slug}/badges'.format(slug=test_issuer.entity_id),
+            data=example_badgeclass_props,
+            format="json")
+
+        modifyData = response.data
+        modifyData["criteria_url"] = None
+
+        response1 = self.client.put(
+                '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                    issuer=test_issuer.entity_id,
+                    badge=modifyData['slug']
+                ),
+                data=modifyData,
+                format="json",
+        )
+
+        self.assertEqual(response1.status_code, 400)
+        self.assertEqual(response1.data[0],
+                         'Changes cannot be made that would leave both criteria_url and criteria_text blank.')
+
+        # Verify that setting one will allow removing the other.
+        modifyData['criteria_text'] = 'Description'
+        response2 = self.client.put(
+            '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_issuer.entity_id,
+                badge=modifyData['slug']
+            ),
+            data=modifyData,
+            format="json",
+        )
+
+        self.assertEqual(response2.status_code, 200)
+
+        # Try to remove narrative
+        modifyData['criteria_text'] = ''
+        response3 = self.client.put(
+            '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_issuer.entity_id,
+                badge=modifyData['slug']
+            ),
+            data=modifyData,
+            format="json",
+        )
+
+        self.assertEqual(response3.status_code, 400)
+        self.assertEqual(response3.data[0],
+                         'Changes cannot be made that would leave both criteria_url and criteria_text blank.')
+
+        # Verify that not sending either won't prevent the changes sent
+        del modifyData["criteria_text"]
+        del modifyData["criteria_url"]
+
+        response4 = self.client.put(
+            '/v1/issuer/issuers/{issuer}/badges/{badge}'.format(
+                issuer=test_issuer.entity_id,
+                badge=modifyData['slug']
+            ),
+            data=modifyData,
+            format="json",
+        )
+
+        self.assertEqual(response4.status_code, 200)
+        self.assertEqual(response4.data.get("criteria_text", None), 'Description')
+        self.assertEqual(response4.data.get("criteria_url", None), None)
+
 
 class BadgeClassesChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
     def test_application_can_get_changed_badgeclasses(self):

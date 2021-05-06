@@ -217,10 +217,21 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
         if new_description:
             instance.description = strip_tags(new_description)
 
-        if 'criteria_text' in validated_data:
-            instance.criteria_text = validated_data.get('criteria_text')
-        if 'criteria_url' in validated_data:
-            instance.criteria_url = validated_data.get('criteria_url')
+        # Assure both criteria_url and criteria_text will not be empty
+        if 'criteria_url' in validated_data or 'criteria_text' in validated_data:
+            end_criteria_url = validated_data['criteria_url'] if  'criteria_url' in validated_data \
+                else instance.criteria_url
+            end_criteria_text = validated_data['criteria_text'] if 'criteria_text' in validated_data \
+                else instance.criteria_text
+
+            if ((end_criteria_url is None or not end_criteria_url.strip())
+                    and (end_criteria_text is None or not end_criteria_text.strip())):
+                raise serializers.ValidationError(
+                    'Changes cannot be made that would leave both criteria_url and criteria_text blank.'
+                )
+            else:
+                instance.criteria_text = end_criteria_text
+                instance.criteria_url = end_criteria_url
 
         if 'image' in validated_data:
             instance.image = validated_data.get('image')
@@ -228,7 +239,6 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
 
         instance.alignment_items = validated_data.get('alignment_items')
         instance.tag_items = validated_data.get('tag_items')
-
 
         instance.expires_amount = validated_data.get('expires_amount', None)
         instance.expires_duration = validated_data.get('expires_duration', None)
@@ -252,13 +262,6 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
                 )
             else:
                 data['criteria_text'] = data.pop('criteria')
-
-        else:
-            if data.get('criteria_text', None) is None and data.get('criteria_url', None) is None:
-                raise serializers.ValidationError(
-                    "One or both of the criteria_text and criteria_url fields must be provided"
-                )
-
         return data
 
     def create(self, validated_data, **kwargs):
@@ -268,6 +271,11 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
 
         if 'issuer' in self.context:
             validated_data['issuer'] = self.context.get('issuer')
+
+        if validated_data.get('criteria_text', None) is None and validated_data.get('criteria_url', None) is None:
+            raise serializers.ValidationError(
+                "One or both of the criteria_text and criteria_url fields must be provided"
+            )
 
         new_badgeclass = BadgeClass.objects.create(**validated_data)
         return new_badgeclass
