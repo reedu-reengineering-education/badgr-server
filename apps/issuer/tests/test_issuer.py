@@ -176,8 +176,9 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
         issuer.badgrapp = self.badgr_app
         issuer.save()
 
-        issuer_data = self.client.get('/v2/issuers/{}'.format(issuer.entity_id)).data['result'][0]
-        self.assertIn('{}/image'.format(issuer_data['entityId']), issuer_data['image'])  # canonical image url
+        first_response = self.client.get('/v2/issuers/{}'.format(issuer.entity_id))
+        self.assertEqual(first_response.status_code, 200)
+        issuer_data = first_response.data['result'][0]
         put_data = {
             'name': 'Test Issuer Updated',
             'url': issuer_data['url'],
@@ -707,8 +708,6 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
 
         response = self.client.post('/v2/issuers', new_issuer_props)
         self.assertEqual(response.status_code, 201)
-        result = response.data['result'][0]
-        self.assertIn('{}/image'.format(result['entityId']), result['image'])  # canonical image url
 
         response = self.client.post('/v1/issuer/issuers', new_issuer_props)
         self.assertEqual(response.status_code, 201)
@@ -818,6 +817,24 @@ class IssuerTests(SetupOAuth2ApplicationHelper, SetupIssuerHelper, BadgrTestCase
             'role': 'staff'
         })
         self.assertEqual(response.status_code, 404)
+
+    def test_issuer_no_image_returns_null(self):
+        test_user = self.setup_user(authenticate=True)
+        CachedEmailAddress.objects.create(
+            user=test_user, email=self.example_issuer_props['email'], verified=True)
+        response = self.client.post('/v1/issuer/issuers', self.example_issuer_props)
+        self.assertEqual(response.data['image'], None)
+        response2 = self.client.get('/v1/issuer/issuers')
+        self.assertEqual(response2.data[0]['image'], None)
+
+        response3 = self.client.post('/v2/issuers', self.example_issuer_props)
+        self.assertEqual(response3.data['result'][0]['image'], None)
+        response3a = self.client.get('/v1/issuer/issuers')
+        self.assertEqual(response3a.data[0]['image'], None)
+        self.assertEqual(response3a.data[1]['image'], None)
+        response4 = self.client.get('/v2/issuers')
+        self.assertEqual(response4.data['result'][0]['image'], None)
+        self.assertEqual(response4.data['result'][1]['image'], None)
 
 
 class IssuersChangedApplicationTests(SetupIssuerHelper, BadgrTestCase):
