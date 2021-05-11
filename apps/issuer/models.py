@@ -821,12 +821,12 @@ class BadgeInstance(BaseAuditedModel,
         return extended_json
 
     def image_url(self, public=False):
-            if public:
-                return OriginSetting.HTTP + reverse('badgeinstance_image', kwargs={'entity_id': self.entity_id})
-            if getattr(settings, 'MEDIA_URL').startswith('http'):
-                return default_storage.url(self.image.name)
-            else:
-                return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
+        if public:
+            return OriginSetting.HTTP + reverse('badgeinstance_image', kwargs={'entity_id': self.entity_id})
+        if getattr(settings, 'MEDIA_URL').startswith('http'):
+            return default_storage.url(self.image.name)
+        else:
+            return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
 
     def get_share_url(self, include_identifier=False):
         url = self.share_url
