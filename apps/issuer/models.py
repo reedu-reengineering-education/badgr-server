@@ -263,12 +263,15 @@ class Issuer(ResizeUploadedImage,
         return OriginSetting.HTTP+self.get_absolute_url()
 
     def image_url(self, public=False):
-        if public:
-            return OriginSetting.HTTP + reverse('issuer_image', kwargs={'entity_id': self.entity_id})
-        if getattr(settings, 'MEDIA_URL').startswith('http'):
-            return default_storage.url(self.image.name)
+        if bool(self.image):
+            if public:
+                return OriginSetting.HTTP + reverse('issuer_image', kwargs={'entity_id': self.entity_id})
+            if getattr(settings, 'MEDIA_URL').startswith('http'):
+                return default_storage.url(self.image.name)
+            else:
+                return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
         else:
-            return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
+            return None
 
     @property
     def jsonld_id(self):
@@ -347,14 +350,14 @@ class Issuer(ResizeUploadedImage,
             url=self.url,
             email=self.email,
             description=self.description))
-        if self.image:
-            image_url = self.image_url(public=True)
-            json['image'] = image_url
-            if self.original_json:
-                image_info = self.get_original_json().get('image', None)
-                if isinstance(image_info, dict):
-                    json['image'] = image_info
-                    json['image']['id'] = image_url
+
+        image_url = self.image_url(public=True)
+        json['image'] = image_url
+        if self.original_json:
+            image_info = self.get_original_json().get('image', None)
+            if isinstance(image_info, dict):
+                json['image'] = image_info
+                json['image']['id'] = image_url
 
         # source url
         if self.source_url:
@@ -818,12 +821,12 @@ class BadgeInstance(BaseAuditedModel,
         return extended_json
 
     def image_url(self, public=False):
-        if public:
-            return OriginSetting.HTTP + reverse('badgeinstance_image', kwargs={'entity_id': self.entity_id})
-        if getattr(settings, 'MEDIA_URL').startswith('http'):
-            return default_storage.url(self.image.name)
-        else:
-            return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
+            if public:
+                return OriginSetting.HTTP + reverse('badgeinstance_image', kwargs={'entity_id': self.entity_id})
+            if getattr(settings, 'MEDIA_URL').startswith('http'):
+                return default_storage.url(self.image.name)
+            else:
+                return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
 
     def get_share_url(self, include_identifier=False):
         url = self.share_url
