@@ -53,7 +53,7 @@ Set or adjust these values in your `settings_local.dev.py` and/or `settings_loca
 * `HELP_EMAIL`:
   - An email address for your support staff. The default is `help@badgr.io`.
 * `BADGR_APPROVED_ISSUERS_ONLY`:
-  - If you choose to use set this value to `True`, that means new user accounts will not be able to define new issuers (though they can be added as staff on issuers defined by others) unless they have the Django user permission 'issuer.add_issuer'. The recommended way to grant users this privilege is to create a group that grants it in the `/staff` admin area and addthe appropriate users to that group.
+  - If you choose to use set this value to `True`, that means new user accounts will not be able to define new issuers (though they can be added as staff on issuers defined by others) unless they have the Django user permission 'issuer.add_issuer'. The recommended way to grant users this privilege is to create a group that grants it in the `/staff` admin area and add the appropriate users to that group.
 * `PINGDOM_MONITORING_ID`:
   - If you use [Pingdom](https://www.pingdom.com/) to monitor site performance, including this setting will embed Pingdom tracking script into the header.
 * `CELERY_ALWAYS_EAGER`:
