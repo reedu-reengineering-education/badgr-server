@@ -1,0 +1,35 @@
+# A dockerized badgr-server stack to emulate a production build
+version: "3.3"
+services:
+  # this container copies in the project code and runs the app with uwsgi
+  api:
+    build:
+      context: .
+    command: uwsgi --ini uwsgi.ini
+    env_file:
+      - .env
+    volumes:
+      - badgr_server_api:/badgr_server
+    networks:
+      - badgr
+
+  # this container runs nginx (webserver) and uses the uwsgi app.sock file from prod_api via a volume
+  nginx:
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile.nginx
+    volumes:
+      - badgr_server_api:/badgr_server
+    depends_on:
+      - "api"
+    networks:
+      - badgr
+    ports:
+      - "8080:80"
+
+networks:
+  badgr:
+    driver: bridge
+
+volumes:
+  badgr_server_api:
