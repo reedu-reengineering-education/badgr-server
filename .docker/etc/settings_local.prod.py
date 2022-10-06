@@ -68,7 +68,10 @@ ANYMAIL = {
         "region_name": env('AWS_REGION'),
     },
 }
-EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
+#EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
+EMAIL_BACKEND = 'django_ses.SESBackend'
+AWS_SES_REGION_NAME = env('AWS_REGION')
+AWS_SES_REGION_ENDPOINT = 'email.eu-central-1.amazonaws.com'
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')  # if you don't already have this in settings
 SERVER_EMAIL = env('SERVER_EMAIL')  # ditto (default from-email for Django errors)
 
