@@ -79,6 +79,7 @@ SERVER_EMAIL = env('SERVER_EMAIL')  # ditto (default from-email for Django error
 #
 ###
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+AWS_QUERYSTRING_AUTH=False
 AWS_ACCESS_KEY_ID=env('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY=env('AWS_ACCESS_KEY_SECRET')
 AWS_STORAGE_BUCKET_NAME=env('AWS_STORAGE_BUCKET_NAME')
