@@ -2,7 +2,6 @@
 *.egg
 settings_local.py
 settings_local.dev.py
-settings_local.prod.py
 .*.sw*
 *~
 .DS_Store
@@ -35,3 +34,5 @@ api_spec_v2.json
 api_spec_bcv1.json
 
 django.log
+
+.env
