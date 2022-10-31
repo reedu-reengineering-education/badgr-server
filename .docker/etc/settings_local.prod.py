@@ -59,19 +59,17 @@ CACHES = {
 # Email Configuration
 #
 ###
-INSTALLED_APPS.append('anymail')
-ANYMAIL = {
-    "AMAZON_SES_CLIENT_PARAMS": {
-        # example: override normal Boto credentials specifically for Anymail
-        "aws_access_key_id": env('AWS_ACCESS_KEY_ID'),
-        "aws_secret_access_key": env('AWS_ACCESS_KEY_SECRET'),
-        "region_name": env('AWS_REGION'),
-    },
-}
-EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+# SMTP Settings
+EMAIL_HOST = env('SMTP_HOST')
+EMAIL_HOST_USER = env('SMTP_USER')
+EMAIL_HOST_PASSWORD = env('SMTP_PASSWORD')
+
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')  # if you don't already have this in settings
 SERVER_EMAIL = env('SERVER_EMAIL')  # ditto (default from-email for Django errors)
 
+HELP_EMAIL = env('HELP_EMAIL')
 
 ###
 #
@@ -110,8 +108,8 @@ BADGR_APPROVED_ISSUERS_ONLY = False
 # Automatically send an email the first time that recipient identifier (email type) has been used on the system.
 GDPR_COMPLIANCE_NOTIFY_ON_FIRST_AWARD = True
 
-SECRET_KEY = env('SECRET_KEY').join(random.choice(string.ascii_uppercase + string.digits) for _ in range(40))
-UNSUBSCRIBE_KEY = env('UNSUBSCRIBE_KEY').join(random.choice(string.ascii_uppercase + string.digits) for _ in range(40))
+SECRET_KEY = env('SECRET_KEY')
+UNSUBSCRIBE_KEY = env('UNSUBSCRIBE_KEY')
 UNSUBSCRIBE_SECRET_KEY = str(SECRET_KEY)
 
 
